@@ -38,7 +38,7 @@ echo "      ✓ Basis-Pakete installiert"
 # 3. Node.js 22 installieren
 # ------------------------------
 echo "[3/7] Node.js 22 installieren..."
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - -qq
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y -qq nodejs
 echo "      ✓ Node.js $(node --version) installiert"
 echo "      ✓ npm $(npm --version) installiert"
@@ -48,7 +48,7 @@ echo "      ✓ npm $(npm --version) installiert"
 # ------------------------------
 echo "[4/7] PM2 installieren (hält Node.js am Laufen)..."
 sudo npm install -g pm2 --quiet
-sudo pm2 startup systemd -u simon --hp /home/simon | tail -1 | sudo bash
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u simon --hp /home/simon
 echo "      ✓ PM2 installiert"
 
 # ------------------------------
