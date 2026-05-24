@@ -1,24 +1,27 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import Layout from './components/Layout';
 
 function PrivateRoute({ children }) {
-    const token = localStorage.getItem('token');
-    return token ? children : <Navigate to="/login" />;
+    const { benutzer } = useAuth();
+    return benutzer ? children : <Navigate to="/login" />;
 }
 
 function App() {
     return (
-        <BrowserRouter>
-            <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/*" element={
-                    <PrivateRoute>
-                        <Dashboard />
-                    </PrivateRoute>
-                } />
-            </Routes>
-        </BrowserRouter>
+        <AuthProvider>
+            <BrowserRouter>
+                <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/*" element={
+                        <PrivateRoute>
+                            <Layout />
+                        </PrivateRoute>
+                    } />
+                </Routes>
+            </BrowserRouter>
+        </AuthProvider>
     );
 }
 
