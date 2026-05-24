@@ -12,6 +12,7 @@ import Aufgaben from '../pages/Aufgaben';
 import Programme from '../pages/Programme';
 import Profil from '../pages/Profil';
 import DossierDetail from '../pages/DossierDetail';
+import KlientDetail from '../pages/KlientDetail';
 
 const NAV = [
     { section: 'Mein Bereich' },
@@ -158,6 +159,7 @@ export default function Layout() {
                     <Route path="/programme" element={<Programme />} />
                     <Route path="/profil"    element={<Profil />} />
                     <Route path="/dossiers/:id" element={<DossierDetail />} />
+                    <Route path="/klienten/:id" element={<KlientDetail />} />
                 </Routes>
             </div>
         </div>

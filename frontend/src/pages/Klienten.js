@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 
 export default function Klienten({ meine }) {
+    const navigate = useNavigate();
     const [klienten, setKlienten] = useState([]);
     const [laden, setLaden] = useState(true);
     const [suche, setSuche] = useState('');
@@ -70,7 +72,7 @@ export default function Klienten({ meine }) {
                             <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', cursor: 'pointer' }}
                                 onMouseOver={e => e.currentTarget.style.background = '#F5F4F0'}
                                 onMouseOut={e => e.currentTarget.style.background = ''}>
-                                <td style={{ padding: '8px 12px', fontWeight: 500, color: '#2563EB' }}>{k.nachname}</td>
+                                <td style={{ padding: '8px 12px', fontWeight: 500, color: '#2563EB', cursor: 'pointer' }} onClick={() => navigate(`/klienten/${k.klient_id}`)}>{k.nachname}</td>
                                 <td style={{ padding: '8px 12px' }}>{k.vorname}</td>
                                 <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>
                                     {k.geburtsdatum ? new Date(k.geburtsdatum).toLocaleDateString('de-CH') : '—'}
