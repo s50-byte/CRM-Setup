@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import client from '../api/client';
+import NeuerTerminModal from '../components/NeuerTerminModal';
 
 const STATUS_STYLE = {
     'Ausstehend': { bg: '#FFFBEB', color: '#B45309', border: 'rgba(217,119,6,.15)' },
@@ -11,6 +12,7 @@ const STATUS_STYLE = {
 export default function Termine() {
     const [termine, setTermine] = useState([]);
     const [laden, setLaden] = useState(true);
+    const [terminModal, setTerminModal] = useState(false);
     const [filter, setFilter] = useState('');
 
     useEffect(() => {
@@ -31,7 +33,7 @@ export default function Termine() {
                     <div style={{ fontSize: 19, fontWeight: 600 }}>Termine</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Erstgespräche, Schnuppereinsätze, Standortgespräche</div>
                 </div>
-                <button style={{
+                <button onClick={() => setTerminModal(true)} style={{
                     padding: '7px 14px', fontSize: 13, fontWeight: 500,
                     cursor: 'pointer', border: 'none', borderRadius: 6,
                     background: '#2563EB', color: '#fff', fontFamily: 'inherit'
@@ -112,6 +114,14 @@ export default function Termine() {
                     </tbody>
                 </table>
             </div>
+            <NeuerTerminModal
+                open={terminModal}
+                onClose={() => setTerminModal(false)}
+                onSaved={() => {
+                    setTerminModal(false);
+                    client.get('/termine').then(r => setTermine(r.data));
+                }}
+            />
         </div>
     );
 }

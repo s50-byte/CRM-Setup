@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import client from '../api/client';
+import NeueAufgabeModal from '../components/NeueAufgabeModal';
 
 const PRIO_STYLE = {
     'Hoch':    { bg: '#FEF2F2', color: '#B91C1C', border: 'rgba(220,38,38,.15)' },
@@ -12,6 +13,7 @@ export default function Aufgaben() {
     const [laden, setLaden] = useState(true);
     const [filterStatus, setFilterStatus] = useState('Offen');
     const [filterPrio, setFilterPrio] = useState('');
+    const [aufgabeModal, setAufgabeModal] = useState(false);
 
     useEffect(() => {
         client.get('/tasks')
@@ -48,6 +50,13 @@ export default function Aufgaben() {
                 background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10,
                 padding: '.5rem .875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)'
             }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                <button onClick={() => setAufgabeModal(true)} style={{
+                    padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                    cursor: 'pointer', border: 'none', borderRadius: 6,
+                    background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                }}>+ Neue Aufgabe</button>
+            </div>
                 <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em' }}>Filter</span>
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{
                     fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
@@ -133,6 +142,14 @@ export default function Aufgaben() {
                     </tbody>
                 </table>
             </div>
+            <NeueAufgabeModal
+                open={aufgabeModal}
+                onClose={() => setAufgabeModal(false)}
+                onSaved={() => {
+                    setAufgabeModal(false);
+                    client.get('/tasks').then(r => setTasks(r.data));
+            }}
+/>
         </div>
     );
 }
