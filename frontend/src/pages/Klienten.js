@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
+import NeuerKlientModal from '../components/NeuerKlientModal';
+import NeueAnfrageModal from '../components/NeueAnfrageModal';
 
 export default function Klienten({ meine }) {
     const navigate = useNavigate();
     const [klienten, setKlienten] = useState([]);
     const [laden, setLaden] = useState(true);
     const [suche, setSuche] = useState('');
+    const [klientModal, setKlientModal] = useState(false);
+    const [anfrageModal, setAnfrageModal] = useState(false);
 
     useEffect(() => {
         client.get('/klienten')
@@ -26,12 +30,18 @@ export default function Klienten({ meine }) {
                     <div style={{ fontSize: 19, fontWeight: 600 }}>{meine ? 'Meine Klienten' : 'Klienten'}</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Stammdaten aller Klientinnen und Klienten</div>
                 </div>
-                <button style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                <div style={{ display: 'flex', gap: 7 }}>
+                 <button onClick={() => setAnfrageModal(true)} style={{
+                    padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                    cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                    background: '#fff', fontFamily: 'inherit', color: '#6B6860'
+                }}>+ Neue Anfrage</button>
+                <button onClick={() => setKlientModal(true)} style={{
                     padding: '7px 14px', fontSize: 13, fontWeight: 500,
                     cursor: 'pointer', border: 'none', borderRadius: 6,
                     background: '#2563EB', color: '#fff', fontFamily: 'inherit'
                 }}>+ Neuer Klient</button>
+            </div>
             </div>
 
             {/* Filterbar */}
@@ -95,6 +105,22 @@ export default function Klienten({ meine }) {
                     </tbody>
                 </table>
             </div>
-        </div>
+            <NeuerKlientModal
+                open={klientModal}
+                onClose={() => setKlientModal(false)}
+                onSaved={() => {
+                    setKlientModal(false);
+                    client.get('/klienten').then(r => setKlienten(r.data));
+                }}
+            />
+            <NeueAnfrageModal
+                open={anfrageModal}
+                onClose={() => setAnfrageModal(false)}
+                onSaved={() => {
+                    setAnfrageModal(false);
+                    client.get('/klienten').then(r => setKlienten(r.data));
+                }}
+            />  
+        </div>  
     );
 }
