@@ -35,7 +35,7 @@ router.post('/login', async (req, res) => {
         // Rollen laden
         const rollenResult = await db.query(
             `SELECT rolle_name, pensum_pct, max_klienten
-             FROM benutzer_rolle WHERE user_id = $1`,
+             FROM benutzer_aufgabe WHERE user_id = $1`,
             [user.user_id]
         );
 

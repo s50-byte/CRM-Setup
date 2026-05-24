@@ -24,7 +24,7 @@ router.get('/', auth, async (req, res) => {
                     '[]'
                 ) AS rollen
              FROM benutzer u
-             LEFT JOIN benutzer_rolle r ON r.user_id = u.user_id
+             LEFT JOIN benutzer_aufgabe r ON r.user_id = u.user_id
              WHERE u.aktiv = TRUE
              GROUP BY u.user_id
              ORDER BY u.full_name`
