@@ -21,7 +21,7 @@ router.get('/', auth, async (req, res) => {
                             'pensum_pct', r.pensum_pct,
                             'max_klienten', r.max_klienten
                         )
-                    ) FILTER (WHERE r.rolle_id IS NOT NULL),
+                    ) FILTER (WHERE r.aufgabe_id IS NOT NULL),
                     '[]'
                 ) AS rollen
              FROM benutzer u
