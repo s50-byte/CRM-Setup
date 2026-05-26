@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import client from '../api/client';
 
-const ROLLEN = ['Klientenführung', 'Job Coach', 'Fachperson', 'Teamleitung', 'Stellvertretung'];
+const ROLLEN = ['Klientenführung', 'Job Coach', 'Fachperson', 'Stellvertretung'];
 
 let _seq = 1;
 const uid = () => String(_seq++);
