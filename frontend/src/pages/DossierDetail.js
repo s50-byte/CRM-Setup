@@ -482,7 +482,8 @@ export default function DossierDetail() {
                 open={zuweisungModal}
                 onClose={() => setZuweisungModal(false)}
                 dossierId={id}
-                bereitsZugewiesen={zugewiesen}
+                zugewiesen={zugewiesen}
+                standortKuerzel={dossier.standort_kuerzel}
                 onSaved={() => {
                     setZuweisungModal(false);
                     client.get(`/dossiers/${id}`).then(r => setDossier(r.data));

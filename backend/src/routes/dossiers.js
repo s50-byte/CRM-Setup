@@ -212,6 +212,27 @@ router.put('/:id/phase', auth, async (req, res) => {
     }
 });
 
+// DELETE /api/dossiers/:id/zuweisung/:user_id — Zuweisung entfernen
+router.delete('/:id/zuweisung/:user_id', auth, async (req, res) => {
+    try {
+        const dossier = await db.query(
+            `SELECT klient_id FROM dossier WHERE dossier_id = $1`,
+            [req.params.id]
+        );
+        if (dossier.rows.length === 0) {
+            return res.status(404).json({ error: 'Dossier nicht gefunden' });
+        }
+        await db.query(
+            `DELETE FROM klient_user WHERE klient_id = $1 AND user_id = $2`,
+            [dossier.rows[0].klient_id, req.params.user_id]
+        );
+        res.json({ message: 'Zuweisung entfernt' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Entfernen der Zuweisung' });
+    }
+});
+
 // POST /api/dossiers/:id/zuweisung — Person zuweisen
 router.post('/:id/zuweisung', auth, async (req, res) => {
     const { user_id, rolle_im_fall, stellvertretung } = req.body;
