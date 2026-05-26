@@ -51,6 +51,16 @@ export default function Standorte() {
                 )}
             </div>
 
+            {!istManagement && (
+                <div style={{
+                    background: '#FFFBEB', border: '1px solid rgba(217,119,6,.2)',
+                    borderRadius: 8, padding: '10px 14px', fontSize: 12.5,
+                    color: '#92400E', marginBottom: '1rem'
+                }}>
+                    Standorte verwalten ist nur im Management-Bereich verfügbar.
+                </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                 {laden ? (
                     <div style={{ color: '#6B6860', fontSize: 12 }}>Laden…</div>

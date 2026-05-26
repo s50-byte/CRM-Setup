@@ -44,9 +44,12 @@ export default function Profil() {
 
     const [rollen, setRollen] = useState(new Set());
     const [programme, setProgramme] = useState(new Set());
+    const [standorte, setStandorte] = useState(new Set());
     const [alleProgramme, setAlleProgramme] = useState([]);
+    const [alleStandorte, setAlleStandorte] = useState([]);
     const [rollenMsg, setRollenMsg] = useState('');
     const [programmeMsg, setProgrammeMsg] = useState('');
+    const [standorteMsg, setStandorteMsg] = useState('');
 
     const initials = benutzer?.avatar_initials ||
         benutzer?.full_name?.split(' ').map(n => n[0]).join('') || '?';
@@ -55,8 +58,10 @@ export default function Profil() {
         client.get('/benutzer/mein-profil').then(r => {
             setRollen(new Set(r.data.rollen.map(ro => ro.rolle_name)));
             setProgramme(new Set(r.data.programme.map(p => p.programm_id)));
+            setStandorte(new Set((r.data.standorte || []).map(s => s.standort_id)));
         }).catch(console.error);
         client.get('/programme').then(r => setAlleProgramme(r.data)).catch(console.error);
+        client.get('/standorte').then(r => setAlleStandorte(r.data)).catch(console.error);
     }, []);
 
     const toggleRolle = (rolle) =>
@@ -64,6 +69,9 @@ export default function Profil() {
 
     const toggleProgramm = (id) =>
         setProgramme(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+    const toggleStandort = (id) =>
+        setStandorte(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
     const speichernRollen = async () => {
         try {
@@ -78,6 +86,14 @@ export default function Profil() {
             await client.put('/benutzer/programme', { programme: [...programme] });
             setProgrammeMsg('Gespeichert ✓');
             setTimeout(() => setProgrammeMsg(''), 2500);
+        } catch (err) { console.error(err); }
+    };
+
+    const speichernStandorte = async () => {
+        try {
+            await client.put('/benutzer/standorte', { standorte: [...standorte] });
+            setStandorteMsg('Gespeichert ✓');
+            setTimeout(() => setStandorteMsg(''), 2500);
         } catch (err) { console.error(err); }
     };
 
@@ -193,6 +209,21 @@ export default function Profil() {
                             border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit'
                         }}>Speichern</button>
                         {programmeMsg && <span style={{ fontSize: 12.5, color: '#16A34A' }}>{programmeMsg}</span>}
+                    </div>
+                </div>
+
+                {/* Meine Standorte */}
+                <div style={CARD}>
+                    <div style={SECTION_LABEL}>Meine Standorte</div>
+                    {alleStandorte.map(s => (
+                        <Toggle key={s.standort_id} label={`${s.name} (${s.kuerzel})`} checked={standorte.has(s.standort_id)} onChange={() => toggleStandort(s.standort_id)} />
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: '.875rem' }}>
+                        <button onClick={speichernStandorte} style={{
+                            padding: '7px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                            border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                        }}>Speichern</button>
+                        {standorteMsg && <span style={{ fontSize: 12.5, color: '#16A34A' }}>{standorteMsg}</span>}
                     </div>
                 </div>
             </div>

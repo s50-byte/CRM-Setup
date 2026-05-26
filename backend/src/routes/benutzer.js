@@ -13,9 +13,8 @@ router.get('/', auth, async (req, res) => {
             `SELECT
                 u.user_id, u.full_name, u.email, u.system_rolle,
                 u.pensum_pct, u.avatar_initials, u.aktiv,
-                st.name AS standort_name, st.kuerzel AS standort_kuerzel,
                 COALESCE(
-                    JSON_AGG(
+                    JSON_AGG(DISTINCT
                         JSONB_BUILD_OBJECT(
                             'rolle_name', r.rolle_name,
                             'pensum_pct', r.pensum_pct,
@@ -23,12 +22,23 @@ router.get('/', auth, async (req, res) => {
                         )
                     ) FILTER (WHERE r.aufgabe_id IS NOT NULL),
                     '[]'
-                ) AS rollen
+                ) AS rollen,
+                COALESCE(
+                    JSON_AGG(DISTINCT
+                        JSONB_BUILD_OBJECT(
+                            'standort_id', st2.standort_id,
+                            'name', st2.name,
+                            'kuerzel', st2.kuerzel
+                        )
+                    ) FILTER (WHERE st2.standort_id IS NOT NULL),
+                    '[]'
+                ) AS standorte
              FROM benutzer u
              LEFT JOIN benutzer_aufgabe r ON r.user_id = u.user_id
-             LEFT JOIN standort st ON st.standort_id = u.standort_id
+             LEFT JOIN benutzer_standort bs ON bs.user_id = u.user_id
+             LEFT JOIN standort st2 ON st2.standort_id = bs.standort_id
              WHERE u.aktiv = TRUE
-             GROUP BY u.user_id, st.name, st.kuerzel
+             GROUP BY u.user_id
              ORDER BY u.full_name`
         );
         res.json(result.rows);
@@ -76,14 +86,12 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
-// GET /api/benutzer/mein-profil — Eigenes Profil inkl. Rollen und Programme
+// GET /api/benutzer/mein-profil — Eigenes Profil inkl. Rollen, Programme und Standorte
 router.get('/mein-profil', auth, async (req, res) => {
     try {
         const user = await db.query(
-            `SELECT u.user_id, u.full_name, u.email, u.system_rolle, u.pensum_pct, u.avatar_initials,
-                    st.name AS standort_name, st.kuerzel AS standort_kuerzel
+            `SELECT u.user_id, u.full_name, u.email, u.system_rolle, u.pensum_pct, u.avatar_initials
              FROM benutzer u
-             LEFT JOIN standort st ON st.standort_id = u.standort_id
              WHERE u.user_id = $1`,
             [req.user.user_id]
         );
@@ -100,8 +108,15 @@ router.get('/mein-profil', auth, async (req, res) => {
              WHERE bp.user_id = $1`,
             [req.user.user_id]
         );
+        const standorte = await db.query(
+            `SELECT s.standort_id, s.name, s.kuerzel
+             FROM benutzer_standort bs
+             JOIN standort s ON s.standort_id = bs.standort_id
+             WHERE bs.user_id = $1`,
+            [req.user.user_id]
+        );
 
-        res.json({ ...user.rows[0], rollen: rollen.rows, programme: programme.rows });
+        res.json({ ...user.rows[0], rollen: rollen.rows, programme: programme.rows, standorte: standorte.rows });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden des Profils' });
@@ -141,6 +156,24 @@ router.put('/programme', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Aktualisieren der Programme' });
+    }
+});
+
+// PUT /api/benutzer/standorte — Eigene Standorte setzen
+router.put('/standorte', auth, async (req, res) => {
+    const { standorte } = req.body;
+    try {
+        await db.query(`DELETE FROM benutzer_standort WHERE user_id = $1`, [req.user.user_id]);
+        for (const standort_id of (standorte || [])) {
+            await db.query(
+                `INSERT INTO benutzer_standort (user_id, standort_id) VALUES ($1, $2)`,
+                [req.user.user_id, standort_id]
+            );
+        }
+        res.json({ message: 'Standorte aktualisiert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren der Standorte' });
     }
 });
 
