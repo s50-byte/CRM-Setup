@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node reset-benutzer.js)"
+      "Bash(node reset-benutzer.js)",
+      "Bash(node -e ' *)"
     ]
   }
 }

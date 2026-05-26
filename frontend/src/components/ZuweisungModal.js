@@ -41,7 +41,7 @@ export default function ZuweisungModal({ open, onClose, onSaved, dossierId, zuge
         setRows(buildRows(zugewiesen));
         setLaden(true);
         client.get('/benutzer')
-            .then(r => setBenutzer(r.data))
+            .then(r => { console.log('benutzer:', r.data); setBenutzer(r.data); })
             .catch(console.error)
             .finally(() => setLaden(false));
     }, [open]);
@@ -90,9 +90,10 @@ export default function ZuweisungModal({ open, onClose, onSaved, dossierId, zuge
         }
     };
 
-    const kandidaten = standortKuerzel
+    const gefiltert = standortKuerzel
         ? benutzer.filter(u => u.standort_kuerzel === standortKuerzel)
         : benutzer;
+    const kandidaten = gefiltert.length > 0 ? gefiltert : benutzer;
 
     const selectedIds = new Set(rows.filter(r => r.user_id).map(r => r.user_id));
 
