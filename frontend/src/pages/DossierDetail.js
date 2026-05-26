@@ -155,16 +155,15 @@ export default function DossierDetail() {
                                 background: '#F5F3FF', color: '#5B21B6',
                                 border: '1px solid rgba(124,58,237,.15)', fontFamily: 'monospace'
                             }}>{dossier.phase_label || dossier.pipeline_status}</span>
-                            {dossier.klient_label && (() => {
-                                const c = LABEL_FARBEN[dossier.klient_label] || '#6B6860';
-                                return (
-                                    <span style={{
-                                        fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                        background: c + '22', color: c,
-                                        border: `1px solid ${c}33`, fontFamily: 'monospace'
-                                    }}>{dossier.klient_label}</span>
-                                );
-                            })()}
+                            {dossier.klient_label && (
+                                <span style={{
+                                    fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                                    background: (LABEL_FARBEN[dossier.klient_label] || '#6B6860') + '22',
+                                    color: LABEL_FARBEN[dossier.klient_label] || '#6B6860',
+                                    border: `1px solid ${LABEL_FARBEN[dossier.klient_label] || '#6B6860'}33`,
+                                    fontFamily: 'monospace'
+                                }}>{dossier.klient_label}</span>
+                            )}
                             <span style={{
                                 fontSize: 11, padding: '2px 7px', borderRadius: 20,
                                 background: '#F5F4F0', color: '#6B6860',

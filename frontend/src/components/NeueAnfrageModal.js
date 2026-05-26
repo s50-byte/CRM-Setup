@@ -6,11 +6,18 @@ import client from '../api/client';
 const PROGRAMME = ['IV-Massnahme', 'Ausbildung', 'Beratung', 'Abklärung', 'Gez. Vorbereitung'];
 const KANAELE = ['Telefon', 'E-Mail', 'Online-Formular', 'Direkt'];
 const LABELS = ['', 'Lernender', 'Teilnehmer', 'Mitarbeiter mit IV-Rente'];
+const LABEL_DEFAULT = {
+    'IV-Massnahme':      'Teilnehmer',
+    'Ausbildung':        'Lernender',
+    'Beratung':          'Teilnehmer',
+    'Abklärung':         'Teilnehmer',
+    'Gez. Vorbereitung': 'Teilnehmer',
+};
 
 export default function NeueAnfrageModal({ open, onClose, onSaved }) {
     const [form, setForm] = useState({
         nachname: '', vorname: '', programm: 'IV-Massnahme',
-        auftraggeber: '', kanal: 'Telefon', klient_label: '',
+        auftraggeber: '', kanal: 'Telefon', klient_label: 'Teilnehmer',
         start: '', ende: '', notiz: '', standort_id: ''
     });
     const [laden, setLaden] = useState(false);
@@ -60,7 +67,7 @@ export default function NeueAnfrageModal({ open, onClose, onSaved }) {
 
             onSaved();
             onClose();
-            setForm({ nachname: '', vorname: '', programm: 'IV-Massnahme', auftraggeber: '', kanal: 'Telefon', klient_label: '', start: '', ende: '', notiz: '', standort_id: '' });
+            setForm({ nachname: '', vorname: '', programm: 'IV-Massnahme', auftraggeber: '', kanal: 'Telefon', klient_label: 'Teilnehmer', start: '', ende: '', notiz: '', standort_id: '' });
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Speichern');
         } finally {
@@ -86,7 +93,10 @@ export default function NeueAnfrageModal({ open, onClose, onSaved }) {
                 </FormField>
             </div>
             <FormField label="Programmtyp">
-                <select style={inputStyle} value={form.programm} onChange={e => set('programm', e.target.value)}>
+                <select style={inputStyle} value={form.programm} onChange={e => {
+                    const p = e.target.value;
+                    setForm(prev => ({ ...prev, programm: p, klient_label: LABEL_DEFAULT[p] || 'Teilnehmer' }));
+                }}>
                     {PROGRAMME.map(p => <option key={p}>{p}</option>)}
                 </select>
             </FormField>

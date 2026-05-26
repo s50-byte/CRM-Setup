@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
+import NeueAnfrageModal from '../components/NeueAnfrageModal';
 
 const FARBEN = {
     'IV-Massnahme': '#2563EB', 'Ausbildung': '#16A34A', 'Beratung': '#7C3AED',
@@ -27,6 +28,7 @@ export default function Dossiers() {
     const [filterTyp, setFilterTyp] = useState('');
     const [filterPhase, setFilterPhase] = useState('');
     const [suche, setSuche] = useState('');
+    const [anfrageModal, setAnfrageModal] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -52,6 +54,11 @@ export default function Dossiers() {
                     <div style={{ fontSize: 19, fontWeight: 600 }}>Falldossiers</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle Klientinnen und Klienten — eine Akte pro Klient</div>
                 </div>
+                <button onClick={() => setAnfrageModal(true)} style={{
+                    padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                    cursor: 'pointer', border: 'none', borderRadius: 6,
+                    background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                }}>+ Neue Anfrage</button>
             </div>
 
             <div style={{
@@ -131,16 +138,15 @@ export default function Dossiers() {
                                         }}>{d.phase_label || d.pipeline_status}</span>
                                     </td>
                                     <td style={{ padding: '8px 12px' }}>
-                                        {d.klient_label ? (() => {
-                                            const c = LABEL_FARBEN[d.klient_label] || '#6B6860';
-                                            return (
-                                                <span style={{
-                                                    fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                                    background: c + '22', color: c,
-                                                    border: `1px solid ${c}33`, fontFamily: 'monospace'
-                                                }}>{d.klient_label}</span>
-                                            );
-                                        })() : '—'}
+                                        {d.klient_label ? (
+                                            <span style={{
+                                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                                                background: (LABEL_FARBEN[d.klient_label] || '#6B6860') + '22',
+                                                color: LABEL_FARBEN[d.klient_label] || '#6B6860',
+                                                border: `1px solid ${LABEL_FARBEN[d.klient_label] || '#6B6860'}33`,
+                                                fontFamily: 'monospace'
+                                            }}>{d.klient_label}</span>
+                                        ) : '—'}
                                     </td>
                                     <td style={{ padding: '8px 12px' }}>
                                         {verlauf.length > 1 ? (
@@ -195,6 +201,14 @@ export default function Dossiers() {
                     </tbody>
                 </table>
             </div>
+            <NeueAnfrageModal
+                open={anfrageModal}
+                onClose={() => setAnfrageModal(false)}
+                onSaved={() => {
+                    setAnfrageModal(false);
+                    client.get('/dossiers').then(r => setDossiers(r.data));
+                }}
+            />
         </div>
     );
 }
