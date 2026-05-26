@@ -76,6 +76,74 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
+// GET /api/benutzer/mein-profil — Eigenes Profil inkl. Rollen und Programme
+router.get('/mein-profil', auth, async (req, res) => {
+    try {
+        const user = await db.query(
+            `SELECT u.user_id, u.full_name, u.email, u.system_rolle, u.pensum_pct, u.avatar_initials,
+                    st.name AS standort_name, st.kuerzel AS standort_kuerzel
+             FROM benutzer u
+             LEFT JOIN standort st ON st.standort_id = u.standort_id
+             WHERE u.user_id = $1`,
+            [req.user.user_id]
+        );
+        if (user.rows.length === 0) return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+
+        const rollen = await db.query(
+            `SELECT aufgabe_id, rolle_name, max_klienten FROM benutzer_aufgabe WHERE user_id = $1`,
+            [req.user.user_id]
+        );
+        const programme = await db.query(
+            `SELECT bp.perm_id, bp.programm_id, p.name AS programm_name, p.farbe_hex
+             FROM benutzer_berechtigung bp
+             JOIN programm p ON p.programm_id = bp.programm_id
+             WHERE bp.user_id = $1`,
+            [req.user.user_id]
+        );
+
+        res.json({ ...user.rows[0], rollen: rollen.rows, programme: programme.rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden des Profils' });
+    }
+});
+
+// PUT /api/benutzer/rollen — Eigene Rollen setzen
+router.put('/rollen', auth, async (req, res) => {
+    const { rollen } = req.body;
+    try {
+        await db.query(`DELETE FROM benutzer_aufgabe WHERE user_id = $1`, [req.user.user_id]);
+        for (const rolle_name of (rollen || [])) {
+            await db.query(
+                `INSERT INTO benutzer_aufgabe (user_id, rolle_name, max_klienten) VALUES ($1, $2, 15)`,
+                [req.user.user_id, rolle_name]
+            );
+        }
+        res.json({ message: 'Rollen aktualisiert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren der Rollen' });
+    }
+});
+
+// PUT /api/benutzer/programme — Eigene Programme setzen
+router.put('/programme', auth, async (req, res) => {
+    const { programme } = req.body;
+    try {
+        await db.query(`DELETE FROM benutzer_berechtigung WHERE user_id = $1`, [req.user.user_id]);
+        for (const programm_id of (programme || [])) {
+            await db.query(
+                `INSERT INTO benutzer_berechtigung (user_id, programm_id) VALUES ($1, $2)`,
+                [req.user.user_id, programm_id]
+            );
+        }
+        res.json({ message: 'Programme aktualisiert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren der Programme' });
+    }
+});
+
 // PUT /api/benutzer/passwort — Eigenes Passwort ändern
 router.put('/passwort', auth, async (req, res) => {
     const { altes_passwort, neues_passwort } = req.body;

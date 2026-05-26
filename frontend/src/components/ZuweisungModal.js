@@ -90,10 +90,17 @@ export default function ZuweisungModal({ open, onClose, onSaved, dossierId, zuge
         }
     };
 
-    const gefiltert = standortKuerzel
+    const nachStandort = standortKuerzel
         ? benutzer.filter(u => u.standort_kuerzel === standortKuerzel)
         : benutzer;
-    const kandidaten = gefiltert.length > 0 ? gefiltert : benutzer;
+    const basisKandidaten = nachStandort.length > 0 ? nachStandort : benutzer;
+
+    const kandidatenFuerRolle = (rolle) => {
+        if (rolle === 'Stellvertretung') return basisKandidaten;
+        return basisKandidaten.filter(u =>
+            (u.rollen || []).some(r => r.rolle_name === rolle)
+        );
+    };
 
     const selectedIds = new Set(rows.filter(r => r.user_id).map(r => r.user_id));
 
@@ -106,6 +113,7 @@ export default function ZuweisungModal({ open, onClose, onSaved, dossierId, zuge
                     <div style={{ marginBottom: '1.25rem' }}>
                         {ROLLEN.map(rolle => {
                             const rolleRows = rows.filter(r => r.rolle === rolle);
+                            const kandidaten = kandidatenFuerRolle(rolle);
                             return (
                                 <div key={rolle} style={{
                                     display: 'grid', gridTemplateColumns: '150px 1fr',
