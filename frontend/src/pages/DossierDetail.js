@@ -52,6 +52,7 @@ export default function DossierDetail() {
                     client.get(`/tasks/klient/${id}`).catch(() => ({ data: [] })),
                 ]);
                 setDossier(dosRes.data);
+                console.log('klient_label:', dosRes.data.klient_label);
                 setJournal(journalRes.data);
                 setTasks(tasksRes.data);
             } catch (err) {

@@ -117,7 +117,8 @@ router.get('/:id', auth, async (req, res) => {
             [dossier.rows[0].klient_id]
         );
 
-        const aktVerlauf = verlauf.rows.find(v => v.status === 'Laufend');
+        const aktVerlauf = verlauf.rows.find(v => v.status === 'Laufend')
+            || verlauf.rows.find(v => v.klient_label);
         res.json({
             ...dossier.rows[0],
             klient_label: aktVerlauf?.klient_label || null,
