@@ -13,6 +13,7 @@ router.get('/', auth, async (req, res) => {
             `SELECT
                 u.user_id, u.full_name, u.email, u.system_rolle,
                 u.pensum_pct, u.avatar_initials, u.aktiv,
+                st.name AS standort_name, st.kuerzel AS standort_kuerzel,
                 COALESCE(
                     JSON_AGG(
                         JSONB_BUILD_OBJECT(
@@ -25,8 +26,9 @@ router.get('/', auth, async (req, res) => {
                 ) AS rollen
              FROM benutzer u
              LEFT JOIN benutzer_aufgabe r ON r.user_id = u.user_id
+             LEFT JOIN standort st ON st.standort_id = u.standort_id
              WHERE u.aktiv = TRUE
-             GROUP BY u.user_id
+             GROUP BY u.user_id, st.name, st.kuerzel
              ORDER BY u.full_name`
         );
         res.json(result.rows);

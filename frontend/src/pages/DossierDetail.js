@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import ZuweisungModal from '../components/ZuweisungModal';
 
 const FARBEN = {
     'Erstmalige berufliche Ausbildung': '#16A34A',
@@ -43,6 +44,7 @@ export default function DossierDetail() {
     const [jFormOpen, setJFormOpen] = useState(false);
     // Kommentar
     const [kommentar, setKommentar] = useState('');
+    const [zuweisungModal, setZuweisungModal] = useState(false);
 
     useEffect(() => {
         async function load() {
@@ -433,8 +435,13 @@ export default function DossierDetail() {
             {/* Sidebar rechts — Zuweisung */}
             <div style={{ marginTop: '.875rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
-                        Zugewiesene Kader
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em' }}>Zugewiesene Kader</span>
+                        <button onClick={() => setZuweisungModal(true)} style={{
+                            fontSize: 11, padding: '3px 9px', cursor: 'pointer',
+                            border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
+                            background: '#fff', fontFamily: 'inherit', color: '#2563EB', fontWeight: 500
+                        }}>+ Person zuweisen</button>
                     </div>
                     {zugewiesen.length === 0 ? (
                         <div style={{ fontSize: 12, color: '#6B6860' }}>Niemand zugewiesen</div>
@@ -471,6 +478,16 @@ export default function DossierDetail() {
                     ) : null)}
                 </div>
             </div>
+            <ZuweisungModal
+                open={zuweisungModal}
+                onClose={() => setZuweisungModal(false)}
+                dossierId={id}
+                bereitsZugewiesen={zugewiesen}
+                onSaved={() => {
+                    setZuweisungModal(false);
+                    client.get(`/dossiers/${id}`).then(r => setDossier(r.data));
+                }}
+            />
         </div>
     );
 }
