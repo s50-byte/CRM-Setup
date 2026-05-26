@@ -13,11 +13,11 @@ export default function Klienten({ meine }) {
     const [anfrageModal, setAnfrageModal] = useState(false);
 
     useEffect(() => {
-        client.get('/klienten')
+        client.get(meine ? '/klienten/meine' : '/klienten')
             .then(r => setKlienten(r.data))
             .catch(console.error)
             .finally(() => setLaden(false));
-    }, []);
+    }, [meine]);
 
     const gefiltert = klienten.filter(k =>
         `${k.nachname} ${k.vorname}`.toLowerCase().includes(suche.toLowerCase())
@@ -82,7 +82,7 @@ export default function Klienten({ meine }) {
                             <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', cursor: 'pointer' }}
                                 onMouseOver={e => e.currentTarget.style.background = '#F5F4F0'}
                                 onMouseOut={e => e.currentTarget.style.background = ''}>
-                                <td style={{ padding: '8px 12px', fontWeight: 500, color: '#2563EB', cursor: 'pointer' }} onClick={() => navigate(`/klienten/${k.klient_id}`)}>{k.nachname}</td>
+                                <td style={{ padding: '8px 12px', fontWeight: 500, color: '#2563EB', cursor: 'pointer' }} onClick={() => k.dossier_id && navigate(`/dossiers/${k.dossier_id}`)}>{k.nachname}</td>
                                 <td style={{ padding: '8px 12px' }}>{k.vorname}</td>
                                 <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>
                                     {k.geburtsdatum ? new Date(k.geburtsdatum).toLocaleDateString('de-CH') : '—'}
@@ -110,7 +110,7 @@ export default function Klienten({ meine }) {
                 onClose={() => setKlientModal(false)}
                 onSaved={() => {
                     setKlientModal(false);
-                    client.get('/klienten').then(r => setKlienten(r.data));
+                    client.get(meine ? '/klienten/meine' : '/klienten').then(r => setKlienten(r.data));
                 }}
             />
             <NeueAnfrageModal
@@ -118,7 +118,7 @@ export default function Klienten({ meine }) {
                 onClose={() => setAnfrageModal(false)}
                 onSaved={() => {
                     setAnfrageModal(false);
-                    client.get('/klienten').then(r => setKlienten(r.data));
+                    client.get(meine ? '/klienten/meine' : '/klienten').then(r => setKlienten(r.data));
                 }}
             />  
         </div>  

@@ -187,6 +187,11 @@ export default function DossierDetail() {
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
+                        <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
+                            padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                            cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                            background: '#fff', fontFamily: 'inherit', color: '#6B6860'
+                        }}>Stammdaten →</button>
                         <button onClick={() => setJFormOpen(true)} style={{
                             padding: '7px 14px', fontSize: 13, fontWeight: 500,
                             cursor: 'pointer', border: 'none', borderRadius: 6,

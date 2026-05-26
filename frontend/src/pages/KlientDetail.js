@@ -61,7 +61,7 @@ export default function KlientDetail() {
                         padding: '7px 14px', fontSize: 13, fontWeight: 500,
                         cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
                         background: '#fff', fontFamily: 'inherit', color: '#6B6860'
-                    }}>Zum Dossier →</button>
+                    }}>Stammdaten →</button>
                 </div>
 
                 {/* Tabs */}
