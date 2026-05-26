@@ -9,9 +9,9 @@ const FARBEN = {
 };
 
 const LABEL_FARBEN = {
-    'Lernender':               '#16A34A',
-    'Teilnehmer':              '#2563EB',
-    'Mitarbeiter mit IV-Rente':'#7C3AED',
+    'Lernender':                { bg: '#ECFDF5', color: '#15803D' },
+    'Teilnehmer':               { bg: '#EEF3FE', color: '#1D4ED8' },
+    'Mitarbeiter mit IV-Rente': { bg: '#F5F3FF', color: '#5B21B6' },
 };
 
 const JKAT = {
@@ -155,12 +155,12 @@ export default function DossierDetail() {
                                 background: '#F5F3FF', color: '#5B21B6',
                                 border: '1px solid rgba(124,58,237,.15)', fontFamily: 'monospace'
                             }}>{dossier.phase_label || dossier.pipeline_status}</span>
-                            {dossier.klient_label && (
+                            {dossier.klient_label && LABEL_FARBEN[dossier.klient_label] && (
                                 <span style={{
                                     fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                    background: (LABEL_FARBEN[dossier.klient_label] || '#6B6860') + '22',
-                                    color: LABEL_FARBEN[dossier.klient_label] || '#6B6860',
-                                    border: `1px solid ${LABEL_FARBEN[dossier.klient_label] || '#6B6860'}33`,
+                                    background: LABEL_FARBEN[dossier.klient_label].bg,
+                                    color: LABEL_FARBEN[dossier.klient_label].color,
+                                    border: `1px solid ${LABEL_FARBEN[dossier.klient_label].color}33`,
                                     fontFamily: 'monospace'
                                 }}>{dossier.klient_label}</span>
                             )}

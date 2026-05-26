@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
+import NeueAnfrageModal from '../components/NeueAnfrageModal';
 
 const STAGES = ['Erstkontakt', 'In Abklärung', 'Erstgespräch', 'Schnupper', 'Programmstart'];
 const FARBEN = {
@@ -11,6 +12,7 @@ const FARBEN = {
 export default function Pipeline() {
     const [dossiers, setDossiers] = useState([]);
     const [laden, setLaden] = useState(true);
+    const [anfrageModal, setAnfrageModal] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -27,7 +29,7 @@ export default function Pipeline() {
                     <div style={{ fontSize: 19, fontWeight: 600 }}>Pipeline</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle laufenden Anfragen nach Status</div>
                 </div>
-                <button style={{
+                <button onClick={() => setAnfrageModal(true)} style={{
                     padding: '7px 14px', fontSize: 13, fontWeight: 500,
                     cursor: 'pointer', border: 'none', borderRadius: 6,
                     background: '#2563EB', color: '#fff', fontFamily: 'inherit'
@@ -86,6 +88,14 @@ export default function Pipeline() {
                     })}
                 </div>
             )}
+            <NeueAnfrageModal
+                open={anfrageModal}
+                onClose={() => setAnfrageModal(false)}
+                onSaved={() => {
+                    setAnfrageModal(false);
+                    client.get('/dossiers').then(r => setDossiers(r.data));
+                }}
+            />
         </div>
     );
 }
