@@ -72,13 +72,15 @@ router.get('/meine', auth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT 
+            `SELECT
                 k.*,
                 lv.pensum_pct, lv.zeit_von, lv.zeit_bis, lv.zeitbasis,
                 lv.tage_mo, lv.tage_di, lv.tage_mi, lv.tage_do, lv.tage_fr,
-                lv.bemerkung AS lv_bemerkung
+                lv.bemerkung AS lv_bemerkung,
+                d.dossier_id
              FROM klient k
              LEFT JOIN leistungsvereinbarung lv ON lv.klient_id = k.klient_id
+             LEFT JOIN dossier d ON d.klient_id = k.klient_id
              WHERE k.klient_id = $1 AND k.aktiv = TRUE`,
             [req.params.id]
         );

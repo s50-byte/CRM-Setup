@@ -8,19 +8,80 @@ const FARBEN = {
     'Gezielte Vorbereitung': '#D97706'
 };
 
+const INPUT_STYLE = {
+    fontSize: 12.5, padding: '4px 8px', border: '1px solid rgba(0,0,0,.13)',
+    borderRadius: 5, background: '#fff', fontFamily: 'inherit',
+    width: '100%', outline: 'none', boxSizing: 'border-box'
+};
+
+const CARD = {
+    background: '#fff', border: '1px solid rgba(0,0,0,.09)',
+    borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)'
+};
+
+function FRow({ label, name, type, form, onChange }) {
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+            <span style={{ color: '#6B6860' }}>{label}</span>
+            <input
+                name={name}
+                type={type || 'text'}
+                value={type === 'date'
+                    ? (form[name] ? form[name].slice(0, 10) : '')
+                    : (form[name] || '')}
+                onChange={onChange}
+                style={INPUT_STYLE}
+            />
+        </div>
+    );
+}
+
+function SaveBar({ laden, gespeichert, onSpeichern }) {
+    return (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: '1rem' }}>
+            {gespeichert && <span style={{ fontSize: 12.5, color: '#16A34A' }}>Gespeichert ✓</span>}
+            <button onClick={onSpeichern} disabled={laden} style={{
+                padding: '7px 18px', fontSize: 13, fontWeight: 500,
+                cursor: laden ? 'default' : 'pointer', border: 'none', borderRadius: 6,
+                background: laden ? '#93C5FD' : '#2563EB', color: '#fff', fontFamily: 'inherit'
+            }}>Speichern</button>
+        </div>
+    );
+}
+
 export default function KlientDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [klient, setKlient] = useState(null);
     const [laden, setLaden] = useState(true);
     const [aktTab, setAktTab] = useState('stamm');
+    const [form, setForm] = useState({});
+    const [speichern, setSpeichern] = useState(false);
+    const [gespeichert, setGespeichert] = useState(false);
 
     useEffect(() => {
         client.get(`/klienten/${id}`)
-            .then(r => setKlient(r.data))
+            .then(r => { setKlient(r.data); setForm(r.data); })
             .catch(console.error)
             .finally(() => setLaden(false));
     }, [id]);
+
+    const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+    const handleSpeichern = async () => {
+        setSpeichern(true);
+        try {
+            const r = await client.put(`/klienten/${id}`, form);
+            setKlient(prev => ({ ...prev, ...r.data }));
+            setForm(prev => ({ ...prev, ...r.data }));
+            setGespeichert(true);
+            setTimeout(() => setGespeichert(false), 2500);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setSpeichern(false);
+        }
+    };
 
     if (laden) return <div style={{ padding: '2rem', color: '#6B6860', fontSize: 13 }}>Laden…</div>;
     if (!klient) return <div style={{ padding: '2rem', color: '#B91C1C', fontSize: 13 }}>Klient nicht gefunden</div>;
@@ -37,11 +98,7 @@ export default function KlientDetail() {
             }}>← Alle Klienten</button>
 
             {/* Header */}
-            <div style={{
-                background: '#fff', border: '1px solid rgba(0,0,0,.09)',
-                borderRadius: 10, padding: '1rem', marginBottom: '.875rem',
-                boxShadow: '0 1px 3px rgba(0,0,0,.07)'
-            }}>
+            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', marginBottom: '.875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{
                         width: 48, height: 48, borderRadius: 12, background: '#EEF3FE',
@@ -57,11 +114,16 @@ export default function KlientDetail() {
                             {klient.ahv_nummer && ` · AHV ${klient.ahv_nummer}`}
                         </div>
                     </div>
-                    <button onClick={() => navigate(`/dossiers`)} style={{
-                        padding: '7px 14px', fontSize: 13, fontWeight: 500,
-                        cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                        background: '#fff', fontFamily: 'inherit', color: '#6B6860'
-                    }}>Stammdaten →</button>
+                    <button
+                        onClick={() => klient.dossier_id && navigate(`/dossiers/${klient.dossier_id}`)}
+                        disabled={!klient.dossier_id}
+                        style={{
+                            padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                            cursor: klient.dossier_id ? 'pointer' : 'default',
+                            border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                            background: '#fff', fontFamily: 'inherit', color: '#6B6860',
+                            opacity: klient.dossier_id ? 1 : 0.4
+                        }}>Zum Dossier →</button>
                 </div>
 
                 {/* Tabs */}
@@ -84,99 +146,66 @@ export default function KlientDetail() {
 
             {/* Stammdaten */}
             {aktTab === 'stamm' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                        <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Persönliche Daten</div>
-                        {[
-                            { label: 'Nachname', value: klient.nachname },
-                            { label: 'Vorname', value: klient.vorname },
-                            { label: 'Geburtsdatum', value: klient.geburtsdatum ? new Date(klient.geburtsdatum).toLocaleDateString('de-CH') : '—' },
-                            { label: 'AHV-Nummer', value: klient.ahv_nummer || '—' },
-                            { label: 'Adresse', value: klient.adresse || '—' },
-                            { label: 'PLZ / Ort', value: klient.plz && klient.ort ? `${klient.plz} ${klient.ort}` : '—' },
-                        ].map((f, i) => (
-                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12.5 }}>
-                                <span style={{ color: '#6B6860' }}>{f.label}</span>
-                                <span style={{ fontWeight: 500 }}>{f.value}</span>
-                            </div>
-                        ))}
+                <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={CARD}>
+                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Persönliche Daten</div>
+                            <FRow label="Nachname"    name="nachname"    form={form} onChange={handleChange} />
+                            <FRow label="Vorname"     name="vorname"     form={form} onChange={handleChange} />
+                            <FRow label="Geburtsdatum" name="geburtsdatum" type="date" form={form} onChange={handleChange} />
+                            <FRow label="AHV-Nummer"  name="ahv_nummer"  form={form} onChange={handleChange} />
+                            <FRow label="Adresse"     name="adresse"     form={form} onChange={handleChange} />
+                            <FRow label="PLZ"         name="plz"         form={form} onChange={handleChange} />
+                            <FRow label="Ort"         name="ort"         form={form} onChange={handleChange} />
+                        </div>
+                        <div style={CARD}>
+                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Kontaktdaten</div>
+                            <FRow label="Telefon" name="telefon" form={form} onChange={handleChange} />
+                            <FRow label="E-Mail"  name="email"   form={form} onChange={handleChange} />
+                            {klient.auftraggeber && (
+                                <div style={{ marginTop: 12 }}>
+                                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Zuweisende Stelle</div>
+                                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{klient.auftraggeber}</div>
+                                    {klient.programm_name && (
+                                        <span style={{
+                                            display: 'inline-block', marginTop: 5, fontSize: 11, padding: '2px 7px',
+                                            borderRadius: 20, background: (FARBEN[klient.programm_name] || '#888') + '22',
+                                            color: FARBEN[klient.programm_name] || '#888',
+                                            border: `1px solid ${FARBEN[klient.programm_name] || '#888'}33`
+                                        }}>{klient.programm_name}</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                        <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Kontaktdaten</div>
-                        {[
-                            { label: 'Telefon', value: klient.telefon || '—' },
-                            { label: 'E-Mail', value: klient.email || '—' },
-                        ].map((f, i) => (
-                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12.5 }}>
-                                <span style={{ color: '#6B6860' }}>{f.label}</span>
-                                <span style={{ fontWeight: 500, color: f.label === 'E-Mail' ? '#2563EB' : '#1A1917' }}>{f.value}</span>
-                            </div>
-                        ))}
-                        {klient.auftraggeber && (
-                            <div style={{ marginTop: 12 }}>
-                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Zuweisende Stelle</div>
-                                <div style={{ fontSize: 12.5, fontWeight: 500 }}>{klient.auftraggeber}</div>
-                                {klient.programm_name && (
-                                    <span style={{
-                                        display: 'inline-block', marginTop: 5, fontSize: 11, padding: '2px 7px',
-                                        borderRadius: 20, background: (FARBEN[klient.programm_name] || '#888') + '22',
-                                        color: FARBEN[klient.programm_name] || '#888',
-                                        border: `1px solid ${FARBEN[klient.programm_name] || '#888'}33`
-                                    }}>{klient.programm_name}</span>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                    <SaveBar laden={speichern} gespeichert={gespeichert} onSpeichern={handleSpeichern} />
                 </div>
             )}
 
             {/* Kontakt & Notfall */}
             {aktTab === 'kontakt' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                        <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Notfallkontakt</div>
-                        {klient.notfall_name ? (
-                            <>
-                                {[
-                                    { label: 'Name', value: klient.notfall_name },
-                                    { label: 'Beziehung', value: klient.notfall_beziehung || '—' },
-                                    { label: 'Telefon', value: klient.notfall_telefon || '—' },
-                                ].map((f, i) => (
-                                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12.5 }}>
-                                        <span style={{ color: '#6B6860' }}>{f.label}</span>
-                                        <span style={{ fontWeight: 500 }}>{f.value}</span>
-                                    </div>
-                                ))}
-                            </>
-                        ) : (
-                            <div style={{ fontSize: 12, color: '#6B6860' }}>Kein Notfallkontakt hinterlegt</div>
-                        )}
+                <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={CARD}>
+                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Notfallkontakt</div>
+                            <FRow label="Name"      name="notfall_name"      form={form} onChange={handleChange} />
+                            <FRow label="Beziehung" name="notfall_beziehung" form={form} onChange={handleChange} />
+                            <FRow label="Telefon"   name="notfall_telefon"   form={form} onChange={handleChange} />
+                        </div>
+                        <div style={CARD}>
+                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Gesetzlicher Vertreter</div>
+                            <FRow label="Name"     name="vertreter_name"     form={form} onChange={handleChange} />
+                            <FRow label="Funktion" name="vertreter_funktion" form={form} onChange={handleChange} />
+                            <FRow label="Telefon"  name="vertreter_telefon"  form={form} onChange={handleChange} />
+                        </div>
                     </div>
-                    <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                        <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Gesetzlicher Vertreter</div>
-                        {klient.vertreter_name ? (
-                            <>
-                                {[
-                                    { label: 'Name', value: klient.vertreter_name },
-                                    { label: 'Funktion', value: klient.vertreter_funktion || '—' },
-                                    { label: 'Telefon', value: klient.vertreter_telefon || '—' },
-                                ].map((f, i) => (
-                                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12.5 }}>
-                                        <span style={{ color: '#6B6860' }}>{f.label}</span>
-                                        <span style={{ fontWeight: 500 }}>{f.value}</span>
-                                    </div>
-                                ))}
-                            </>
-                        ) : (
-                            <div style={{ fontSize: 12, color: '#6B6860' }}>Kein gesetzlicher Vertreter hinterlegt</div>
-                        )}
-                    </div>
+                    <SaveBar laden={speichern} gespeichert={gespeichert} onSpeichern={handleSpeichern} />
                 </div>
             )}
 
             {/* Leistungsvereinbarung */}
             {aktTab === 'lv' && (
-                <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
+                <div style={CARD}>
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.875rem' }}>Leistungsvereinbarung & Präsenzzeiten</div>
                     {klient.pensum_pct ? (
                         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
