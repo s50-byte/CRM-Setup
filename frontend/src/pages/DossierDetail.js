@@ -48,7 +48,7 @@ export default function DossierDetail() {
             try {
                 const [dosRes, journalRes, tasksRes] = await Promise.all([
                     client.get(`/dossiers/${id}`),
-                    client.get(`/journal/${id.split('-')[0]}`).catch(() => ({ data: [] })),
+                    client.get(`/journal/${id}`).catch(() => ({ data: [] })),
                     client.get(`/tasks/klient/${id}`).catch(() => ({ data: [] })),
                 ]);
                 setDossier(dosRes.data);
