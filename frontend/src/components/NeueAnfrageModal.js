@@ -4,7 +4,6 @@ import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } fro
 import client from '../api/client';
 
 const PROGRAMME = [
-    'IV-Massnahme',
     'Erstmalige berufliche Ausbildung',
     'Beratung & Coaching',
     'Erstmalige berufliche Abklärung',
@@ -13,7 +12,6 @@ const PROGRAMME = [
 const KANAELE = ['Telefon', 'E-Mail', 'Online-Formular', 'Direkt'];
 const LABELS = ['', 'LE', 'TN', 'MA'];
 const LABEL_DEFAULT = {
-    'IV-Massnahme':                    'TN',
     'Erstmalige berufliche Ausbildung':'LE',
     'Beratung & Coaching':             'TN',
     'Erstmalige berufliche Abklärung': 'TN',
@@ -22,7 +20,7 @@ const LABEL_DEFAULT = {
 
 export default function NeueAnfrageModal({ open, onClose, onSaved }) {
     const [form, setForm] = useState({
-        nachname: '', vorname: '', programm: 'IV-Massnahme',
+        nachname: '', vorname: '', programm: 'Erstmalige berufliche Ausbildung',
         auftraggeber: '', kanal: 'Telefon', klient_label: 'TN',
         start: '', ende: '', notiz: '', standort_id: ''
     });
@@ -73,7 +71,7 @@ export default function NeueAnfrageModal({ open, onClose, onSaved }) {
 
             onSaved();
             onClose();
-            setForm({ nachname: '', vorname: '', programm: 'IV-Massnahme', auftraggeber: '', kanal: 'Telefon', klient_label: 'TN', start: '', ende: '', notiz: '', standort_id: '' });
+            setForm({ nachname: '', vorname: '', programm: 'Erstmalige berufliche Ausbildung', auftraggeber: '', kanal: 'Telefon', klient_label: 'TN', start: '', ende: '', notiz: '', standort_id: '' });
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Speichern');
         } finally {

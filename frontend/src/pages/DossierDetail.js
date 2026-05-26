@@ -4,7 +4,7 @@ import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 const FARBEN = {
-    'IV-Massnahme': '#2563EB', 'Erstmalige berufliche Ausbildung': '#16A34A',
+    'Erstmalige berufliche Ausbildung': '#16A34A',
     'Beratung & Coaching': '#7C3AED', 'Erstmalige berufliche Abklärung': '#EA580C',
     'Gezielte Vorbereitung': '#D97706'
 };

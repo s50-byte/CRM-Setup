@@ -42,7 +42,7 @@ export default function Klienten({ meine }) {
     };
     const si = f => !f ? '' : sortField === f ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
 
-    const programme = [...new Set(klienten.map(k => k.programm_name).filter(Boolean))].sort();
+    const programme = [...new Set(klienten.map(k => k.programm_name).filter(Boolean))].filter(p => p !== 'IV-Massnahme').sort();
     const standorte = [...new Set(klienten.map(k => k.standort_kuerzel).filter(Boolean))].sort();
 
     const gefiltert = sortData(
