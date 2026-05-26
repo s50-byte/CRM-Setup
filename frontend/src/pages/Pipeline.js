@@ -12,23 +12,45 @@ const FARBEN = {
 
 export default function Pipeline() {
     const [dossiers, setDossiers] = useState([]);
+    const [standorte, setStandorte] = useState([]);
     const [laden, setLaden] = useState(true);
+    const [filterStandort, setFilterStandort] = useState('');
     const [anfrageModal, setAnfrageModal] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
-        client.get('/dossiers')
-            .then(r => setDossiers(r.data))
-            .catch(console.error)
-            .finally(() => setLaden(false));
+        Promise.all([
+            client.get('/dossiers'),
+            client.get('/standorte'),
+        ]).then(([dr, sr]) => {
+            setDossiers(dr.data);
+            setStandorte(sr.data);
+        }).catch(console.error)
+          .finally(() => setLaden(false));
     }, []);
+
+    const gefiltert = filterStandort
+        ? dossiers.filter(d => d.standort_kuerzel === filterStandort)
+        : dossiers;
 
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-                <div>
-                    <div style={{ fontSize: 19, fontWeight: 600 }}>Pipeline</div>
-                    <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle laufenden Anfragen nach Status</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div>
+                        <div style={{ fontSize: 19, fontWeight: 600 }}>Pipeline</div>
+                        <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle laufenden Anfragen nach Status</div>
+                    </div>
+                    <select value={filterStandort} onChange={e => setFilterStandort(e.target.value)} style={{
+                        fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
+                        borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28,
+                        marginTop: 2
+                    }}>
+                        <option value="">Alle Standorte</option>
+                        {standorte.map(s => (
+                            <option key={s.standort_id} value={s.kuerzel}>{s.kuerzel} — {s.name}</option>
+                        ))}
+                    </select>
                 </div>
                 <button onClick={() => setAnfrageModal(true)} style={{
                     padding: '7px 14px', fontSize: 13, fontWeight: 500,
@@ -42,7 +64,7 @@ export default function Pipeline() {
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 9 }}>
                     {STAGES.map(stage => {
-                        const items = dossiers.filter(d => d.pipeline_status === stage);
+                        const items = gefiltert.filter(d => d.pipeline_status === stage);
                         return (
                             <div key={stage} style={{
                                 background: '#fff', border: '1px solid rgba(0,0,0,.09)',

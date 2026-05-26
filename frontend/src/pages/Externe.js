@@ -11,11 +11,24 @@ const TYP_STYLE = {
     'Sonstiges':        { bg: '#F5F4F0', color: '#6B6860' },
 };
 
+function sortData(arr, field, dir) {
+    if (!field) return arr;
+    return [...arr].sort((a, b) => {
+        const va = a[field] ?? '';
+        const vb = b[field] ?? '';
+        const cmp = typeof va === 'number' && typeof vb === 'number'
+            ? va - vb : String(va).localeCompare(String(vb), 'de');
+        return dir === 'asc' ? cmp : -cmp;
+    });
+}
+
 export default function Externe() {
     const [personen, setPersonen] = useState([]);
     const [laden, setLaden] = useState(true);
     const [suche, setSuche] = useState('');
     const [filterTyp, setFilterTyp] = useState('');
+    const [sortField, setSortField] = useState('');
+    const [sortDir, setSortDir] = useState('asc');
 
     useEffect(() => {
         client.get('/externe')
@@ -24,11 +37,30 @@ export default function Externe() {
             .finally(() => setLaden(false));
     }, []);
 
-    const gefiltert = personen.filter(p => {
-        const match = `${p.vorname} ${p.nachname} ${p.firma || ''}`.toLowerCase().includes(suche.toLowerCase());
-        const typ = !filterTyp || p.typ === filterTyp;
-        return match && typ;
-    });
+    const handleSort = field => {
+        if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSortField(field); setSortDir('asc'); }
+    };
+    const si = f => !f ? '' : sortField === f ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
+
+    const gefiltert = sortData(
+        personen.filter(p => {
+            const match = `${p.vorname} ${p.nachname} ${p.firma || ''}`.toLowerCase().includes(suche.toLowerCase());
+            const typ = !filterTyp || p.typ === filterTyp;
+            return match && typ;
+        }),
+        sortField, sortDir
+    );
+
+    const COLS = [
+        { label: 'Name',     field: 'nachname' },
+        { label: 'Funktion', field: 'funktion' },
+        { label: 'Firma',    field: 'firma' },
+        { label: 'Typ',      field: 'typ' },
+        { label: 'Telefon',  field: 'telefon' },
+        { label: 'E-Mail',   field: 'email' },
+        { label: 'Klienten', field: 'anzahl_klienten' },
+    ];
 
     return (
         <div>
@@ -79,8 +111,13 @@ export default function Externe() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                         <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
-                            {['Name', 'Funktion', 'Firma', 'Typ', 'Telefon', 'E-Mail', 'Klienten'].map(h => (
-                                <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>
+                            {COLS.map((c, i) => (
+                                <th key={i} onClick={() => c.field && handleSort(c.field)} style={{
+                                    textAlign: 'left', padding: '8px 12px', fontSize: 10.5, fontWeight: 600,
+                                    color: (c.field && sortField === c.field) ? '#2563EB' : '#6B6860',
+                                    textTransform: 'uppercase', letterSpacing: '.06em',
+                                    whiteSpace: 'nowrap', cursor: c.field ? 'pointer' : 'default', userSelect: 'none'
+                                }}>{c.label}{si(c.field)}</th>
                             ))}
                         </tr>
                     </thead>

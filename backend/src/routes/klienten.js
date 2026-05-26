@@ -19,12 +19,14 @@ router.get('/', auth, async (req, res) => {
                 lv.tage_mo, lv.tage_di, lv.tage_mi, lv.tage_do, lv.tage_fr,
                 d.dossier_id, d.auftraggeber, d.pipeline_status,
                 p.name AS programm_name, p.farbe_hex,
-                ph.label AS phase_label
+                ph.label AS phase_label,
+                st.kuerzel AS standort_kuerzel, st.name AS standort_name
              FROM klient k
              LEFT JOIN leistungsvereinbarung lv ON lv.klient_id = k.klient_id
              LEFT JOIN dossier d ON d.klient_id = k.klient_id
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
              LEFT JOIN phase ph ON ph.phase_id = d.akt_phase_id
+             LEFT JOIN standort st ON st.standort_id = d.standort_id
              WHERE k.aktiv = TRUE
              ORDER BY k.nachname, k.vorname`
         );
@@ -49,7 +51,8 @@ router.get('/meine', auth, async (req, res) => {
                 lv.tage_mo, lv.tage_di, lv.tage_mi, lv.tage_do, lv.tage_fr,
                 d.dossier_id, d.auftraggeber, d.pipeline_status,
                 p.name AS programm_name, p.farbe_hex,
-                ph.label AS phase_label
+                ph.label AS phase_label,
+                st.kuerzel AS standort_kuerzel, st.name AS standort_name
              FROM klient k
              JOIN klient_user ku ON ku.klient_id = k.klient_id
                 AND ku.user_id = $1 AND ku.aktiv = TRUE
@@ -57,6 +60,7 @@ router.get('/meine', auth, async (req, res) => {
              LEFT JOIN dossier d ON d.klient_id = k.klient_id
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
              LEFT JOIN phase ph ON ph.phase_id = d.akt_phase_id
+             LEFT JOIN standort st ON st.standort_id = d.standort_id
              WHERE k.aktiv = TRUE
              ORDER BY k.nachname, k.vorname`,
             [req.user.user_id]

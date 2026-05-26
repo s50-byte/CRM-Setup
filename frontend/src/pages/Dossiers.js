@@ -23,12 +23,28 @@ const PHASE_STYLE = {
     'Programmstart': { bg: '#ECFDF5', color: '#15803D' },
 };
 
+const SEL = { fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28 };
+
+function sortData(arr, field, dir) {
+    if (!field) return arr;
+    return [...arr].sort((a, b) => {
+        const va = a[field] ?? '';
+        const vb = b[field] ?? '';
+        const cmp = typeof va === 'number' && typeof vb === 'number'
+            ? va - vb : String(va).localeCompare(String(vb), 'de');
+        return dir === 'asc' ? cmp : -cmp;
+    });
+}
+
 export default function Dossiers() {
     const [dossiers, setDossiers] = useState([]);
     const [laden, setLaden] = useState(true);
     const [filterTyp, setFilterTyp] = useState('');
     const [filterPhase, setFilterPhase] = useState('');
+    const [filterStandort, setFilterStandort] = useState('');
     const [suche, setSuche] = useState('');
+    const [sortField, setSortField] = useState('');
+    const [sortDir, setSortDir] = useState('asc');
     const [anfrageModal, setAnfrageModal] = useState(false);
     const navigate = useNavigate();
 
@@ -39,14 +55,42 @@ export default function Dossiers() {
             .finally(() => setLaden(false));
     }, []);
 
-    const gefiltert = dossiers.filter(d => {
-        const name = `${d.nachname} ${d.vorname}`.toLowerCase();
-        return (
-            (!suche || name.includes(suche.toLowerCase())) &&
-            (!filterTyp || d.programm_name === filterTyp) &&
-            (!filterPhase || d.pipeline_status === filterPhase)
-        );
-    });
+    const handleSort = field => {
+        if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSortField(field); setSortDir('asc'); }
+    };
+    const si = f => !f ? '' : sortField === f ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
+
+    const standorte = [...new Set(dossiers.map(d => d.standort_kuerzel).filter(Boolean))].sort();
+
+    const gefiltert = sortData(
+        dossiers.filter(d => {
+            const name = `${d.nachname} ${d.vorname}`.toLowerCase();
+            return (
+                (!suche || name.includes(suche.toLowerCase())) &&
+                (!filterTyp || d.programm_name === filterTyp) &&
+                (!filterPhase || d.pipeline_status === filterPhase) &&
+                (!filterStandort || d.standort_kuerzel === filterStandort)
+            );
+        }),
+        sortField, sortDir
+    );
+
+    const COLS = [
+        { label: 'Name',     field: 'nachname' },
+        { label: 'Programm', field: 'programm_name' },
+        { label: 'Phase',    field: 'pipeline_status' },
+        { label: 'Label',    field: 'klient_label' },
+        { label: 'Verlauf',  field: null },
+        { label: 'Start',    field: 'eingang_datum' },
+        { label: 'Ende',     field: null },
+        { label: 'Standort', field: 'standort_kuerzel' },
+        { label: 'CM / JC',  field: null },
+        { label: 'Tasks',    field: 'offene_tasks' },
+        { label: '',         field: null },
+    ];
+
+    const hasFilter = suche || filterTyp || filterPhase || filterStandort;
 
     return (
         <div>
@@ -70,28 +114,22 @@ export default function Dossiers() {
                 <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em' }}>Filter</span>
                 <input type="text" value={suche} onChange={e => setSuche(e.target.value)}
                     placeholder="Name suchen…"
-                    style={{
-                        fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
-                        borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit',
-                        height: 28, width: 140, outline: 'none'
-                    }}
+                    style={{ ...SEL, width: 140, outline: 'none' }}
                 />
-                <select value={filterTyp} onChange={e => setFilterTyp(e.target.value)} style={{
-                    fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
-                    borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28
-                }}>
+                <select value={filterTyp} onChange={e => setFilterTyp(e.target.value)} style={SEL}>
                     <option value="">Alle Typen</option>
                     {Object.keys(FARBEN).map(t => <option key={t}>{t}</option>)}
                 </select>
-                <select value={filterPhase} onChange={e => setFilterPhase(e.target.value)} style={{
-                    fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
-                    borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28
-                }}>
+                <select value={filterPhase} onChange={e => setFilterPhase(e.target.value)} style={SEL}>
                     <option value="">Alle Phasen</option>
                     {Object.keys(PHASE_STYLE).map(p => <option key={p}>{p}</option>)}
                 </select>
-                {(suche || filterTyp || filterPhase) && (
-                    <button onClick={() => { setSuche(''); setFilterTyp(''); setFilterPhase(''); }} style={{
+                <select value={filterStandort} onChange={e => setFilterStandort(e.target.value)} style={SEL}>
+                    <option value="">Alle Standorte</option>
+                    {standorte.map(s => <option key={s}>{s}</option>)}
+                </select>
+                {hasFilter && (
+                    <button onClick={() => { setSuche(''); setFilterTyp(''); setFilterPhase(''); setFilterStandort(''); }} style={{
                         height: 28, padding: '0 9px', fontSize: 12, cursor: 'pointer',
                         border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
                         background: 'transparent', color: '#6B6860', fontFamily: 'inherit'
@@ -103,16 +141,21 @@ export default function Dossiers() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                         <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
-                            {['Name', 'Programm', 'Phase', 'Label', 'Verlauf', 'Start', 'Ende', 'Standort', 'CM / JC', 'Tasks', ''].map(h => (
-                                <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>
+                            {COLS.map((c, i) => (
+                                <th key={i} onClick={() => c.field && handleSort(c.field)} style={{
+                                    textAlign: 'left', padding: '8px 12px', fontSize: 10.5, fontWeight: 600,
+                                    color: (c.field && sortField === c.field) ? '#2563EB' : '#6B6860',
+                                    textTransform: 'uppercase', letterSpacing: '.06em',
+                                    whiteSpace: 'nowrap', cursor: c.field ? 'pointer' : 'default', userSelect: 'none'
+                                }}>{c.label}{si(c.field)}</th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
                         {laden ? (
-                            <tr><td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
+                            <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
                         ) : gefiltert.length === 0 ? (
-                            <tr><td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
+                            <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
                         ) : gefiltert.map((d, i) => {
                             const farbe = FARBEN[d.programm_name] || '#888';
                             const ps = PHASE_STYLE[d.pipeline_status] || { bg: '#F5F4F0', color: '#6B6860' };

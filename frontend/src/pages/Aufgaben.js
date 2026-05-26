@@ -8,11 +8,28 @@ const PRIO_STYLE = {
     'Niedrig': { bg: '#F5F4F0', color: '#6B6860', border: 'rgba(0,0,0,.09)' },
 };
 
+const PRIO_ORDER = { 'Hoch': 0, 'Mittel': 1, 'Niedrig': 2 };
+
+function sortData(arr, field, dir) {
+    if (!field) return arr;
+    return [...arr].sort((a, b) => {
+        let va = a[field] ?? '';
+        let vb = b[field] ?? '';
+        if (field === 'prioritaet') { va = PRIO_ORDER[va] ?? 99; vb = PRIO_ORDER[vb] ?? 99; }
+        if (field === 'erledigt') { va = va ? 1 : 0; vb = vb ? 1 : 0; }
+        const cmp = typeof va === 'number' && typeof vb === 'number'
+            ? va - vb : String(va).localeCompare(String(vb), 'de');
+        return dir === 'asc' ? cmp : -cmp;
+    });
+}
+
 export default function Aufgaben() {
     const [tasks, setTasks] = useState([]);
     const [laden, setLaden] = useState(true);
     const [filterStatus, setFilterStatus] = useState('Offen');
     const [filterPrio, setFilterPrio] = useState('');
+    const [sortField, setSortField] = useState('');
+    const [sortDir, setSortDir] = useState('asc');
     const [aufgabeModal, setAufgabeModal] = useState(false);
 
     useEffect(() => {
@@ -31,18 +48,44 @@ export default function Aufgaben() {
         }
     }
 
-    const gefiltert = tasks.filter(t => {
-        if (filterStatus === 'Offen' && t.erledigt) return false;
-        if (filterStatus === 'Erledigt' && !t.erledigt) return false;
-        if (filterPrio && t.prioritaet !== filterPrio) return false;
-        return true;
-    });
+    const handleSort = field => {
+        if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSortField(field); setSortDir('asc'); }
+    };
+    const si = f => !f ? '' : sortField === f ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
+
+    const gefiltert = sortData(
+        tasks.filter(t => {
+            if (filterStatus === 'Offen' && t.erledigt) return false;
+            if (filterStatus === 'Erledigt' && !t.erledigt) return false;
+            if (filterPrio && t.prioritaet !== filterPrio) return false;
+            return true;
+        }),
+        sortField, sortDir
+    );
+
+    const COLS = [
+        { label: '',          field: null },
+        { label: 'Aufgabe',   field: 'text' },
+        { label: 'Klient/in', field: 'nachname' },
+        { label: 'Phase',     field: 'phase_label' },
+        { label: 'Fällig',    field: 'faellig_am' },
+        { label: 'Priorität', field: 'prioritaet' },
+        { label: 'Status',    field: 'erledigt' },
+    ];
 
     return (
         <div>
-            <div style={{ marginBottom: '1.25rem' }}>
-                <div style={{ fontSize: 19, fontWeight: 600 }}>Aufgaben</div>
-                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle offenen und erledigten Tasks</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <div>
+                    <div style={{ fontSize: 19, fontWeight: 600 }}>Aufgaben</div>
+                    <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle offenen und erledigten Tasks</div>
+                </div>
+                <button onClick={() => setAufgabeModal(true)} style={{
+                    padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                    cursor: 'pointer', border: 'none', borderRadius: 6,
+                    background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                }}>+ Neue Aufgabe</button>
             </div>
 
             <div style={{
@@ -50,13 +93,6 @@ export default function Aufgaben() {
                 background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10,
                 padding: '.5rem .875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)'
             }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-                <button onClick={() => setAufgabeModal(true)} style={{
-                    padding: '7px 14px', fontSize: 13, fontWeight: 500,
-                    cursor: 'pointer', border: 'none', borderRadius: 6,
-                    background: '#2563EB', color: '#fff', fontFamily: 'inherit'
-                }}>+ Neue Aufgabe</button>
-            </div>
                 <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em' }}>Filter</span>
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{
                     fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
@@ -81,8 +117,13 @@ export default function Aufgaben() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                         <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
-                            {['', 'Aufgabe', 'Klient/in', 'Phase', 'Fällig', 'Priorität', 'Status'].map((h, i) => (
-                                <th key={i} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>
+                            {COLS.map((c, i) => (
+                                <th key={i} onClick={() => c.field && handleSort(c.field)} style={{
+                                    textAlign: 'left', padding: '8px 12px', fontSize: 10.5, fontWeight: 600,
+                                    color: (c.field && sortField === c.field) ? '#2563EB' : '#6B6860',
+                                    textTransform: 'uppercase', letterSpacing: '.06em',
+                                    whiteSpace: 'nowrap', cursor: c.field ? 'pointer' : 'default', userSelect: 'none'
+                                }}>{c.label}{si(c.field)}</th>
                             ))}
                         </tr>
                     </thead>
@@ -148,8 +189,8 @@ export default function Aufgaben() {
                 onSaved={() => {
                     setAufgabeModal(false);
                     client.get('/tasks').then(r => setTasks(r.data));
-            }}
-/>
+                }}
+            />
         </div>
     );
 }
