@@ -22,7 +22,7 @@ const NAV = [
     { path: '/aufgaben',  label: 'Aufgaben',           icon: '☑' },
     { section: 'Operativ' },
     { path: '/pipeline',  label: 'Pipeline',           icon: '⋮' },
-    { path: '/dossiers',  label: 'Falldossiers',       icon: '📁' },
+    { path: '/dossiers',  label: 'Klientendossiers',    icon: '📁' },
     { path: '/termine',   label: 'Termine',            icon: '📅' },
     { path: '/praesenz',  label: 'Präsenzkontrolle',   icon: '✓' },
     { section: 'Stammdaten' },
@@ -76,7 +76,7 @@ export default function Layout() {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: '#fff', fontSize: 15
                     }}>✦</div>
-                    IV-CRM
+                    Klientenführungstool Prototyp
                 </div>
                 <span style={{
                     fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20,

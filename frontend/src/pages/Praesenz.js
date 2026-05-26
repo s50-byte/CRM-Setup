@@ -117,9 +117,10 @@ export default function Praesenz() {
                 }}>
                     <option value="">Alle Programme</option>
                     <option>IV-Massnahme</option>
-                    <option>Ausbildung</option>
-                    <option>Beratung</option>
-                    <option>Gez. Vorbereitung</option>
+                    <option>Erstmalige berufliche Ausbildung</option>
+                    <option>Beratung & Coaching</option>
+                    <option>Erstmalige berufliche Abklärung</option>
+                    <option>Gezielte Vorbereitung</option>
                 </select>
             </div>
 

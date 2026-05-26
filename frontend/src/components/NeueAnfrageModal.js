@@ -3,21 +3,27 @@ import Modal from './Modal';
 import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } from './FormField';
 import client from '../api/client';
 
-const PROGRAMME = ['IV-Massnahme', 'Ausbildung', 'Beratung', 'Abklärung', 'Gez. Vorbereitung'];
+const PROGRAMME = [
+    'IV-Massnahme',
+    'Erstmalige berufliche Ausbildung',
+    'Beratung & Coaching',
+    'Erstmalige berufliche Abklärung',
+    'Gezielte Vorbereitung',
+];
 const KANAELE = ['Telefon', 'E-Mail', 'Online-Formular', 'Direkt'];
-const LABELS = ['', 'Lernender', 'Teilnehmer', 'Mitarbeiter mit IV-Rente'];
+const LABELS = ['', 'LE', 'TN', 'MA'];
 const LABEL_DEFAULT = {
-    'IV-Massnahme':      'Teilnehmer',
-    'Ausbildung':        'Lernender',
-    'Beratung':          'Teilnehmer',
-    'Abklärung':         'Teilnehmer',
-    'Gez. Vorbereitung': 'Teilnehmer',
+    'IV-Massnahme':                    'TN',
+    'Erstmalige berufliche Ausbildung':'LE',
+    'Beratung & Coaching':             'TN',
+    'Erstmalige berufliche Abklärung': 'TN',
+    'Gezielte Vorbereitung':           'TN',
 };
 
 export default function NeueAnfrageModal({ open, onClose, onSaved }) {
     const [form, setForm] = useState({
         nachname: '', vorname: '', programm: 'IV-Massnahme',
-        auftraggeber: '', kanal: 'Telefon', klient_label: 'Teilnehmer',
+        auftraggeber: '', kanal: 'Telefon', klient_label: 'TN',
         start: '', ende: '', notiz: '', standort_id: ''
     });
     const [laden, setLaden] = useState(false);
@@ -67,7 +73,7 @@ export default function NeueAnfrageModal({ open, onClose, onSaved }) {
 
             onSaved();
             onClose();
-            setForm({ nachname: '', vorname: '', programm: 'IV-Massnahme', auftraggeber: '', kanal: 'Telefon', klient_label: 'Teilnehmer', start: '', ende: '', notiz: '', standort_id: '' });
+            setForm({ nachname: '', vorname: '', programm: 'IV-Massnahme', auftraggeber: '', kanal: 'Telefon', klient_label: 'TN', start: '', ende: '', notiz: '', standort_id: '' });
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Speichern');
         } finally {
@@ -100,7 +106,7 @@ export default function NeueAnfrageModal({ open, onClose, onSaved }) {
                     {PROGRAMME.map(p => <option key={p}>{p}</option>)}
                 </select>
             </FormField>
-            <FormField label="Auftraggeber *">
+            <FormField label="Zuweisende Stelle *">
                 <input style={inputStyle} value={form.auftraggeber} onChange={e => set('auftraggeber', e.target.value)} placeholder="z.B. IV-Stelle ZH" />
             </FormField>
             <FormField label="Eingangskanal">

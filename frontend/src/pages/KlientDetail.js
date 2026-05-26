@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 
 const FARBEN = {
-    'IV-Massnahme': '#2563EB', 'Ausbildung': '#16A34A', 'Beratung': '#7C3AED',
-    'Abklärung': '#EA580C', 'Gez. Vorbereitung': '#D97706'
+    'IV-Massnahme': '#2563EB', 'Erstmalige berufliche Ausbildung': '#16A34A',
+    'Beratung & Coaching': '#7C3AED', 'Erstmalige berufliche Abklärung': '#EA580C',
+    'Gezielte Vorbereitung': '#D97706'
 };
 
 export default function KlientDetail() {
@@ -113,7 +114,7 @@ export default function KlientDetail() {
                         ))}
                         {klient.auftraggeber && (
                             <div style={{ marginTop: 12 }}>
-                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Auftraggeber</div>
+                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Zuweisende Stelle</div>
                                 <div style={{ fontSize: 12.5, fontWeight: 500 }}>{klient.auftraggeber}</div>
                                 {klient.programm_name && (
                                     <span style={{

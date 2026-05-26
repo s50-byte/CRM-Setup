@@ -5,8 +5,9 @@ import NeueAnfrageModal from '../components/NeueAnfrageModal';
 
 const STAGES = ['Erstkontakt', 'In Abklärung', 'Erstgespräch', 'Schnupper', 'Programmstart'];
 const FARBEN = {
-    'IV-Massnahme': '#2563EB', 'Ausbildung': '#16A34A', 'Beratung': '#7C3AED',
-    'Abklärung': '#EA580C', 'Gez. Vorbereitung': '#D97706'
+    'IV-Massnahme': '#2563EB', 'Erstmalige berufliche Ausbildung': '#16A34A',
+    'Beratung & Coaching': '#7C3AED', 'Erstmalige berufliche Abklärung': '#EA580C',
+    'Gezielte Vorbereitung': '#D97706'
 };
 
 export default function Pipeline() {

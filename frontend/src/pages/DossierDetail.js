@@ -4,25 +4,26 @@ import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 const FARBEN = {
-    'IV-Massnahme': '#2563EB', 'Ausbildung': '#16A34A', 'Beratung': '#7C3AED',
-    'Abklärung': '#EA580C', 'Gez. Vorbereitung': '#D97706'
+    'IV-Massnahme': '#2563EB', 'Erstmalige berufliche Ausbildung': '#16A34A',
+    'Beratung & Coaching': '#7C3AED', 'Erstmalige berufliche Abklärung': '#EA580C',
+    'Gezielte Vorbereitung': '#D97706'
 };
 
 const LABEL_FARBEN = {
-    'Lernender':                { bg: '#ECFDF5', color: '#15803D' },
-    'Teilnehmer':               { bg: '#EEF3FE', color: '#1D4ED8' },
-    'Mitarbeiter mit IV-Rente': { bg: '#F5F3FF', color: '#5B21B6' },
+    'LE': { bg: '#ECFDF5', color: '#15803D' },
+    'TN': { bg: '#EEF3FE', color: '#1D4ED8' },
+    'MA': { bg: '#F5F3FF', color: '#5B21B6' },
 };
 
 const JKAT = {
-    'Standortgespräch':          { bg: '#E0F2FE', color: '#0369A1' },
-    'Job Coaching':               { bg: '#F0FDF4', color: '#166534' },
-    'Beobachtung':                { bg: '#F5F3FF', color: '#5B21B6' },
-    'Zielfortschritt':            { bg: '#FFF7ED', color: '#9A3412' },
-    'Abwesenheit':                { bg: '#FEF2F2', color: '#991B1B' },
-    'Kommunikation Auftraggeber': { bg: '#E0F2FE', color: '#075985' },
-    'Externe Person':             { bg: '#FDF4FF', color: '#7E22CE' },
-    'Sonstiges':                  { bg: '#F5F4F0', color: '#6B6860' },
+    'Standortgespräch':                  { bg: '#E0F2FE', color: '#0369A1' },
+    'Job Coaching':                       { bg: '#F0FDF4', color: '#166534' },
+    'Beobachtung':                        { bg: '#F5F3FF', color: '#5B21B6' },
+    'Zielfortschritt':                    { bg: '#FFF7ED', color: '#9A3412' },
+    'Absenz':                             { bg: '#FEF2F2', color: '#991B1B' },
+    'Kommunikation zuweisende Stelle':    { bg: '#E0F2FE', color: '#075985' },
+    'Externe Person':                     { bg: '#FDF4FF', color: '#7E22CE' },
+    'Sonstiges':                          { bg: '#F5F4F0', color: '#6B6860' },
 };
 
 export default function DossierDetail() {
@@ -428,7 +429,7 @@ export default function DossierDetail() {
             <div style={{ marginTop: '.875rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
-                        Zuweisung
+                        Zugewiesene Kader
                     </div>
                     {zugewiesen.length === 0 ? (
                         <div style={{ fontSize: 12, color: '#6B6860' }}>Niemand zugewiesen</div>

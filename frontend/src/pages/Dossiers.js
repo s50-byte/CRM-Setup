@@ -4,14 +4,15 @@ import client from '../api/client';
 import NeueAnfrageModal from '../components/NeueAnfrageModal';
 
 const FARBEN = {
-    'IV-Massnahme': '#2563EB', 'Ausbildung': '#16A34A', 'Beratung': '#7C3AED',
-    'Abklärung': '#EA580C', 'Gez. Vorbereitung': '#D97706'
+    'IV-Massnahme': '#2563EB', 'Erstmalige berufliche Ausbildung': '#16A34A',
+    'Beratung & Coaching': '#7C3AED', 'Erstmalige berufliche Abklärung': '#EA580C',
+    'Gezielte Vorbereitung': '#D97706'
 };
 
 const LABEL_FARBEN = {
-    'Lernender':               '#16A34A',
-    'Teilnehmer':              '#2563EB',
-    'Mitarbeiter mit IV-Rente':'#7C3AED',
+    'LE': '#16A34A',
+    'TN': '#2563EB',
+    'MA': '#7C3AED',
 };
 
 const PHASE_STYLE = {
@@ -51,7 +52,7 @@ export default function Dossiers() {
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
                 <div>
-                    <div style={{ fontSize: 19, fontWeight: 600 }}>Falldossiers</div>
+                    <div style={{ fontSize: 19, fontWeight: 600 }}>Klientendossiers</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle Klientinnen und Klienten — eine Akte pro Klient</div>
                 </div>
                 <button onClick={() => setAnfrageModal(true)} style={{

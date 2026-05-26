@@ -43,9 +43,14 @@ router.post('/', auth, async (req, res) => {
     }
 
     const { full_name, email, passwort, system_rolle, pensum_pct, avatar_initials } = req.body;
+    const GUELTIGE_ROLLEN = ['admin', 'mitarbeitende', 'teamleitung', 'management', 'kader'];
 
     if (!full_name || !email || !passwort) {
         return res.status(400).json({ error: 'Name, E-Mail und Passwort erforderlich' });
+    }
+
+    if (system_rolle && !GUELTIGE_ROLLEN.includes(system_rolle)) {
+        return res.status(400).json({ error: `Ungültige Rolle. Erlaubt: ${GUELTIGE_ROLLEN.join(', ')}` });
     }
 
     try {

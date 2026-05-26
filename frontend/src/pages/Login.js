@@ -44,7 +44,7 @@ export default function Login() {
                         color: '#fff', fontSize: 18
                     }}>✦</div>
                     <div>
-                        <div style={{ fontWeight: 600, fontSize: 16 }}>IV-CRM</div>
+                        <div style={{ fontWeight: 600, fontSize: 16 }}>Klientenführungstool Prototyp</div>
                         <div style={{ fontSize: 11, color: '#6B6860' }}>Soziale Integration</div>
                     </div>
                 </div>

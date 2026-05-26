@@ -35,7 +35,7 @@ export default function Externe() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
                 <div>
                     <div style={{ fontSize: 19, fontWeight: 600 }}>Externe Personen & Firmen</div>
-                    <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Auftraggeber, Arbeitgeber, gesetzliche Vertreter, Ärzte</div>
+                    <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Zuweisende Stellen, Arbeitgeber, gesetzliche Vertreter, Ärzte</div>
                 </div>
                 <button style={{
                     padding: '7px 14px', fontSize: 13, fontWeight: 500,
