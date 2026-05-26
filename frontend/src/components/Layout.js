@@ -13,6 +13,7 @@ import Programme from '../pages/Programme';
 import Profil from '../pages/Profil';
 import DossierDetail from '../pages/DossierDetail';
 import KlientDetail from '../pages/KlientDetail';
+import Standorte from '../pages/Standorte';
 
 const NAV = [
     { section: 'Mein Bereich' },
@@ -30,6 +31,7 @@ const NAV = [
     { section: 'Verwaltung' },
     { path: '/programme', label: 'Programme',          icon: '⚙' },
     { path: '/profil',    label: 'Mein Profil',        icon: '👤' },
+    { path: '/standorte', label: 'Standorte',          icon: '📍' },
 ];
 
 export default function Layout() {
@@ -160,6 +162,7 @@ export default function Layout() {
                     <Route path="/profil"    element={<Profil />} />
                     <Route path="/dossiers/:id" element={<DossierDetail />} />
                     <Route path="/klienten/:id" element={<KlientDetail />} />
+                    <Route path="/standorte" element={<Standorte />} />
                 </Routes>
             </div>
         </div>

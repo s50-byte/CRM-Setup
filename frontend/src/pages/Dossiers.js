@@ -7,6 +7,12 @@ const FARBEN = {
     'Abklärung': '#EA580C', 'Gez. Vorbereitung': '#D97706'
 };
 
+const LABEL_FARBEN = {
+    'Lernender':               '#16A34A',
+    'Teilnehmer':              '#2563EB',
+    'Mitarbeiter mit IV-Rente':'#7C3AED',
+};
+
 const PHASE_STYLE = {
     'Erstkontakt':   { bg: '#EEF3FE', color: '#1D4ED8' },
     'In Abklärung':  { bg: '#FFFBEB', color: '#B45309' },
@@ -89,16 +95,16 @@ export default function Dossiers() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                         <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
-                            {['Name', 'Programm', 'Phase', 'Verlauf', 'Start', 'Ende', 'CM / JC', 'Tasks', ''].map(h => (
+                            {['Name', 'Programm', 'Phase', 'Label', 'Verlauf', 'Start', 'Ende', 'Standort', 'CM / JC', 'Tasks', ''].map(h => (
                                 <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
                         {laden ? (
-                            <tr><td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
+                            <tr><td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
                         ) : gefiltert.length === 0 ? (
-                            <tr><td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
+                            <tr><td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
                         ) : gefiltert.map((d, i) => {
                             const farbe = FARBEN[d.programm_name] || '#888';
                             const ps = PHASE_STYLE[d.pipeline_status] || { bg: '#F5F4F0', color: '#6B6860' };
@@ -125,6 +131,18 @@ export default function Dossiers() {
                                         }}>{d.phase_label || d.pipeline_status}</span>
                                     </td>
                                     <td style={{ padding: '8px 12px' }}>
+                                        {d.klient_label ? (() => {
+                                            const c = LABEL_FARBEN[d.klient_label] || '#6B6860';
+                                            return (
+                                                <span style={{
+                                                    fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                                                    background: c + '22', color: c,
+                                                    border: `1px solid ${c}33`, fontFamily: 'monospace'
+                                                }}>{d.klient_label}</span>
+                                            );
+                                        })() : '—'}
+                                    </td>
+                                    <td style={{ padding: '8px 12px' }}>
                                         {verlauf.length > 1 ? (
                                             <span style={{
                                                 fontSize: 11, padding: '2px 7px', borderRadius: 20,
@@ -137,6 +155,15 @@ export default function Dossiers() {
                                         {d.eingang_datum ? new Date(d.eingang_datum).toLocaleDateString('de-CH') : '—'}
                                     </td>
                                     <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>—</td>
+                                    <td style={{ padding: '8px 12px' }}>
+                                        {d.standort_name ? (
+                                            <span style={{
+                                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                                                background: '#EEF3FE', color: '#1D4ED8',
+                                                border: '1px solid rgba(37,99,235,.15)', fontFamily: 'monospace'
+                                            }}>{d.standort_kuerzel}</span>
+                                        ) : '—'}
+                                    </td>
                                     <td style={{ padding: '8px 12px', fontSize: 11.5 }}>
                                         {(d.zugewiesen || []).map(u => u.full_name).join(', ') || '—'}
                                     </td>

@@ -8,6 +8,12 @@ const FARBEN = {
     'Abklärung': '#EA580C', 'Gez. Vorbereitung': '#D97706'
 };
 
+const LABEL_FARBEN = {
+    'Lernender':               '#16A34A',
+    'Teilnehmer':              '#2563EB',
+    'Mitarbeiter mit IV-Rente':'#7C3AED',
+};
+
 const JKAT = {
     'Standortgespräch':          { bg: '#E0F2FE', color: '#0369A1' },
     'Job Coaching':               { bg: '#F0FDF4', color: '#166534' },
@@ -149,6 +155,16 @@ export default function DossierDetail() {
                                 background: '#F5F3FF', color: '#5B21B6',
                                 border: '1px solid rgba(124,58,237,.15)', fontFamily: 'monospace'
                             }}>{dossier.phase_label || dossier.pipeline_status}</span>
+                            {dossier.klient_label && (() => {
+                                const c = LABEL_FARBEN[dossier.klient_label] || '#6B6860';
+                                return (
+                                    <span style={{
+                                        fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                                        background: c + '22', color: c,
+                                        border: `1px solid ${c}33`, fontFamily: 'monospace'
+                                    }}>{dossier.klient_label}</span>
+                                );
+                            })()}
                             <span style={{
                                 fontSize: 11, padding: '2px 7px', borderRadius: 20,
                                 background: '#F5F4F0', color: '#6B6860',
@@ -157,6 +173,12 @@ export default function DossierDetail() {
                         </div>
                         <div style={{ fontSize: 11.5, color: '#6B6860', marginTop: 3, display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                             <span>{dossier.auftraggeber}</span>
+                            {dossier.standort_name && (
+                                <>
+                                    <span style={{ color: '#A09D97' }}>·</span>
+                                    <span>{dossier.standort_name}</span>
+                                </>
+                            )}
                             <span style={{ color: '#A09D97' }}>·</span>
                             <span>{dossier.programm_name || '—'}</span>
                             <span style={{ color: '#A09D97' }}>·</span>

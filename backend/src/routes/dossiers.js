@@ -15,6 +15,9 @@ router.get('/', auth, async (req, res) => {
                 k.klient_id, k.nachname, k.vorname,
                 p.name AS programm_name, p.farbe_hex,
                 ph.label AS phase_label,
+                d.standort_id,
+                st.name AS standort_name,
+                st.kuerzel AS standort_kuerzel,
                 -- Zugewiesene Personen
                 COALESCE(
                     JSON_AGG(
@@ -28,6 +31,10 @@ router.get('/', auth, async (req, res) => {
                     ) FILTER (WHERE u.user_id IS NOT NULL),
                     '[]'
                 ) AS zugewiesen,
+                -- Klient-Label aus laufendem Programmverlauf
+                (SELECT pv2.klient_label FROM programm_verlauf pv2
+                 WHERE pv2.dossier_id = d.dossier_id AND pv2.status = 'Laufend'
+                 LIMIT 1) AS klient_label,
                 -- Programmverlauf
                 COALESCE(
                     JSON_AGG(
@@ -37,7 +44,8 @@ router.get('/', auth, async (req, res) => {
                             'farbe_hex', pp.farbe_hex,
                             'start_datum', pv.start_datum,
                             'end_datum', pv.end_datum,
-                            'status', pv.status
+                            'status', pv.status,
+                            'klient_label', pv.klient_label
                         )
                     ) FILTER (WHERE pv.verlauf_id IS NOT NULL),
                     '[]'
@@ -53,9 +61,11 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN programm_verlauf pv ON pv.dossier_id = d.dossier_id
              LEFT JOIN programm pp ON pp.programm_id = pv.programm_id
              LEFT JOIN task t ON t.klient_id = k.klient_id
+             LEFT JOIN standort st ON st.standort_id = d.standort_id
              WHERE k.aktiv = TRUE
              GROUP BY d.dossier_id, k.klient_id, k.nachname, k.vorname,
-                      p.name, p.farbe_hex, ph.label
+                      p.name, p.farbe_hex, ph.label,
+                      d.standort_id, st.name, st.kuerzel
              ORDER BY k.nachname, k.vorname`
         );
         res.json(result.rows);
@@ -70,11 +80,13 @@ router.get('/:id', auth, async (req, res) => {
     try {
         const dossier = await db.query(
             `SELECT d.*, k.*, p.name AS programm_name, p.farbe_hex,
-                    ph.label AS phase_label
+                    ph.label AS phase_label,
+                    st.name AS standort_name, st.kuerzel AS standort_kuerzel
              FROM dossier d
              JOIN klient k ON k.klient_id = d.klient_id
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
              LEFT JOIN phase ph ON ph.phase_id = d.akt_phase_id
+             LEFT JOIN standort st ON st.standort_id = d.standort_id
              WHERE d.dossier_id = $1`,
             [req.params.id]
         );
@@ -105,8 +117,10 @@ router.get('/:id', auth, async (req, res) => {
             [dossier.rows[0].klient_id]
         );
 
+        const aktVerlauf = verlauf.rows.find(v => v.status === 'Laufend');
         res.json({
             ...dossier.rows[0],
+            klient_label: aktVerlauf?.klient_label || null,
             programm_verlauf: verlauf.rows,
             zugewiesen: zugewiesen.rows
         });
@@ -118,7 +132,7 @@ router.get('/:id', auth, async (req, res) => {
 
 // POST /api/dossiers — Neues Dossier
 router.post('/', auth, async (req, res) => {
-    const { klient_id, auftraggeber, kanal, programm_id } = req.body;
+    const { klient_id, auftraggeber, kanal, programm_id, standort_id, klient_label } = req.body;
 
     if (!klient_id || !auftraggeber) {
         return res.status(400).json({ error: 'Klient und Auftraggeber erforderlich' });
@@ -126,11 +140,19 @@ router.post('/', auth, async (req, res) => {
 
     try {
         const result = await db.query(
-            `INSERT INTO dossier (klient_id, auftraggeber, kanal, akt_programm_id)
-             VALUES ($1, $2, $3, $4)
+            `INSERT INTO dossier (klient_id, auftraggeber, kanal, akt_programm_id, standort_id)
+             VALUES ($1, $2, $3, $4, $5)
              RETURNING *`,
-            [klient_id, auftraggeber, kanal || null, programm_id || null]
+            [klient_id, auftraggeber, kanal || null, programm_id || null, standort_id || null]
         );
+
+        if (programm_id) {
+            await db.query(
+                `INSERT INTO programm_verlauf (dossier_id, programm_id, status, klient_label)
+                 VALUES ($1, $2, 'Geplant', $3)`,
+                [result.rows[0].dossier_id, programm_id, klient_label || null]
+            );
+        }
 
         // Zeitachse-Eintrag
         await db.query(
