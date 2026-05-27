@@ -13,6 +13,7 @@ import Programme from '../pages/Programme';
 import Profil from '../pages/Profil';
 import DossierDetail from '../pages/DossierDetail';
 import KlientDetail from '../pages/KlientDetail';
+import ExterneDetail from '../pages/ExterneDetail';
 import Standorte from '../pages/Standorte';
 
 const NAV = [
@@ -162,6 +163,7 @@ export default function Layout() {
                     <Route path="/profil"    element={<Profil />} />
                     <Route path="/dossiers/:id" element={<DossierDetail />} />
                     <Route path="/klienten/:id" element={<KlientDetail />} />
+                    <Route path="/externe/:id"  element={<ExterneDetail />} />
                     <Route path="/standorte" element={<Standorte />} />
                 </Routes>
             </div>
