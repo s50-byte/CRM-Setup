@@ -94,6 +94,34 @@ export default function Standorte() {
                             {s.telefon && <><span style={{ color: '#6B6860' }}>Telefon</span><span>{s.telefon}</span></>}
                             {s.email && <><span style={{ color: '#6B6860' }}>E-Mail</span><span style={{ color: '#2563EB' }}>{s.email}</span></>}
                         </div>
+                        {(s.benutzer || []).length > 0 && (
+                            <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid rgba(0,0,0,.06)' }}>
+                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Zugewiesen</div>
+                                {(s.benutzer || []).slice(0, 4).map(u => (
+                                    <div key={u.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                                        <div style={{
+                                            width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+                                            background: '#EEF3FE', color: '#1D4ED8',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: 9.5, fontWeight: 600
+                                        }}>{u.avatar_initials || u.full_name?.split(' ').map(n => n[0]).join('').slice(0, 3)}</div>
+                                        <div style={{ minWidth: 0 }}>
+                                            <div style={{ fontSize: 12, fontWeight: 500, color: '#1A1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.full_name}</div>
+                                            {(u.rollen || []).length > 0 && (
+                                                <div style={{ fontSize: 10.5, color: '#6B6860', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {u.rollen.join(', ')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                {(s.benutzer || []).length > 4 && (
+                                    <div style={{ fontSize: 11, color: '#6B6860', paddingLeft: 34, marginTop: 2 }}>
+                                        + {s.benutzer.length - 4} weitere
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>

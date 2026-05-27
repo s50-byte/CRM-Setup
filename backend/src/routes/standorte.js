@@ -2,11 +2,33 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-// GET /api/standorte — Alle Standorte
+// GET /api/standorte — Alle Standorte inkl. zugewiesener Benutzer
 router.get('/', auth, async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT * FROM standort WHERE aktiv = TRUE ORDER BY name`
+            `SELECT
+                s.*,
+                COALESCE(
+                    JSON_AGG(
+                        JSONB_BUILD_OBJECT(
+                            'user_id', u.user_id,
+                            'full_name', u.full_name,
+                            'avatar_initials', u.avatar_initials,
+                            'rollen', (
+                                SELECT COALESCE(JSON_AGG(ba.rolle_name ORDER BY ba.rolle_name), '[]'::json)
+                                FROM benutzer_aufgabe ba
+                                WHERE ba.user_id = u.user_id
+                            )
+                        ) ORDER BY u.full_name
+                    ) FILTER (WHERE u.user_id IS NOT NULL),
+                    '[]'
+                ) AS benutzer
+             FROM standort s
+             LEFT JOIN benutzer_standort bs ON bs.standort_id = s.standort_id
+             LEFT JOIN benutzer u ON u.user_id = bs.user_id AND u.aktiv = TRUE
+             WHERE s.aktiv = TRUE
+             GROUP BY s.standort_id
+             ORDER BY s.name`
         );
         res.json(result.rows);
     } catch (err) {
