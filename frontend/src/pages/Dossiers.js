@@ -103,7 +103,6 @@ export default function Dossiers() {
         { label: 'Betreuung', field: null },
         { label: 'Tasks',     field: 'offene_tasks' },
         { label: 'Ziele',     field: null },
-        { label: '',          field: null },
     ];
 
     const hasFilter = suche || filterTyp || filterPhase || filterStandort;
@@ -153,9 +152,8 @@ export default function Dossiers() {
                 )}
             </div>
 
-            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)', display: 'block' }}>
-                <div style={{ overflowX: 'auto', width: '100%' }}>
-                <table style={{ width: 'max-content', minWidth: 1200, borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
+                <table style={{ width: '100%', minWidth: 1200, borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                         <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
                             {COLS.map((c, i) => (
@@ -170,9 +168,9 @@ export default function Dossiers() {
                     </thead>
                     <tbody>
                         {laden ? (
-                            <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
+                            <tr><td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
                         ) : gefiltert.length === 0 ? (
-                            <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
+                            <tr><td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
                         ) : gefiltert.map((d, i) => {
                             const farbe = FARBEN[d.programm_name] || '#888';
                             const ps = PHASE_STYLE[d.pipeline_status] || { bg: '#F5F4F0', color: '#6B6860' };
@@ -183,7 +181,7 @@ export default function Dossiers() {
                                 <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', cursor: 'pointer', background: warnBg }}
                                     onMouseOver={e => e.currentTarget.style.background = '#F5F4F0'}
                                     onMouseOut={e => e.currentTarget.style.background = warnBg}>
-                                    <td style={{ padding: '8px 12px', fontWeight: 500 }}>{d.nachname} {d.vorname}</td>
+                                    <td onClick={() => navigate(`/dossiers/${d.dossier_id}`)} style={{ padding: '8px 12px', fontWeight: 500, color: '#2563EB', cursor: 'pointer', whiteSpace: 'nowrap' }}>{d.nachname} {d.vorname}</td>
                                     <td style={{ padding: '8px 12px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                                             {d.programm_name ? (
@@ -268,19 +266,11 @@ export default function Dossiers() {
                                             ? <span style={{ color: d.ziele_erreicht === d.ziele_total ? '#15803D' : '#1A1917' }}>{d.ziele_erreicht}/{d.ziele_total}</span>
                                             : <span style={{ color: '#A09D97' }}>—</span>}
                                     </td>
-                                    <td style={{ padding: '8px 12px' }}>
-                                        <button onClick={() => navigate(`/dossiers/${d.dossier_id}`)} style={{
-                                            padding: '3px 9px', fontSize: 11.5, cursor: 'pointer',
-                                            border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
-                                            background: '#fff', fontFamily: 'inherit', color: '#6B6860'
-                                        }}>Öffnen →</button>
-                                    </td>
                                 </tr>
                             );
                         })}
                     </tbody>
                 </table>
-                </div>
             </div>
             <NeueAnfrageModal
                 open={anfrageModal}

@@ -148,7 +148,7 @@ export default function Layout() {
             </div>
 
             {/* MAIN */}
-            <div style={{ overflowY: 'auto', padding: '1.5rem 1.75rem', background: '#F5F4F0' }}>
+            <div style={{ overflow: 'auto', padding: '1.5rem 1.75rem', background: '#F5F4F0' }}>
                 <Routes>
                     <Route path="/"          element={<Dashboard />} />
                     <Route path="/meine"     element={<Klienten meine />} />
