@@ -55,7 +55,14 @@ router.get('/', auth, async (req, res) => {
                     '[]'
                 ) AS programm_verlauf,
                 -- Offene Tasks
-                COUNT(DISTINCT t.task_id) FILTER (WHERE t.erledigt = FALSE) AS offene_tasks
+                COUNT(DISTINCT t.task_id) FILTER (WHERE t.erledigt = FALSE) AS offene_tasks,
+                -- Ziele (laufendes Programm)
+                (SELECT COUNT(*) FROM vereinbarungsziel vz
+                 JOIN programm_verlauf pv2 ON pv2.verlauf_id = vz.verlauf_id
+                 WHERE pv2.dossier_id = d.dossier_id AND pv2.status = 'Laufend') AS ziele_total,
+                (SELECT COUNT(*) FROM vereinbarungsziel vz
+                 JOIN programm_verlauf pv2 ON pv2.verlauf_id = vz.verlauf_id
+                 WHERE pv2.dossier_id = d.dossier_id AND pv2.status = 'Laufend' AND vz.erreicht = TRUE) AS ziele_erreicht
              FROM dossier d
              JOIN klient k ON k.klient_id = d.klient_id
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
@@ -136,11 +143,19 @@ router.get('/:id', auth, async (req, res) => {
 
         const aktVerlauf = verlauf.rows.find(v => v.status === 'Laufend')
             || verlauf.rows.find(v => v.klient_label);
+
+        const ziele = aktVerlauf ? await db.query(
+            `SELECT * FROM vereinbarungsziel WHERE verlauf_id = $1 ORDER BY reihenfolge`,
+            [aktVerlauf.verlauf_id]
+        ) : { rows: [] };
+
         res.json({
             ...dossier.rows[0],
             klient_label: aktVerlauf?.klient_label || null,
             programm_verlauf: verlauf.rows,
-            zugewiesen: zugewiesen.rows
+            zugewiesen: zugewiesen.rows,
+            ziele: ziele.rows,
+            akt_verlauf_id: aktVerlauf?.verlauf_id || null,
         });
     } catch (err) {
         console.error(err);
@@ -272,6 +287,59 @@ router.post('/:id/zuweisung', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler bei der Zuweisung' });
+    }
+});
+
+// POST /api/dossiers/:id/ziele — Neues Ziel erstellen
+router.post('/:id/ziele', auth, async (req, res) => {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'Text erforderlich' });
+    try {
+        const verlauf = await db.query(
+            `SELECT verlauf_id FROM programm_verlauf WHERE dossier_id = $1 AND status = 'Laufend' LIMIT 1`,
+            [req.params.id]
+        );
+        if (verlauf.rows.length === 0) return res.status(404).json({ error: 'Kein laufender Programmverlauf' });
+        const verlauf_id = verlauf.rows[0].verlauf_id;
+        const count = await db.query(`SELECT COUNT(*) FROM vereinbarungsziel WHERE verlauf_id = $1`, [verlauf_id]);
+        const reihenfolge = parseInt(count.rows[0].count);
+        const result = await db.query(
+            `INSERT INTO vereinbarungsziel (verlauf_id, text, reihenfolge) VALUES ($1,$2,$3) RETURNING *`,
+            [verlauf_id, text.trim(), reihenfolge]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Erstellen des Ziels' });
+    }
+});
+
+// PUT /api/dossiers/:id/ziele/:ziel_id — Ziel abhaken
+router.put('/:id/ziele/:ziel_id', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `UPDATE vereinbarungsziel
+             SET erreicht = NOT erreicht,
+                 erreicht_am = CASE WHEN erreicht = FALSE THEN CURRENT_DATE ELSE NULL END
+             WHERE ziel_id = $1 RETURNING *`,
+            [req.params.ziel_id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Ziel nicht gefunden' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren des Ziels' });
+    }
+});
+
+// DELETE /api/dossiers/:id/ziele/:ziel_id — Ziel löschen
+router.delete('/:id/ziele/:ziel_id', auth, async (req, res) => {
+    try {
+        await db.query(`DELETE FROM vereinbarungsziel WHERE ziel_id = $1`, [req.params.ziel_id]);
+        res.json({ message: 'Ziel gelöscht' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Löschen des Ziels' });
     }
 });
 

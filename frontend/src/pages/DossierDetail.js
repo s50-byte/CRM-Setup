@@ -49,6 +49,8 @@ export default function DossierDetail() {
     const [agModal, setAgModal] = useState(false);
     const [agListe, setAgListe] = useState([]);
     const [agAuswahl, setAgAuswahl] = useState('');
+    const [ziele, setZiele] = useState([]);
+    const [zielInput, setZielInput] = useState('');
 
     useEffect(() => {
         async function load() {
@@ -59,6 +61,7 @@ export default function DossierDetail() {
                     client.get(`/tasks/klient/${id}`).catch(() => ({ data: [] })),
                 ]);
                 setDossier(dosRes.data);
+                setZiele(dosRes.data.ziele || []);
                 console.log('klient_label:', dosRes.data.klient_label);
                 setJournal(journalRes.data);
                 setTasks(tasksRes.data);
@@ -120,6 +123,29 @@ export default function DossierDetail() {
         } catch (err) {
             console.error(err);
         }
+    }
+
+    async function addZiel() {
+        if (!zielInput.trim()) return;
+        try {
+            const r = await client.post(`/dossiers/${id}/ziele`, { text: zielInput.trim() });
+            setZiele(prev => [...prev, r.data]);
+            setZielInput('');
+        } catch (err) { console.error(err); }
+    }
+
+    async function toggleZiel(ziel_id) {
+        try {
+            const r = await client.put(`/dossiers/${id}/ziele/${ziel_id}`);
+            setZiele(prev => prev.map(z => z.ziel_id === ziel_id ? r.data : z));
+        } catch (err) { console.error(err); }
+    }
+
+    async function deleteZiel(ziel_id) {
+        try {
+            await client.delete(`/dossiers/${id}/ziele/${ziel_id}`);
+            setZiele(prev => prev.filter(z => z.ziel_id !== ziel_id));
+        } catch (err) { console.error(err); }
     }
 
     async function oeffneAgModal() {
@@ -308,6 +334,58 @@ export default function DossierDetail() {
                     </div>
                 </div>
             )}
+
+            {/* Ziele */}
+            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, marginBottom: '.875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)', overflow: 'hidden' }}>
+                <div style={{ padding: '.65rem 1rem', borderBottom: '1px solid rgba(0,0,0,.05)', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    ◎ Ziele aus Vereinbarung
+                    {ziele.length > 0 && (
+                        <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: '#ECFDF5', color: '#15803D', border: '1px solid rgba(22,163,74,.15)', fontFamily: 'monospace', marginLeft: 6 }}>
+                            {ziele.filter(z => z.erreicht).length}/{ziele.length}
+                        </span>
+                    )}
+                </div>
+                <div style={{ padding: '1rem' }}>
+                    {ziele.map((z) => (
+                        <div key={z.ziel_id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
+                            <div
+                                onClick={() => toggleZiel(z.ziel_id)}
+                                style={{
+                                    width: 16, height: 16, borderRadius: 4, flexShrink: 0, cursor: 'pointer',
+                                    border: z.erreicht ? 'none' : '1.5px solid rgba(0,0,0,.15)',
+                                    background: z.erreicht ? '#16A34A' : '#fff',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: '#fff', fontSize: 9
+                                }}>{z.erreicht ? '✓' : ''}</div>
+                            <span style={{
+                                flex: 1, fontSize: 12.5,
+                                textDecoration: z.erreicht ? 'line-through' : 'none',
+                                color: z.erreicht ? '#A09D97' : '#1A1917',
+                                cursor: 'pointer'
+                            }} onClick={() => toggleZiel(z.ziel_id)}>{z.text}</span>
+                            {z.erreicht_am && (
+                                <span style={{ fontSize: 10.5, color: '#A09D97', fontFamily: 'monospace', flexShrink: 0 }}>
+                                    {new Date(z.erreicht_am).toLocaleDateString('de-CH')}
+                                </span>
+                            )}
+                            <button
+                                onClick={() => deleteZiel(z.ziel_id)}
+                                style={{ width: 22, height: 22, flexShrink: 0, border: '1px solid rgba(220,38,38,.2)', borderRadius: 5, background: '#FEF2F2', color: '#B91C1C', cursor: 'pointer', fontSize: 13, lineHeight: 1, fontFamily: 'inherit', padding: 0 }}
+                            >×</button>
+                        </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: 7, marginTop: ziele.length > 0 ? 10 : 0 }}>
+                        <input
+                            value={zielInput}
+                            onChange={e => setZielInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && addZiel()}
+                            placeholder="Neues Ziel eingeben…"
+                            style={{ flex: 1, fontSize: 12.5, padding: '6px 10px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, fontFamily: 'inherit', outline: 'none' }}
+                        />
+                        <button onClick={addZiel} style={{ padding: '6px 14px', fontSize: 12.5, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', fontWeight: 500 }}>+</button>
+                    </div>
+                </div>
+            </div>
 
             {/* Tasks */}
             <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, marginBottom: '.875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)', overflow: 'hidden' }}>

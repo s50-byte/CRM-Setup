@@ -87,6 +87,7 @@ export default function Dossiers() {
         { label: 'Standort', field: 'standort_kuerzel' },
         { label: 'CM / JC',  field: null },
         { label: 'Tasks',    field: 'offene_tasks' },
+        { label: 'Ziele',   field: null },
         { label: '',         field: null },
     ];
 
@@ -153,9 +154,9 @@ export default function Dossiers() {
                     </thead>
                     <tbody>
                         {laden ? (
-                            <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
+                            <tr><td colSpan={12} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
                         ) : gefiltert.length === 0 ? (
-                            <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
+                            <tr><td colSpan={12} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
                         ) : gefiltert.map((d, i) => {
                             const farbe = FARBEN[d.programm_name] || '#888';
                             const ps = PHASE_STYLE[d.pipeline_status] || { bg: '#F5F4F0', color: '#6B6860' };
@@ -231,6 +232,11 @@ export default function Dossiers() {
                                                 border: '1px solid rgba(22,163,74,.15)', fontFamily: 'monospace'
                                             }}>0</span>
                                         )}
+                                    </td>
+                                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>
+                                        {(d.ziele_total > 0)
+                                            ? <span style={{ color: d.ziele_erreicht === d.ziele_total ? '#15803D' : '#1A1917' }}>{d.ziele_erreicht}/{d.ziele_total}</span>
+                                            : <span style={{ color: '#A09D97' }}>—</span>}
                                     </td>
                                     <td style={{ padding: '8px 12px' }}>
                                         <button onClick={() => navigate(`/dossiers/${d.dossier_id}`)} style={{
