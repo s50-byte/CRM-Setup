@@ -25,7 +25,7 @@ export default function Dashboard() {
                 const [tasksRes, termineRes, dossiersRes] = await Promise.all([
                     client.get('/tasks'),
                     client.get('/termine'),
-                    client.get('/dossiers'),
+                    client.get('/dossiers?meine=true'),
                 ]);
                 setTasks(tasksRes.data);
                 setTermine(termineRes.data);

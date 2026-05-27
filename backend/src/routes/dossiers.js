@@ -78,11 +78,18 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN standort st ON st.standort_id = d.standort_id
              LEFT JOIN externe_person ag ON ag.person_id = d.arbeitgeber_id
              WHERE k.aktiv = TRUE
+             AND ($1::uuid IS NULL OR EXISTS (
+                 SELECT 1 FROM klient_user ku2
+                 WHERE ku2.klient_id = k.klient_id
+                 AND ku2.user_id = $1
+                 AND ku2.aktiv = TRUE
+             ))
              GROUP BY d.dossier_id, k.klient_id, k.nachname, k.vorname,
                       p.name, p.farbe_hex, p.avg_dauer_tage, ph.label,
                       d.standort_id, st.name, st.kuerzel,
                       ag.person_id, ag.vorname, ag.nachname, ag.firma
-             ORDER BY k.nachname, k.vorname`
+             ORDER BY k.nachname, k.vorname`,
+            [req.query.meine === 'true' ? req.user.user_id : null]
         );
         res.json(result.rows);
     } catch (err) {

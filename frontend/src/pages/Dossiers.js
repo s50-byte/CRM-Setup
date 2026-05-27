@@ -93,18 +93,17 @@ export default function Dossiers() {
     );
 
     const COLS = [
-        { label: 'Name',     field: 'nachname' },
-        { label: 'Programm', field: 'programm_name' },
-        { label: 'Phase',    field: 'pipeline_status' },
-        { label: 'Label',    field: 'klient_label' },
-        { label: 'Verlauf',  field: null },
-        { label: 'Start',    field: 'eingang_datum' },
-        { label: 'Ende (geplant)', field: null },
-        { label: 'Standort', field: 'standort_kuerzel' },
-        { label: 'CM / JC',  field: null },
-        { label: 'Tasks',    field: 'offene_tasks' },
-        { label: 'Ziele',   field: null },
-        { label: '',         field: null },
+        { label: 'Name',      field: 'nachname' },
+        { label: 'Programm',  field: 'programm_name' },
+        { label: 'Phase',     field: 'pipeline_status' },
+        { label: 'Label',     field: 'klient_label' },
+        { label: 'Verlauf',   field: null },
+        { label: 'Laufzeit',  field: null },
+        { label: 'Standort',  field: 'standort_kuerzel' },
+        { label: 'Betreuung', field: null },
+        { label: 'Tasks',     field: 'offene_tasks' },
+        { label: 'Ziele',     field: null },
+        { label: '',          field: null },
     ];
 
     const hasFilter = suche || filterTyp || filterPhase || filterStandort;
@@ -154,8 +153,8 @@ export default function Dossiers() {
                 )}
             </div>
 
-            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, overflowX: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
+                <table style={{ width: '100%', minWidth: 1200, borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                         <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
                             {COLS.map((c, i) => (
@@ -170,9 +169,9 @@ export default function Dossiers() {
                     </thead>
                     <tbody>
                         {laden ? (
-                            <tr><td colSpan={12} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
+                            <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
                         ) : gefiltert.length === 0 ? (
-                            <tr><td colSpan={12} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
+                            <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
                         ) : gefiltert.map((d, i) => {
                             const farbe = FARBEN[d.programm_name] || '#888';
                             const ps = PHASE_STYLE[d.pipeline_status] || { bg: '#F5F4F0', color: '#6B6860' };
@@ -225,16 +224,15 @@ export default function Dossiers() {
                                             }}>{verlauf.length} Programme</span>
                                         ) : '1 Programm'}
                                     </td>
-                                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>
-                                        {d.eingang_datum ? new Date(d.eingang_datum).toLocaleDateString('de-CH') : '—'}
-                                    </td>
-                                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>
+                                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5, whiteSpace: 'nowrap' }}>
                                         {(() => {
+                                            const fmt = d => new Date(d).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: '2-digit' });
                                             const enddatum = berechneEnddatum(d.laufend_start_datum, d.avg_dauer_tage);
-                                            if (!enddatum) return '—';
-                                            const tage = berechneTageVerbleibend(d.laufend_start_datum, d.avg_dauer_tage);
+                                            if (!d.laufend_start_datum && !enddatum) return '—';
+                                            const start = d.laufend_start_datum ? fmt(d.laufend_start_datum) : '?';
+                                            const ende = enddatum ? fmt(enddatum) : '?';
                                             const color = tage !== null && tage < 14 ? '#B91C1C' : tage !== null && tage < 28 ? '#B45309' : undefined;
-                                            return <span style={color ? { color, fontWeight: 600 } : {}}>{enddatum.toLocaleDateString('de-CH')}</span>;
+                                            return <span style={color ? { color, fontWeight: 600 } : {}}>{start} – {ende}</span>;
                                         })()}
                                     </td>
                                     <td style={{ padding: '8px 12px' }}>
