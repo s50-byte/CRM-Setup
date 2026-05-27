@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import ZuweisungModal from '../components/ZuweisungModal';
+import Modal from '../components/Modal';
 
 const FARBEN = {
     'Erstmalige berufliche Ausbildung': '#16A34A',
@@ -45,6 +46,9 @@ export default function DossierDetail() {
     // Kommentar
     const [kommentar, setKommentar] = useState('');
     const [zuweisungModal, setZuweisungModal] = useState(false);
+    const [agModal, setAgModal] = useState(false);
+    const [agListe, setAgListe] = useState([]);
+    const [agAuswahl, setAgAuswahl] = useState('');
 
     useEffect(() => {
         async function load() {
@@ -113,6 +117,25 @@ export default function DossierDetail() {
         try {
             const res = await client.put(`/tasks/${task_id}/erledigt`);
             setTasks(prev => prev.map(t => t.task_id === task_id ? res.data : t));
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function oeffneAgModal() {
+        client.get('/externe').then(r => {
+            setAgListe(r.data.filter(p => p.typ === 'Arbeitgeber'));
+            setAgAuswahl(dossier.arbeitgeber_id || '');
+            setAgModal(true);
+        }).catch(console.error);
+    }
+
+    async function speichernArbeitgeber() {
+        try {
+            await client.put(`/dossiers/${id}/arbeitgeber`, { arbeitgeber_id: agAuswahl || null });
+            const r = await client.get(`/dossiers/${id}`);
+            setDossier(r.data);
+            setAgModal(false);
         } catch (err) {
             console.error(err);
         }
@@ -192,6 +215,12 @@ export default function DossierDetail() {
                                     <span>{dossier.pensum_pct}%</span>
                                 </>
                             )}
+                            {(dossier.arbeitgeber_firma || dossier.arbeitgeber_nachname) && (
+                                <>
+                                    <span style={{ color: '#A09D97' }}>·</span>
+                                    <span>🏢 {dossier.arbeitgeber_firma || `${dossier.arbeitgeber_vorname} ${dossier.arbeitgeber_nachname}`.trim()}</span>
+                                </>
+                            )}
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
@@ -200,6 +229,11 @@ export default function DossierDetail() {
                             cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
                             background: '#fff', fontFamily: 'inherit', color: '#6B6860'
                         }}>Stammdaten →</button>
+                        <button onClick={oeffneAgModal} style={{
+                            padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                            cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                            background: '#fff', fontFamily: 'inherit', color: '#1A1917'
+                        }}>🏢 Arbeitgeber</button>
                         <button onClick={() => setJFormOpen(true)} style={{
                             padding: '7px 14px', fontSize: 13, fontWeight: 500,
                             cursor: 'pointer', border: 'none', borderRadius: 6,
@@ -495,6 +529,35 @@ export default function DossierDetail() {
                     client.get(`/dossiers/${id}`).then(r => setDossier(r.data));
                 }}
             />
+
+            <Modal open={agModal} onClose={() => setAgModal(false)} title="Arbeitgeber / Partnerfirma zuweisen" width={480}>
+                <div style={{ marginBottom: 14 }}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>
+                        Arbeitgeber (Typ: Arbeitgeber)
+                    </label>
+                    <select
+                        value={agAuswahl}
+                        onChange={e => setAgAuswahl(e.target.value)}
+                        style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit' }}
+                    >
+                        <option value="">— Kein Arbeitgeber —</option>
+                        {agListe.map(p => (
+                            <option key={p.person_id} value={p.person_id}>
+                                {p.firma ? `${p.firma} (${p.vorname} ${p.nachname})` : `${p.vorname} ${p.nachname}`}
+                            </option>
+                        ))}
+                    </select>
+                    {agListe.length === 0 && (
+                        <div style={{ fontSize: 11.5, color: '#A09D97', marginTop: 6 }}>
+                            Keine externen Personen vom Typ "Arbeitgeber" vorhanden.
+                        </div>
+                    )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button onClick={() => setAgModal(false)} style={{ padding: '7px 14px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}>Abbrechen</button>
+                    <button onClick={speichernArbeitgeber} style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit' }}>Speichern</button>
+                </div>
+            </Modal>
         </div>
     );
 }

@@ -18,6 +18,10 @@ router.get('/', auth, async (req, res) => {
                 d.standort_id,
                 st.name AS standort_name,
                 st.kuerzel AS standort_kuerzel,
+                ag.person_id AS arbeitgeber_id,
+                ag.vorname AS arbeitgeber_vorname,
+                ag.nachname AS arbeitgeber_nachname,
+                ag.firma AS arbeitgeber_firma,
                 -- Zugewiesene Personen
                 COALESCE(
                     JSON_AGG(
@@ -62,10 +66,12 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN programm pp ON pp.programm_id = pv.programm_id
              LEFT JOIN task t ON t.klient_id = k.klient_id
              LEFT JOIN standort st ON st.standort_id = d.standort_id
+             LEFT JOIN externe_person ag ON ag.person_id = d.arbeitgeber_id
              WHERE k.aktiv = TRUE
              GROUP BY d.dossier_id, k.klient_id, k.nachname, k.vorname,
                       p.name, p.farbe_hex, ph.label,
-                      d.standort_id, st.name, st.kuerzel
+                      d.standort_id, st.name, st.kuerzel,
+                      ag.person_id, ag.vorname, ag.nachname, ag.firma
              ORDER BY k.nachname, k.vorname`
         );
         res.json(result.rows);
@@ -82,12 +88,17 @@ router.get('/:id', auth, async (req, res) => {
             `SELECT d.*, k.*, p.name AS programm_name, p.farbe_hex,
                     ph.label AS phase_label,
                     st.name AS standort_name, st.kuerzel AS standort_kuerzel,
-                    lv.pensum_pct
+                    lv.pensum_pct,
+                    ag.person_id AS arbeitgeber_id,
+                    ag.vorname AS arbeitgeber_vorname,
+                    ag.nachname AS arbeitgeber_nachname,
+                    ag.firma AS arbeitgeber_firma
              FROM dossier d
              JOIN klient k ON k.klient_id = d.klient_id
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
              LEFT JOIN phase ph ON ph.phase_id = d.akt_phase_id
              LEFT JOIN standort st ON st.standort_id = d.standort_id
+             LEFT JOIN externe_person ag ON ag.person_id = d.arbeitgeber_id
              LEFT JOIN LATERAL (
                  SELECT pensum_pct FROM leistungsvereinbarung
                  WHERE klient_id = d.klient_id
@@ -261,6 +272,21 @@ router.post('/:id/zuweisung', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler bei der Zuweisung' });
+    }
+});
+
+// PUT /api/dossiers/:id/arbeitgeber — Arbeitgeber zuweisen
+router.put('/:id/arbeitgeber', auth, async (req, res) => {
+    const { arbeitgeber_id } = req.body;
+    try {
+        await db.query(
+            `UPDATE dossier SET arbeitgeber_id = $1 WHERE dossier_id = $2`,
+            [arbeitgeber_id || null, req.params.id]
+        );
+        res.json({ message: 'Arbeitgeber aktualisiert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Setzen des Arbeitgebers' });
     }
 });
 
