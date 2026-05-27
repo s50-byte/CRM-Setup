@@ -153,8 +153,9 @@ export default function Dossiers() {
                 )}
             </div>
 
-            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, overflowX: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                <table style={{ width: '100%', minWidth: 1200, borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)', display: 'block' }}>
+                <div style={{ overflowX: 'auto', width: '100%' }}>
+                <table style={{ width: 'max-content', minWidth: 1200, borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                         <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
                             {COLS.map((c, i) => (
@@ -279,6 +280,7 @@ export default function Dossiers() {
                         })}
                     </tbody>
                 </table>
+                </div>
             </div>
             <NeueAnfrageModal
                 open={anfrageModal}
