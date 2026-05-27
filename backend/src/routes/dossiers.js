@@ -81,12 +81,18 @@ router.get('/:id', auth, async (req, res) => {
         const dossier = await db.query(
             `SELECT d.*, k.*, p.name AS programm_name, p.farbe_hex,
                     ph.label AS phase_label,
-                    st.name AS standort_name, st.kuerzel AS standort_kuerzel
+                    st.name AS standort_name, st.kuerzel AS standort_kuerzel,
+                    lv.pensum_pct
              FROM dossier d
              JOIN klient k ON k.klient_id = d.klient_id
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
              LEFT JOIN phase ph ON ph.phase_id = d.akt_phase_id
              LEFT JOIN standort st ON st.standort_id = d.standort_id
+             LEFT JOIN LATERAL (
+                 SELECT pensum_pct FROM leistungsvereinbarung
+                 WHERE klient_id = d.klient_id
+                 ORDER BY created_at DESC LIMIT 1
+             ) lv ON TRUE
              WHERE d.dossier_id = $1`,
             [req.params.id]
         );

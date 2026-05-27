@@ -186,6 +186,12 @@ export default function DossierDetail() {
                             <span>{dossier.programm_name || '—'}</span>
                             <span style={{ color: '#A09D97' }}>·</span>
                             <span>Eingang: {dossier.eingang_datum ? new Date(dossier.eingang_datum).toLocaleDateString('de-CH') : '—'}</span>
+                            {dossier.pensum_pct && (
+                                <>
+                                    <span style={{ color: '#A09D97' }}>·</span>
+                                    <span>{dossier.pensum_pct}%</span>
+                                </>
+                            )}
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
