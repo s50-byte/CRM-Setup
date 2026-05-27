@@ -34,6 +34,13 @@ function berechneTageVerbleibend(start_datum, avg_dauer_tage) {
     return Math.floor((ende - heute) / (1000 * 60 * 60 * 24));
 }
 
+function berechneEnddatum(start_datum, avg_dauer_tage) {
+    if (!start_datum || !avg_dauer_tage) return null;
+    const ende = new Date(start_datum);
+    ende.setDate(ende.getDate() + avg_dauer_tage);
+    return ende;
+}
+
 function sortData(arr, field, dir) {
     if (!field) return arr;
     return [...arr].sort((a, b) => {
@@ -92,7 +99,7 @@ export default function Dossiers() {
         { label: 'Label',    field: 'klient_label' },
         { label: 'Verlauf',  field: null },
         { label: 'Start',    field: 'eingang_datum' },
-        { label: 'Ende',     field: null },
+        { label: 'Ende (geplant)', field: null },
         { label: 'Standort', field: 'standort_kuerzel' },
         { label: 'CM / JC',  field: null },
         { label: 'Tasks',    field: 'offene_tasks' },
@@ -221,7 +228,15 @@ export default function Dossiers() {
                                     <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>
                                         {d.eingang_datum ? new Date(d.eingang_datum).toLocaleDateString('de-CH') : '—'}
                                     </td>
-                                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>—</td>
+                                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>
+                                        {(() => {
+                                            const enddatum = berechneEnddatum(d.laufend_start_datum, d.avg_dauer_tage);
+                                            if (!enddatum) return '—';
+                                            const tage = berechneTageVerbleibend(d.laufend_start_datum, d.avg_dauer_tage);
+                                            const color = tage !== null && tage < 14 ? '#B91C1C' : tage !== null && tage < 28 ? '#B45309' : undefined;
+                                            return <span style={color ? { color, fontWeight: 600 } : {}}>{enddatum.toLocaleDateString('de-CH')}</span>;
+                                        })()}
+                                    </td>
                                     <td style={{ padding: '8px 12px' }}>
                                         {d.standort_name ? (
                                             <span style={{
