@@ -25,6 +25,15 @@ const PHASE_STYLE = {
 
 const SEL = { fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28 };
 
+function berechneTageVerbleibend(start_datum, avg_dauer_tage) {
+    if (!start_datum || !avg_dauer_tage) return null;
+    const ende = new Date(start_datum);
+    ende.setDate(ende.getDate() + avg_dauer_tage);
+    const heute = new Date();
+    heute.setHours(0, 0, 0, 0);
+    return Math.floor((ende - heute) / (1000 * 60 * 60 * 24));
+}
+
 function sortData(arr, field, dir) {
     if (!field) return arr;
     return [...arr].sort((a, b) => {
@@ -161,19 +170,26 @@ export default function Dossiers() {
                             const farbe = FARBEN[d.programm_name] || '#888';
                             const ps = PHASE_STYLE[d.pipeline_status] || { bg: '#F5F4F0', color: '#6B6860' };
                             const verlauf = d.programm_verlauf || [];
+                            const tage = berechneTageVerbleibend(d.laufend_start_datum, d.avg_dauer_tage);
+                            const warnBg = tage !== null && tage < 14 ? '#FEF2F2' : tage !== null && tage < 28 ? '#FFFBEB' : '';
                             return (
-                                <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', cursor: 'pointer' }}
+                                <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', cursor: 'pointer', background: warnBg }}
                                     onMouseOver={e => e.currentTarget.style.background = '#F5F4F0'}
-                                    onMouseOut={e => e.currentTarget.style.background = ''}>
+                                    onMouseOut={e => e.currentTarget.style.background = warnBg}>
                                     <td style={{ padding: '8px 12px', fontWeight: 500 }}>{d.nachname} {d.vorname}</td>
                                     <td style={{ padding: '8px 12px' }}>
-                                        {d.programm_name ? (
-                                            <span style={{
-                                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                                background: farbe + '22', color: farbe,
-                                                border: `1px solid ${farbe}33`, fontWeight: 500
-                                            }}>{d.programm_name}</span>
-                                        ) : '—'}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                            {d.programm_name ? (
+                                                <span style={{
+                                                    fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                                                    background: farbe + '22', color: farbe,
+                                                    border: `1px solid ${farbe}33`, fontWeight: 500
+                                                }}>{d.programm_name}</span>
+                                            ) : '—'}
+                                            {tage !== null && tage < 28 && (
+                                                <span title={`${tage} Tage verbleibend`} style={{ fontSize: 12, cursor: 'default', color: tage < 14 ? '#B91C1C' : '#B45309' }}>⚠</span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td style={{ padding: '8px 12px' }}>
                                         <span style={{

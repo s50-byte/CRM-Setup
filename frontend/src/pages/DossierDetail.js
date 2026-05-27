@@ -175,6 +175,15 @@ export default function DossierDetail() {
     const zugewiesen = dossier.zugewiesen || [];
     const offeneTasks = tasks.filter(t => !t.erledigt).length;
 
+    const aktVerlaufStart = verlauf.find(v => v.status === 'Laufend')?.start_datum;
+    const tageVerbleibend = (() => {
+        if (!aktVerlaufStart || !dossier.avg_dauer_tage) return null;
+        const ende = new Date(aktVerlaufStart);
+        ende.setDate(ende.getDate() + dossier.avg_dauer_tage);
+        const heute = new Date(); heute.setHours(0,0,0,0);
+        return Math.floor((ende - heute) / (1000 * 60 * 60 * 24));
+    })();
+
     return (
         <div>
             {/* Back */}
@@ -223,6 +232,19 @@ export default function DossierDetail() {
                                 border: '1px solid rgba(0,0,0,.09)', fontFamily: 'monospace'
                             }}>{verlauf.length} Programm{verlauf.length !== 1 ? 'e' : ''}</span>
                         </div>
+                        {tageVerbleibend !== null && tageVerbleibend < 28 && (
+                            <div style={{
+                                marginTop: 6, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                                background: tageVerbleibend < 14 ? '#FEF2F2' : '#FFFBEB',
+                                color: tageVerbleibend < 14 ? '#B91C1C' : '#B45309',
+                                border: `1px solid ${tageVerbleibend < 14 ? 'rgba(220,38,38,.2)' : 'rgba(217,119,6,.2)'}`,
+                                display: 'inline-flex', alignItems: 'center', gap: 5
+                            }}>
+                                ⚠ {tageVerbleibend < 14
+                                    ? `Programmende in ${tageVerbleibend} Tag${tageVerbleibend === 1 ? '' : 'en'} — Abschlussbericht fällig`
+                                    : `Programmende in ${Math.ceil(tageVerbleibend / 7)} Woche${Math.ceil(tageVerbleibend / 7) === 1 ? '' : 'n'}`}
+                            </div>
+                        )}
                         <div style={{ fontSize: 11.5, color: '#6B6860', marginTop: 3, display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                             <span>{dossier.auftraggeber}</span>
                             {dossier.standort_name && (

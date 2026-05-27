@@ -1,22 +1,35 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
 
+function berechneTageVerbleibend(start_datum, avg_dauer_tage) {
+    if (!start_datum || !avg_dauer_tage) return null;
+    const ende = new Date(start_datum);
+    ende.setDate(ende.getDate() + avg_dauer_tage);
+    const heute = new Date(); heute.setHours(0, 0, 0, 0);
+    return Math.floor((ende - heute) / (1000 * 60 * 60 * 24));
+}
+
 export default function Dashboard() {
     const { benutzer } = useAuth();
+    const navigate = useNavigate();
     const [tasks, setTasks] = useState([]);
     const [termine, setTermine] = useState([]);
+    const [dossiers, setDossiers] = useState([]);
     const [laden, setLaden] = useState(true);
 
     useEffect(() => {
         async function laden() {
             try {
-                const [tasksRes, termineRes] = await Promise.all([
+                const [tasksRes, termineRes, dossiersRes] = await Promise.all([
                     client.get('/tasks'),
                     client.get('/termine'),
+                    client.get('/dossiers'),
                 ]);
                 setTasks(tasksRes.data);
                 setTermine(termineRes.data);
+                setDossiers(dossiersRes.data);
             } catch (err) {
                 console.error(err);
             } finally {
@@ -29,6 +42,10 @@ export default function Dashboard() {
     const offeneTasks = tasks.filter(t => !t.erledigt);
     const heute = new Date().toISOString().slice(0, 10);
     const heuteTermine = termine.filter(t => t.datum === heute);
+    const baldAblaufend = dossiers.filter(d => {
+        const tage = berechneTageVerbleibend(d.laufend_start_datum, d.avg_dauer_tage);
+        return tage !== null && tage < 28;
+    });
 
     return (
         <div>
@@ -44,15 +61,17 @@ export default function Dashboard() {
             </div>
 
             {/* KPIs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
                 {[
                     { label: 'Offene Aufgaben', wert: offeneTasks.length, farbe: '#D97706' },
                     { label: 'Termine heute', wert: heuteTermine.length, farbe: '#1A1917' },
                     { label: 'Erledigte Tasks', wert: tasks.filter(t => t.erledigt).length, farbe: '#16A34A' },
+                    { label: 'Bald ablaufend', wert: baldAblaufend.length, farbe: baldAblaufend.length > 0 ? '#B91C1C' : '#16A34A', link: '/dossiers' },
                 ].map((k, i) => (
-                    <div key={i} style={{
+                    <div key={i} onClick={k.link ? () => navigate(k.link) : undefined} style={{
                         background: '#fff', border: '1px solid rgba(0,0,0,.09)',
-                        borderRadius: 10, padding: '.875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)'
+                        borderRadius: 10, padding: '.875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)',
+                        cursor: k.link ? 'pointer' : 'default'
                     }}>
                         <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>{k.label}</div>
                         <div style={{ fontSize: 21, fontWeight: 600, color: k.farbe }}>{laden ? '…' : k.wert}</div>

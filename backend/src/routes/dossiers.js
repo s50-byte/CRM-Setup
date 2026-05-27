@@ -13,7 +13,7 @@ router.get('/', auth, async (req, res) => {
                 d.dossier_id, d.auftraggeber, d.kanal,
                 d.eingang_datum, d.pipeline_status, d.abbruch_grund,
                 k.klient_id, k.nachname, k.vorname,
-                p.name AS programm_name, p.farbe_hex,
+                p.name AS programm_name, p.farbe_hex, p.avg_dauer_tage,
                 ph.label AS phase_label,
                 d.standort_id,
                 st.name AS standort_name,
@@ -35,10 +35,13 @@ router.get('/', auth, async (req, res) => {
                     ) FILTER (WHERE u.user_id IS NOT NULL),
                     '[]'
                 ) AS zugewiesen,
-                -- Klient-Label aus laufendem Programmverlauf
+                -- Klient-Label + Start-Datum aus laufendem Programmverlauf
                 (SELECT pv2.klient_label FROM programm_verlauf pv2
                  WHERE pv2.dossier_id = d.dossier_id AND pv2.status = 'Laufend'
                  LIMIT 1) AS klient_label,
+                (SELECT pv2.start_datum FROM programm_verlauf pv2
+                 WHERE pv2.dossier_id = d.dossier_id AND pv2.status = 'Laufend'
+                 LIMIT 1) AS laufend_start_datum,
                 -- Programmverlauf
                 COALESCE(
                     JSON_AGG(
@@ -76,7 +79,7 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN externe_person ag ON ag.person_id = d.arbeitgeber_id
              WHERE k.aktiv = TRUE
              GROUP BY d.dossier_id, k.klient_id, k.nachname, k.vorname,
-                      p.name, p.farbe_hex, ph.label,
+                      p.name, p.farbe_hex, p.avg_dauer_tage, ph.label,
                       d.standort_id, st.name, st.kuerzel,
                       ag.person_id, ag.vorname, ag.nachname, ag.firma
              ORDER BY k.nachname, k.vorname`
@@ -92,7 +95,7 @@ router.get('/', auth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
     try {
         const dossier = await db.query(
-            `SELECT d.*, k.*, p.name AS programm_name, p.farbe_hex,
+            `SELECT d.*, k.*, p.name AS programm_name, p.farbe_hex, p.avg_dauer_tage,
                     ph.label AS phase_label,
                     st.name AS standort_name, st.kuerzel AS standort_kuerzel,
                     lv.pensum_pct,
