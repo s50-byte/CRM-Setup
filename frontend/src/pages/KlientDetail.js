@@ -58,10 +58,30 @@ export default function KlientDetail() {
     const [form, setForm] = useState({});
     const [speichern, setSpeichern] = useState(false);
     const [gespeichert, setGespeichert] = useState(false);
+    const [lvForm, setLvForm] = useState({});
+    const [lvSpeichern, setLvSpeichern] = useState(false);
+    const [lvGespeichert, setLvGespeichert] = useState(false);
+
+    function initLvForm(data) {
+        setLvForm({
+            pensum_pct:  data.pensum_pct  ?? 100,
+            tage_mo:     data.tage_mo     ?? true,
+            tage_di:     data.tage_di     ?? true,
+            tage_mi:     data.tage_mi     ?? true,
+            tage_do:     data.tage_do     ?? true,
+            tage_fr:     data.tage_fr     ?? true,
+            zeit_von:    data.zeit_von    ? data.zeit_von.slice(0,5) : '08:00',
+            zeit_bis:    data.zeit_bis    ? data.zeit_bis.slice(0,5) : '17:00',
+            zeitbasis:   data.zeitbasis   || 'Ganztagesbasis',
+            lv_bemerkung:data.lv_bemerkung|| '',
+            gueltig_ab:  data.gueltig_ab  ? data.gueltig_ab.slice(0,10) : new Date().toISOString().slice(0,10),
+            gueltig_bis: data.gueltig_bis ? data.gueltig_bis.slice(0,10) : '',
+        });
+    }
 
     useEffect(() => {
         client.get(`/klienten/${id}`)
-            .then(r => { setKlient(r.data); setForm(r.data); })
+            .then(r => { setKlient(r.data); setForm(r.data); initLvForm(r.data); })
             .catch(console.error)
             .finally(() => setLaden(false));
     }, [id]);
@@ -80,6 +100,38 @@ export default function KlientDetail() {
             console.error(err);
         } finally {
             setSpeichern(false);
+        }
+    };
+
+    const handleLvSpeichern = async () => {
+        setLvSpeichern(true);
+        try {
+            const payload = {
+                pensum_pct:  Number(lvForm.pensum_pct),
+                tage_mo:     lvForm.tage_mo,
+                tage_di:     lvForm.tage_di,
+                tage_mi:     lvForm.tage_mi,
+                tage_do:     lvForm.tage_do,
+                tage_fr:     lvForm.tage_fr,
+                zeit_von:    lvForm.zeit_von,
+                zeit_bis:    lvForm.zeit_bis,
+                zeitbasis:   lvForm.zeitbasis,
+                bemerkung:   lvForm.lv_bemerkung || null,
+                gueltig_ab:  lvForm.gueltig_ab,
+                gueltig_bis: lvForm.gueltig_bis || null,
+            };
+            const r = klient.lv_id
+                ? await client.put(`/klienten/${id}/lv`, payload)
+                : await client.post(`/klienten/${id}/lv`, payload);
+            const updated = { ...r.data, lv_bemerkung: r.data.bemerkung };
+            setKlient(prev => ({ ...prev, ...updated }));
+            initLvForm({ ...updated, lv_bemerkung: r.data.bemerkung });
+            setLvGespeichert(true);
+            setTimeout(() => setLvGespeichert(false), 2500);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLvSpeichern(false);
         }
     };
 
@@ -205,34 +257,92 @@ export default function KlientDetail() {
 
             {/* Leistungsvereinbarung */}
             {aktTab === 'lv' && (
-                <div style={CARD}>
-                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.875rem' }}>Leistungsvereinbarung & Präsenzzeiten</div>
-                    {klient.pensum_pct ? (
-                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                            <div style={{ background: '#F5F4F0', borderRadius: 8, padding: '12px 16px', flex: 1, minWidth: 120 }}>
-                                <div style={{ fontSize: 10, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Pensum</div>
-                                <div style={{ fontSize: 22, fontWeight: 600, color: '#2563EB' }}>{klient.pensum_pct}%</div>
+                <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        {/* Pensum & Zeiten */}
+                        <div style={CARD}>
+                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Pensum & Zeiten</div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+                                <span style={{ color: '#6B6860' }}>Pensum %</span>
+                                <input
+                                    type="number" min={10} max={100}
+                                    value={lvForm.pensum_pct}
+                                    onChange={e => setLvForm(f => ({ ...f, pensum_pct: e.target.value }))}
+                                    style={INPUT_STYLE}
+                                />
                             </div>
-                            <div style={{ background: '#F5F4F0', borderRadius: 8, padding: '12px 16px', flex: 1, minWidth: 120 }}>
-                                <div style={{ fontSize: 10, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Präsenztage</div>
-                                <div style={{ fontSize: 14, fontWeight: 500 }}>{tage.join(', ') || '—'}</div>
-                            </div>
-                            <div style={{ background: '#F5F4F0', borderRadius: 8, padding: '12px 16px', flex: 1, minWidth: 120 }}>
-                                <div style={{ fontSize: 10, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Zeiten</div>
-                                <div style={{ fontSize: 14, fontWeight: 500, fontFamily: 'monospace' }}>
-                                    {klient.zeit_von?.slice(0,5)} – {klient.zeit_bis?.slice(0,5)}
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+                                <span style={{ color: '#6B6860' }}>Präsenztage</span>
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                    {[['tage_mo','Mo'],['tage_di','Di'],['tage_mi','Mi'],['tage_do','Do'],['tage_fr','Fr']].map(([key, label]) => (
+                                        <label key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', fontSize: 11, color: '#6B6860' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={!!lvForm[key]}
+                                                onChange={e => setLvForm(f => ({ ...f, [key]: e.target.checked }))}
+                                            />
+                                            {label}
+                                        </label>
+                                    ))}
                                 </div>
-                                <div style={{ fontSize: 11, color: '#6B6860', marginTop: 2 }}>{klient.zeitbasis}</div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+                                <span style={{ color: '#6B6860' }}>Zeit von</span>
+                                <input type="time" value={lvForm.zeit_von} onChange={e => setLvForm(f => ({ ...f, zeit_von: e.target.value }))} style={INPUT_STYLE} />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+                                <span style={{ color: '#6B6860' }}>Zeit bis</span>
+                                <input type="time" value={lvForm.zeit_bis} onChange={e => setLvForm(f => ({ ...f, zeit_bis: e.target.value }))} style={INPUT_STYLE} />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+                                <span style={{ color: '#6B6860' }}>Zeitbasis</span>
+                                <select value={lvForm.zeitbasis} onChange={e => setLvForm(f => ({ ...f, zeitbasis: e.target.value }))} style={INPUT_STYLE}>
+                                    <option>Stundenbasis</option>
+                                    <option>Halbtagesbasis</option>
+                                    <option>Ganztagesbasis</option>
+                                </select>
                             </div>
                         </div>
-                    ) : (
-                        <div style={{ fontSize: 12, color: '#6B6860' }}>Keine Leistungsvereinbarung hinterlegt</div>
-                    )}
-                    {klient.lv_bemerkung && (
-                        <div style={{ marginTop: 12, padding: '9px 12px', background: '#F5F4F0', borderRadius: 6, fontSize: 12, color: '#6B6860', borderLeft: '3px solid rgba(0,0,0,.09)' }}>
-                            {klient.lv_bemerkung}
+
+                        {/* Gültigkeit & Bemerkung */}
+                        <div style={CARD}>
+                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Gültigkeit & Bemerkung</div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+                                <span style={{ color: '#6B6860' }}>Gültig ab</span>
+                                <input type="date" value={lvForm.gueltig_ab} onChange={e => setLvForm(f => ({ ...f, gueltig_ab: e.target.value }))} style={INPUT_STYLE} />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+                                <span style={{ color: '#6B6860' }}>Gültig bis</span>
+                                <input type="date" value={lvForm.gueltig_bis} onChange={e => setLvForm(f => ({ ...f, gueltig_bis: e.target.value }))} style={INPUT_STYLE} />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '8px 0', alignItems: 'start', fontSize: 12.5 }}>
+                                <span style={{ color: '#6B6860', paddingTop: 4 }}>Bemerkung</span>
+                                <textarea
+                                    rows={5}
+                                    value={lvForm.lv_bemerkung}
+                                    onChange={e => setLvForm(f => ({ ...f, lv_bemerkung: e.target.value }))}
+                                    style={{ ...INPUT_STYLE, resize: 'vertical', lineHeight: 1.5 }}
+                                />
+                            </div>
                         </div>
-                    )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: '1rem' }}>
+                        {lvGespeichert && <span style={{ fontSize: 12.5, color: '#16A34A' }}>Gespeichert ✓</span>}
+                        <button onClick={handleLvSpeichern} disabled={lvSpeichern} style={{
+                            padding: '7px 18px', fontSize: 13, fontWeight: 500,
+                            cursor: lvSpeichern ? 'default' : 'pointer', border: 'none', borderRadius: 6,
+                            background: lvSpeichern ? '#93C5FD' : '#2563EB', color: '#fff', fontFamily: 'inherit'
+                        }}>Speichern</button>
+                    </div>
                 </div>
             )}
         </div>

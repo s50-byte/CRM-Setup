@@ -78,12 +78,17 @@ router.get('/:id', auth, async (req, res) => {
         const result = await db.query(
             `SELECT
                 k.*,
-                lv.pensum_pct, lv.zeit_von, lv.zeit_bis, lv.zeitbasis,
+                lv.lv_id, lv.pensum_pct, lv.zeit_von, lv.zeit_bis, lv.zeitbasis,
                 lv.tage_mo, lv.tage_di, lv.tage_mi, lv.tage_do, lv.tage_fr,
                 lv.bemerkung AS lv_bemerkung,
+                lv.gueltig_ab, lv.gueltig_bis,
                 d.dossier_id
              FROM klient k
-             LEFT JOIN leistungsvereinbarung lv ON lv.klient_id = k.klient_id
+             LEFT JOIN LATERAL (
+                 SELECT * FROM leistungsvereinbarung
+                 WHERE klient_id = k.klient_id
+                 ORDER BY created_at DESC LIMIT 1
+             ) lv ON TRUE
              LEFT JOIN dossier d ON d.klient_id = k.klient_id
              WHERE k.klient_id = $1 AND k.aktiv = TRUE`,
             [req.params.id]
@@ -178,6 +183,61 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // DELETE /api/klienten/:id — Klient deaktivieren (soft delete)
+// POST /api/klienten/:id/lv — Neue Leistungsvereinbarung erstellen
+router.post('/:id/lv', auth, async (req, res) => {
+    const { pensum_pct, tage_mo, tage_di, tage_mi, tage_do, tage_fr,
+            zeit_von, zeit_bis, zeitbasis, bemerkung, gueltig_ab, gueltig_bis } = req.body;
+    try {
+        const result = await db.query(
+            `INSERT INTO leistungsvereinbarung
+                (klient_id, pensum_pct, tage_mo, tage_di, tage_mi, tage_do, tage_fr,
+                 zeit_von, zeit_bis, zeitbasis, bemerkung, gueltig_ab, gueltig_bis)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+             RETURNING *`,
+            [req.params.id, pensum_pct,
+             tage_mo ?? true, tage_di ?? true, tage_mi ?? true, tage_do ?? true, tage_fr ?? true,
+             zeit_von || '08:00', zeit_bis || '17:00',
+             zeitbasis || 'Ganztagesbasis',
+             bemerkung || null,
+             gueltig_ab || new Date().toISOString().slice(0, 10),
+             gueltig_bis || null]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Erstellen der LV' });
+    }
+});
+
+// PUT /api/klienten/:id/lv — Bestehende Leistungsvereinbarung aktualisieren
+router.put('/:id/lv', auth, async (req, res) => {
+    const { pensum_pct, tage_mo, tage_di, tage_mi, tage_do, tage_fr,
+            zeit_von, zeit_bis, zeitbasis, bemerkung, gueltig_ab, gueltig_bis } = req.body;
+    try {
+        const result = await db.query(
+            `UPDATE leistungsvereinbarung SET
+                pensum_pct = $1, tage_mo = $2, tage_di = $3, tage_mi = $4,
+                tage_do = $5, tage_fr = $6, zeit_von = $7, zeit_bis = $8,
+                zeitbasis = $9, bemerkung = $10, gueltig_ab = $11,
+                gueltig_bis = $12, updated_at = NOW()
+             WHERE klient_id = $13
+             RETURNING *`,
+            [pensum_pct,
+             tage_mo ?? true, tage_di ?? true, tage_mi ?? true, tage_do ?? true, tage_fr ?? true,
+             zeit_von || '08:00', zeit_bis || '17:00',
+             zeitbasis || 'Ganztagesbasis',
+             bemerkung || null,
+             gueltig_ab || new Date().toISOString().slice(0, 10),
+             gueltig_bis || null,
+             req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren der LV' });
+    }
+});
+
 router.delete('/:id', auth, async (req, res) => {
     try {
         await db.query(
