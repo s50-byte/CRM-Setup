@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import client from '../api/client';
+import ExternePersonModal from '../components/ExternePersonModal';
 
 const TYP_STYLE = {
     'IV-Stelle':        { bg: '#EEF3FE', color: '#1D4ED8' },
@@ -29,13 +30,22 @@ export default function Externe() {
     const [filterTyp, setFilterTyp] = useState('');
     const [sortField, setSortField] = useState('');
     const [sortDir, setSortDir] = useState('asc');
+    const [modal, setModal] = useState(false);
+    const [editPerson, setEditPerson] = useState(null);
 
-    useEffect(() => {
+    function ladeListe() {
+        setLaden(true);
         client.get('/externe')
             .then(r => setPersonen(r.data))
             .catch(console.error)
             .finally(() => setLaden(false));
-    }, []);
+    }
+
+    useEffect(() => { ladeListe(); }, []);
+
+    function oeffneNeu() { setEditPerson(null); setModal(true); }
+    function oeffneBearbeiten(p) { setEditPerson(p); setModal(true); }
+    function handleGespeichert() { setModal(false); ladeListe(); }
 
     const handleSort = field => {
         if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -60,6 +70,7 @@ export default function Externe() {
         { label: 'Telefon',  field: 'telefon' },
         { label: 'E-Mail',   field: 'email' },
         { label: 'Klienten', field: 'anzahl_klienten' },
+        { label: '',         field: null },
     ];
 
     return (
@@ -69,7 +80,7 @@ export default function Externe() {
                     <div style={{ fontSize: 19, fontWeight: 600 }}>Externe Personen & Firmen</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Zuweisende Stellen, Arbeitgeber, gesetzliche Vertreter, Ärzte</div>
                 </div>
-                <button style={{
+                <button onClick={oeffneNeu} style={{
                     padding: '7px 14px', fontSize: 13, fontWeight: 500,
                     cursor: 'pointer', border: 'none', borderRadius: 6,
                     background: '#2563EB', color: '#fff', fontFamily: 'inherit'
@@ -123,13 +134,13 @@ export default function Externe() {
                     </thead>
                     <tbody>
                         {laden ? (
-                            <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
+                            <tr><td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
                         ) : gefiltert.length === 0 ? (
-                            <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Einträge</td></tr>
+                            <tr><td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Einträge</td></tr>
                         ) : gefiltert.map((p, i) => {
                             const s = TYP_STYLE[p.typ] || TYP_STYLE['Sonstiges'];
                             return (
-                                <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', cursor: 'pointer' }}
+                                <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,.05)' }}
                                     onMouseOver={e => e.currentTarget.style.background = '#F5F4F0'}
                                     onMouseOut={e => e.currentTarget.style.background = ''}>
                                     <td style={{ padding: '8px 12px', fontWeight: 500, color: '#2563EB' }}>{p.vorname} {p.nachname}</td>
@@ -145,12 +156,28 @@ export default function Externe() {
                                     <td style={{ padding: '8px 12px', fontSize: 11.5 }}>{p.telefon || '—'}</td>
                                     <td style={{ padding: '8px 12px', color: '#2563EB', fontSize: 11.5 }}>{p.email || '—'}</td>
                                     <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{p.anzahl_klienten || 0}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                                        <button
+                                            onClick={e => { e.stopPropagation(); oeffneBearbeiten(p); }}
+                                            style={{
+                                                fontSize: 11.5, padding: '3px 10px', cursor: 'pointer',
+                                                border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
+                                                background: '#fff', color: '#1A1917', fontFamily: 'inherit'
+                                            }}>Bearbeiten</button>
+                                    </td>
                                 </tr>
                             );
                         })}
                     </tbody>
                 </table>
             </div>
+
+            <ExternePersonModal
+                open={modal}
+                onClose={() => setModal(false)}
+                onSaved={handleGespeichert}
+                person={editPerson}
+            />
         </div>
     );
 }
