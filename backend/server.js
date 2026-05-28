@@ -19,7 +19,8 @@ app.use('/api/praesenz',  require('./src/routes/praesenz'));
 app.use('/api/externe',   require('./src/routes/externe'));
 app.use('/api/programme', require('./src/routes/programme'));
 app.use('/api/benutzer',  require('./src/routes/benutzer'));
-app.use('/api/standorte', require('./src/routes/standorte'));
+app.use('/api/standorte',   require('./src/routes/standorte'));
+app.use('/api/management', require('./src/routes/management'));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

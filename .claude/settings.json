@@ -7,7 +7,14 @@
       "Bash(curl -s http://localhost:3000/api/dossiers -H 'Authorization: Bearer __TRACKED_VAR__')",
       "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); d=data[0] if data else {}; print\\([k for k in d.keys\\(\\)]\\); print\\('avg_dauer_tage:', d.get\\('avg_dauer_tage'\\)\\); print\\('laufend_start_datum:', d.get\\('laufend_start_datum'\\)\\)\")",
       "Bash(curl -s \"http://localhost:3000/api/dossiers\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAxIiwiaWF0IjoxNzc5OTAwNDQ5fQ.5Jxh7l59bUL9w6RXByJOEjHkShgoTwWa-E9lnNB4c7I\")",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(pm2 list *)",
+      "Bash(node -e \"const jwt=require\\('./backend/node_modules/jsonwebtoken'\\); console.log\\(jwt.sign\\({user_id:'test', system_rolle:'mitarbeitende'}, 'iv_crm_jwt_secret_2025_bitte_aendern'\\)\\)\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/management/dashboard -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(node -e \"const jwt=require\\('./backend/node_modules/jsonwebtoken'\\); console.log\\(jwt.sign\\({user_id:'test', system_rolle:'management'}, 'iv_crm_jwt_secret_2025_bitte_aendern'\\)\\)\")",
+      "Bash(pm2 logs *)",
+      "Bash(curl -s http://localhost:3000/api/management/dashboard -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }
