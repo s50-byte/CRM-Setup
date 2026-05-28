@@ -129,7 +129,10 @@ export default function Layout() {
 
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
                     {istManagementUser && (
-                        <MgmtToggle aktiv={managementModus} onToggle={toggleManagementModus} />
+                        <MgmtToggle aktiv={managementModus} onToggle={() => {
+                            toggleManagementModus();
+                            navigate(managementModus ? '/' : '/management');
+                        }} />
                     )}
                     <div style={{
                         display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer',
