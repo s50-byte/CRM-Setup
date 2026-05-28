@@ -154,7 +154,7 @@ router.get('/:id', auth, async (req, res) => {
         const aktVerlauf = verlauf.rows.find(v => v.status === 'Laufend')
             || verlauf.rows.find(v => v.klient_label);
 
-        const [ziele, externePersonen, phasen] = await Promise.all([
+        const [ziele, externePersonen, phasen, phaseDaten] = await Promise.all([
             aktVerlauf
                 ? db.query(`SELECT * FROM vereinbarungsziel WHERE verlauf_id = $1 ORDER BY reihenfolge`, [aktVerlauf.verlauf_id])
                 : Promise.resolve({ rows: [] }),
@@ -173,7 +173,16 @@ router.get('/:id', auth, async (req, res) => {
                     [dossier.rows[0].akt_programm_id]
                   )
                 : Promise.resolve({ rows: [] }),
+            db.query(
+                `SELECT phase_id, start_datum, end_datum
+                 FROM dossier_phase_verlauf
+                 WHERE dossier_id = $1`,
+                [req.params.id]
+            ).catch(() => ({ rows: [] })),
         ]);
+
+        const phaseDatumMap = {};
+        phaseDaten.rows.forEach(pd => { phaseDatumMap[pd.phase_id] = pd; });
 
         res.json({
             ...dossier.rows[0],
@@ -183,7 +192,11 @@ router.get('/:id', auth, async (req, res) => {
             ziele: ziele.rows,
             akt_verlauf_id: aktVerlauf?.verlauf_id || null,
             externe_personen: externePersonen.rows,
-            phasen: phasen.rows,
+            phasen: phasen.rows.map(ph => ({
+                ...ph,
+                start_datum: phaseDatumMap[ph.phase_id]?.start_datum || null,
+                end_datum:   phaseDatumMap[ph.phase_id]?.end_datum   || null,
+            })),
             laufend_start_datum: aktVerlauf?.start_datum || null,
             geplantes_enddatum: aktVerlauf?.geplantes_enddatum || null,
         });
@@ -257,6 +270,18 @@ router.put('/:id/phase', auth, async (req, res) => {
              WHERE dossier_id = $4
              RETURNING *`,
             [phase_id, programm_id || null, phase.rows[0]?.label, req.params.id]
+        );
+
+        // Phase-Verlauf tracken
+        await db.query(
+            `UPDATE dossier_phase_verlauf SET end_datum = CURRENT_DATE
+             WHERE dossier_id = $1 AND end_datum IS NULL`,
+            [req.params.id]
+        );
+        await db.query(
+            `INSERT INTO dossier_phase_verlauf (dossier_id, phase_id)
+             VALUES ($1, $2)`,
+            [req.params.id, phase_id]
         );
 
         // Zeitachse-Eintrag

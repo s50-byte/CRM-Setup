@@ -81,10 +81,28 @@ export default function DossierPhase() {
                 dos.klient_id ? client.get(`/termine?klient_id=${dos.klient_id}`) : Promise.resolve({ data: [] }),
             ]);
 
+            const aktPhase = (dos.phasen || []).find(p => p.phase_id === phase_id);
+            const phaseStart = aktPhase?.start_datum ? new Date(aktPhase.start_datum) : null;
+            const phaseEnde  = aktPhase?.end_datum   ? new Date(aktPhase.end_datum)   : null;
+
             setKriterien(krRes.data);
+
             setTasks((taskRes.data || []).filter(t => t.phase_id === phase_id));
-            setJournal(journalRes.data || []);
-            setTermine(termRes.data || []);
+
+            const alleJournal = journalRes.data || [];
+            setJournal(phaseStart
+                ? alleJournal.filter(j => new Date(j.datum) >= phaseStart)
+                : alleJournal
+            );
+
+            const alleTermine = termRes.data || [];
+            setTermine(phaseStart
+                ? alleTermine.filter(t => {
+                    const td = new Date(t.datum);
+                    return phaseEnde ? (td >= phaseStart && td <= phaseEnde) : td >= phaseStart;
+                })
+                : alleTermine
+            );
         } catch (err) {
             console.error(err);
         } finally {
