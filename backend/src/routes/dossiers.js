@@ -154,7 +154,7 @@ router.get('/:id', auth, async (req, res) => {
         const aktVerlauf = verlauf.rows.find(v => v.status === 'Laufend')
             || verlauf.rows.find(v => v.klient_label);
 
-        const [ziele, externePersonen] = await Promise.all([
+        const [ziele, externePersonen, phasen] = await Promise.all([
             aktVerlauf
                 ? db.query(`SELECT * FROM vereinbarungsziel WHERE verlauf_id = $1 ORDER BY reihenfolge`, [aktVerlauf.verlauf_id])
                 : Promise.resolve({ rows: [] }),
@@ -166,6 +166,13 @@ router.get('/:id', auth, async (req, res) => {
                  ORDER BY ep.nachname, ep.vorname`,
                 [req.params.id]
             ),
+            dossier.rows[0].akt_programm_id
+                ? db.query(
+                    `SELECT phase_id, label, reihenfolge FROM phase
+                     WHERE programm_id = $1 ORDER BY reihenfolge`,
+                    [dossier.rows[0].akt_programm_id]
+                  )
+                : Promise.resolve({ rows: [] }),
         ]);
 
         res.json({
@@ -176,6 +183,9 @@ router.get('/:id', auth, async (req, res) => {
             ziele: ziele.rows,
             akt_verlauf_id: aktVerlauf?.verlauf_id || null,
             externe_personen: externePersonen.rows,
+            phasen: phasen.rows,
+            laufend_start_datum: aktVerlauf?.start_datum || null,
+            geplantes_enddatum: aktVerlauf?.geplantes_enddatum || null,
         });
     } catch (err) {
         console.error(err);
