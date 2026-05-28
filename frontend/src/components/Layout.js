@@ -16,6 +16,7 @@ import ExterneDetail from '../pages/ExterneDetail';
 import Standorte from '../pages/Standorte';
 import ManagementDashboard from '../pages/management/ManagementDashboard';
 import Auslastung from '../pages/management/Auslastung';
+import Benutzer from '../pages/management/Benutzer';
 
 const MANAGEMENT_ROLLEN = ['management', 'admin', 'teamleitung'];
 
@@ -216,7 +217,7 @@ export default function Layout() {
                     <Route path="/management"              element={<ManagementDashboard />} />
                     <Route path="/management/auslastung"   element={<Auslastung />} />
                     <Route path="/management/finanzen"     element={<Platzhalter titel="Finanzen" />} />
-                    <Route path="/management/benutzer"     element={<Platzhalter titel="Benutzerverwaltung" />} />
+                    <Route path="/management/benutzer"     element={<Benutzer />} />
                 </Routes>
             </div>
         </div>
