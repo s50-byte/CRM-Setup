@@ -85,6 +85,15 @@ export default function DossierPhase() {
             const phaseStart = aktPhase?.start_datum ? new Date(aktPhase.start_datum) : null;
             const phaseEnde  = aktPhase?.end_datum   ? new Date(aktPhase.end_datum)   : null;
 
+            console.log('[DossierPhase] phase_id (param):', phase_id, typeof phase_id);
+            console.log('[DossierPhase] aktPhase:', aktPhase);
+            console.log('[DossierPhase] phaseStart:', phaseStart, '| phaseEnde:', phaseEnde);
+            console.log('[DossierPhase] tasks sample:', (taskRes.data || []).slice(0, 3).map(t => ({ phase_id: t.phase_id, text: t.text })));
+            if ((taskRes.data || []).length > 0) {
+                const t0 = taskRes.data[0];
+                console.log('[DossierPhase] task phase_id type:', typeof t0.phase_id, '| value:', t0.phase_id, '| match:', t0.phase_id === phase_id);
+            }
+
             setKriterien(krRes.data);
 
             setTasks((taskRes.data || []).filter(t => t.phase_id === phase_id));
