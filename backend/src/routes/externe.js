@@ -131,6 +131,20 @@ router.put('/:id', auth, async (req, res) => {
     }
 });
 
+// DELETE /api/externe/:id/dossier/:dossier_id — Zuweisung entfernen
+router.delete('/:id/dossier/:dossier_id', auth, async (req, res) => {
+    try {
+        await db.query(
+            `DELETE FROM externe_person_dossier WHERE person_id = $1 AND dossier_id = $2`,
+            [req.params.id, req.params.dossier_id]
+        );
+        res.json({ message: 'Zuweisung entfernt' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Entfernen' });
+    }
+});
+
 // POST /api/externe/:id/dossier — Person einem Dossier zuweisen
 router.post('/:id/dossier', auth, async (req, res) => {
     const { dossier_id, rolle } = req.body;

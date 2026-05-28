@@ -4,6 +4,7 @@ import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import ZuweisungModal from '../components/ZuweisungModal';
 import Modal from '../components/Modal';
+import ExterneZuweisungModal from '../components/ExterneZuweisungModal';
 
 const FARBEN = {
     'Erstmalige berufliche Ausbildung': '#16A34A',
@@ -15,6 +16,16 @@ const LABEL_FARBEN = {
     'LE': { bg: '#ECFDF5', color: '#15803D' },
     'TN': { bg: '#EEF3FE', color: '#1D4ED8' },
     'MA': { bg: '#F5F3FF', color: '#5B21B6' },
+};
+
+const TYP_FARBEN = {
+    'IV-Stelle':        '#2563EB',
+    'RAV':              '#7C3AED',
+    'Sozialdienst':     '#D97706',
+    'Arbeitgeber':      '#16A34A',
+    'Arzt / Therapeut': '#0891B2',
+    'Schule':           '#EA580C',
+    'Sonstiges':        '#6B6860',
 };
 
 const JKAT = {
@@ -46,6 +57,7 @@ export default function DossierDetail() {
     // Kommentar
     const [kommentar, setKommentar] = useState('');
     const [zuweisungModal, setZuweisungModal] = useState(false);
+    const [externeModal, setExterneModal] = useState(false);
     const [agModal, setAgModal] = useState(false);
     const [agListe, setAgListe] = useState([]);
     const [agAuswahl, setAgAuswahl] = useState('');
@@ -618,6 +630,36 @@ export default function DossierDetail() {
                     ) : null)}
                 </div>
             </div>
+            {/* Externe Personen */}
+            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)', marginTop: '.875rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em' }}>Externe Personen</span>
+                    <button onClick={() => setExterneModal(true)} style={{
+                        fontSize: 11, padding: '3px 9px', cursor: 'pointer',
+                        border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
+                        background: '#fff', fontFamily: 'inherit', color: '#2563EB', fontWeight: 500
+                    }}>+ Externe Person zuweisen</button>
+                </div>
+                {(dossier.externe_personen || []).length === 0 ? (
+                    <div style={{ fontSize: 12, color: '#6B6860' }}>Keine externen Personen zugewiesen</div>
+                ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                        {(dossier.externe_personen || []).map((p, i) => {
+                            const farbe = TYP_FARBEN[p.typ] || '#6B6860';
+                            return (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#F5F4F0', borderRadius: 7, border: '1px solid rgba(0,0,0,.06)' }}>
+                                    <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: farbe + '22', color: farbe, border: `1px solid ${farbe}33`, fontFamily: 'monospace' }}>{p.typ}</span>
+                                    <div>
+                                        <div style={{ fontSize: 12, fontWeight: 500 }}>{p.nachname} {p.vorname}</div>
+                                        <div style={{ fontSize: 10.5, color: '#6B6860' }}>{p.rolle}{p.firma ? ` · ${p.firma}` : ''}</div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
             <ZuweisungModal
                 open={zuweisungModal}
                 onClose={() => setZuweisungModal(false)}
@@ -626,6 +668,17 @@ export default function DossierDetail() {
                 standortKuerzel={dossier.standort_kuerzel}
                 onSaved={() => {
                     setZuweisungModal(false);
+                    client.get(`/dossiers/${id}`).then(r => setDossier(r.data));
+                }}
+            />
+
+            <ExterneZuweisungModal
+                open={externeModal}
+                onClose={() => setExterneModal(false)}
+                dossierId={id}
+                zugewieseneExterne={dossier.externe_personen || []}
+                onSaved={() => {
+                    setExterneModal(false);
                     client.get(`/dossiers/${id}`).then(r => setDossier(r.data));
                 }}
             />

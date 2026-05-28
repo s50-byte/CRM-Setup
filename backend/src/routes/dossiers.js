@@ -154,10 +154,19 @@ router.get('/:id', auth, async (req, res) => {
         const aktVerlauf = verlauf.rows.find(v => v.status === 'Laufend')
             || verlauf.rows.find(v => v.klient_label);
 
-        const ziele = aktVerlauf ? await db.query(
-            `SELECT * FROM vereinbarungsziel WHERE verlauf_id = $1 ORDER BY reihenfolge`,
-            [aktVerlauf.verlauf_id]
-        ) : { rows: [] };
+        const [ziele, externePersonen] = await Promise.all([
+            aktVerlauf
+                ? db.query(`SELECT * FROM vereinbarungsziel WHERE verlauf_id = $1 ORDER BY reihenfolge`, [aktVerlauf.verlauf_id])
+                : Promise.resolve({ rows: [] }),
+            db.query(
+                `SELECT ep.person_id, ep.vorname, ep.nachname, ep.typ, ep.firma, epd.rolle
+                 FROM externe_person_dossier epd
+                 JOIN externe_person ep ON ep.person_id = epd.person_id
+                 WHERE epd.dossier_id = $1
+                 ORDER BY ep.nachname, ep.vorname`,
+                [req.params.id]
+            ),
+        ]);
 
         res.json({
             ...dossier.rows[0],
@@ -166,6 +175,7 @@ router.get('/:id', auth, async (req, res) => {
             zugewiesen: zugewiesen.rows,
             ziele: ziele.rows,
             akt_verlauf_id: aktVerlauf?.verlauf_id || null,
+            externe_personen: externePersonen.rows,
         });
     } catch (err) {
         console.error(err);
