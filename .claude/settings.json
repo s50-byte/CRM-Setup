@@ -14,7 +14,15 @@
       "Bash(node -e \"const jwt=require\\('./backend/node_modules/jsonwebtoken'\\); console.log\\(jwt.sign\\({user_id:'test', system_rolle:'management'}, 'iv_crm_jwt_secret_2025_bitte_aendern'\\)\\)\")",
       "Bash(pm2 logs *)",
       "Bash(curl -s http://localhost:3000/api/management/dashboard -H 'Authorization: Bearer __TRACKED_VAR__')",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(curl -s -X POST http://localhost:5000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"simon@iv-crm.ch\",\"password\":\"Test2025!\"}')",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('pro_rolle count:', len\\(d['auslastung']['pro_rolle']\\)\\); [print\\(r['rolle_name'], r['standort_kuerzel'], r['anzahl_personen'], r['aktive_klienten_total'], r['kapazitaet_total'], r['auslastung_pct']\\) for r in d['auslastung']['pro_rolle']]\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"simon@iv-crm.ch\",\"password\":\"Test2025!\"}')",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('token ok' if 'token' in d else d\\)\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"simon@iv-crm.ch\",\"password\":\"Admin2025!\"}')",
+      "Bash(curl -v -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"simon@iv-crm.ch\",\"password\":\"Admin2025!\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"barbara.vogt@kft-prototyp.ch\",\"passwort\":\"Test2025!\"}')",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); print\\('count:', len\\(data\\)\\); print\\(json.dumps\\(data[0], indent=2, ensure_ascii=False\\)\\)\")"
     ]
   }
 }

@@ -11,6 +11,7 @@ import Aufgaben from '../pages/Aufgaben';
 import Programme from '../pages/Programme';
 import Profil from '../pages/Profil';
 import DossierDetail from '../pages/DossierDetail';
+import DossierPhase from '../pages/DossierPhase';
 import KlientDetail from '../pages/KlientDetail';
 import ExterneDetail from '../pages/ExterneDetail';
 import Standorte from '../pages/Standorte';
@@ -211,6 +212,7 @@ export default function Layout() {
                     <Route path="/programme" element={<Programme />} />
                     <Route path="/profil"    element={<Profil />} />
                     <Route path="/dossiers/:id" element={<DossierDetail />} />
+                    <Route path="/dossiers/:id/phase/:phase_id" element={<DossierPhase />} />
                     <Route path="/klienten/:id" element={<KlientDetail />} />
                     <Route path="/externe/:id"  element={<ExterneDetail />} />
                     <Route path="/standorte"    element={<Standorte />} />

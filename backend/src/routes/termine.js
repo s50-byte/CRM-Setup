@@ -5,8 +5,9 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-// GET /api/termine — Alle Termine
+// GET /api/termine — Alle Termine (?klient_id=uuid für Filter)
 router.get('/', auth, async (req, res) => {
+    const klientFilter = req.query.klient_id || null;
     try {
         const result = await db.query(
             `SELECT
@@ -26,8 +27,10 @@ router.get('/', auth, async (req, res) => {
              JOIN klient k ON k.klient_id = t.klient_id
              LEFT JOIN termin_user tu ON tu.termin_id = t.termin_id
              LEFT JOIN benutzer u ON u.user_id = tu.user_id
+             WHERE ($1::uuid IS NULL OR t.klient_id = $1::uuid)
              GROUP BY t.termin_id, k.klient_id, k.nachname, k.vorname
              ORDER BY t.datum ASC, t.zeit ASC NULLS LAST`,
+            [klientFilter]
         );
         res.json(result.rows);
     } catch (err) {

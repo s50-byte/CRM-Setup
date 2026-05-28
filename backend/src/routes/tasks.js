@@ -35,6 +35,7 @@ router.get('/klient/:klient_id', auth, async (req, res) => {
             `SELECT
                 t.task_id, t.text, t.prioritaet, t.typ,
                 t.faellig_am, t.erledigt, t.erledigt_am,
+                t.phase_id,
                 u.full_name AS zugewiesen_an, u.avatar_initials,
                 ph.label AS phase_label
              FROM task t

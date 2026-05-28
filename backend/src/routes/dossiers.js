@@ -388,4 +388,52 @@ router.put('/:id/arbeitgeber', auth, async (req, res) => {
     }
 });
 
+// GET /api/dossiers/:id/phase/:phase_id/kriterien
+router.get('/:id/phase/:phase_id/kriterien', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT k.kriterium_id, k.text, k.typ, k.pflicht, k.reihenfolge,
+                    ks.erfuellt, ks.erfuellt_am
+             FROM kriterium k
+             LEFT JOIN kriterium_status ks
+               ON ks.kriterium_id = k.kriterium_id
+               AND ks.klient_id = (SELECT klient_id FROM dossier WHERE dossier_id = $1)
+             WHERE k.phase_id = $2
+             ORDER BY k.reihenfolge`,
+            [req.params.id, req.params.phase_id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der Kriterien' });
+    }
+});
+
+// PUT /api/dossiers/:id/phase/:phase_id/kriterien/:kriterium_id — abhaken toggle
+router.put('/:id/phase/:phase_id/kriterien/:kriterium_id', auth, async (req, res) => {
+    try {
+        const klientRes = await db.query(
+            `SELECT klient_id FROM dossier WHERE dossier_id = $1`,
+            [req.params.id]
+        );
+        if (klientRes.rows.length === 0) return res.status(404).json({ error: 'Dossier nicht gefunden' });
+        const klient_id = klientRes.rows[0].klient_id;
+
+        const result = await db.query(
+            `INSERT INTO kriterium_status (kriterium_id, klient_id, erfuellt, erfuellt_am, erfuellt_von)
+             VALUES ($1, $2, TRUE, CURRENT_DATE, $3)
+             ON CONFLICT (kriterium_id, klient_id) DO UPDATE
+               SET erfuellt    = NOT kriterium_status.erfuellt,
+                   erfuellt_am = CASE WHEN kriterium_status.erfuellt = FALSE THEN CURRENT_DATE ELSE NULL END,
+                   erfuellt_von = $3
+             RETURNING erfuellt, erfuellt_am`,
+            [req.params.kriterium_id, klient_id, req.user.user_id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren des Kriteriums' });
+    }
+});
+
 module.exports = router;
