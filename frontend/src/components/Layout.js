@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Dashboard from '../pages/Dashboard';
@@ -15,6 +14,10 @@ import DossierDetail from '../pages/DossierDetail';
 import KlientDetail from '../pages/KlientDetail';
 import ExterneDetail from '../pages/ExterneDetail';
 import Standorte from '../pages/Standorte';
+import ManagementDashboard from '../pages/management/ManagementDashboard';
+import Auslastung from '../pages/management/Auslastung';
+
+const MANAGEMENT_ROLLEN = ['management', 'admin', 'teamleitung'];
 
 const NAV = [
     { section: 'Mein Bereich' },
@@ -23,7 +26,7 @@ const NAV = [
     { path: '/aufgaben',  label: 'Aufgaben',           icon: '☑' },
     { section: 'Operativ' },
     { path: '/pipeline',  label: 'Pipeline',           icon: '⋮' },
-    { path: '/dossiers',  label: 'Klientendossiers',    icon: '📁' },
+    { path: '/dossiers',  label: 'Klientendossiers',   icon: '📁' },
     { path: '/termine',   label: 'Termine',            icon: '📅' },
     { path: '/praesenz',  label: 'Präsenzkontrolle',   icon: '✓' },
     { section: 'Stammdaten' },
@@ -35,10 +38,47 @@ const NAV = [
     { path: '/standorte', label: 'Standorte',          icon: '📍' },
 ];
 
+const MANAGEMENT_NAV = [
+    { section: 'Management' },
+    { path: '/management',             label: 'Dashboard',  icon: '📊' },
+    { path: '/management/auslastung',  label: 'Auslastung', icon: '👥' },
+    { path: '/management/finanzen',    label: 'Finanzen',   icon: '💰' },
+    { path: '/management/benutzer',    label: 'Benutzer',   icon: '⚙' },
+];
+
+function Platzhalter({ titel }) {
+    return (
+        <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 13, boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
+            {titel} — kommt bald
+        </div>
+    );
+}
+
+function MgmtToggle({ aktiv, onToggle }) {
+    return (
+        <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', userSelect: 'none' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 500, color: aktiv ? '#2563EB' : '#6B6860' }}>Management</span>
+            <div style={{
+                width: 36, height: 20, borderRadius: 10,
+                background: aktiv ? '#2563EB' : '#D1D5DB',
+                position: 'relative', transition: 'background .2s',
+                flexShrink: 0
+            }}>
+                <div style={{
+                    position: 'absolute', top: 3, left: aktiv ? 19 : 3,
+                    width: 14, height: 14, borderRadius: '50%', background: '#fff',
+                    boxShadow: '0 1px 3px rgba(0,0,0,.2)', transition: 'left .2s'
+                }} />
+            </div>
+        </div>
+    );
+}
+
 export default function Layout() {
-    const { benutzer, logout } = useAuth();
+    const { benutzer, logout, managementModus, toggleManagementModus } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const istManagementUser = MANAGEMENT_ROLLEN.includes(benutzer?.system_rolle);
 
     function handleLogout() {
         logout();
@@ -47,6 +87,8 @@ export default function Layout() {
 
     const initials = benutzer?.avatar_initials ||
         benutzer?.full_name?.split(' ').map(n => n[0]).join('') || '?';
+
+    const aktivNav = (managementModus && istManagementUser) ? MANAGEMENT_NAV : NAV;
 
     return (
         <div style={{
@@ -73,9 +115,9 @@ export default function Layout() {
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontWeight: 600, fontSize: 15 }}>
                     <div style={{
-                        width: 30, height: 30, background: '#2563EB', borderRadius: 7,
+                        width: 30, height: 30, background: managementModus && istManagementUser ? '#7C3AED' : '#2563EB', borderRadius: 7,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#fff', fontSize: 15
+                        color: '#fff', fontSize: 15, transition: 'background .2s'
                     }}>✦</div>
                     Klientenführungstool Prototyp
                 </div>
@@ -85,7 +127,10 @@ export default function Layout() {
                     border: '1px solid rgba(217,119,6,.15)', fontFamily: 'monospace'
                 }}>v2</span>
 
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {istManagementUser && (
+                        <MgmtToggle aktiv={managementModus} onToggle={toggleManagementModus} />
+                    )}
                     <div style={{
                         display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer',
                         padding: '4px 10px 4px 4px', borderRadius: 6,
@@ -117,7 +162,7 @@ export default function Layout() {
                 overflowY: 'auto',
                 padding: '.5rem 0 1.5rem'
             }}>
-                {NAV.map((item, i) => {
+                {aktivNav.map((item, i) => {
                     if (item.section) {
                         return (
                             <div key={i} style={{
@@ -133,11 +178,11 @@ export default function Layout() {
                             display: 'flex', alignItems: 'center', gap: 9,
                             padding: '7px 12px 7px 1rem', fontSize: 13,
                             fontWeight: active ? 500 : 400,
-                            color: active ? '#2563EB' : '#6B6860',
+                            color: active ? (managementModus && istManagementUser ? '#7C3AED' : '#2563EB') : '#6B6860',
                             cursor: 'pointer', border: 'none',
                             background: active ? '#F5F4F0' : 'transparent',
                             width: '100%', textAlign: 'left',
-                            borderLeft: active ? '3px solid #2563EB' : '3px solid transparent',
+                            borderLeft: active ? `3px solid ${managementModus && istManagementUser ? '#7C3AED' : '#2563EB'}` : '3px solid transparent',
                             fontFamily: 'inherit'
                         }}>
                             <span style={{ fontSize: 14, opacity: active ? 1 : .75 }}>{item.icon}</span>
@@ -164,7 +209,11 @@ export default function Layout() {
                     <Route path="/dossiers/:id" element={<DossierDetail />} />
                     <Route path="/klienten/:id" element={<KlientDetail />} />
                     <Route path="/externe/:id"  element={<ExterneDetail />} />
-                    <Route path="/standorte" element={<Standorte />} />
+                    <Route path="/standorte"    element={<Standorte />} />
+                    <Route path="/management"              element={<ManagementDashboard />} />
+                    <Route path="/management/auslastung"   element={<Auslastung />} />
+                    <Route path="/management/finanzen"     element={<Platzhalter titel="Finanzen" />} />
+                    <Route path="/management/benutzer"     element={<Platzhalter titel="Benutzerverwaltung" />} />
                 </Routes>
             </div>
         </div>
