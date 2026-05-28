@@ -75,8 +75,8 @@ router.get('/dashboard', auth, requireManagement, async (req, res) => {
                 SELECT COALESCE(SUM(
                     p.monatspreis *
                     GREATEST(0, LEAST(
-                        EXTRACT(EPOCH FROM (LEAST(NOW(), $2::date) - pv.start_datum)) / (30.44 * 86400),
-                        EXTRACT(EPOCH FROM ($2::date - $1::date)) / (30.44 * 86400)
+                        (LEAST(CURRENT_DATE, $2::date) - pv.start_datum) / 30.44,
+                        ($2::date - $1::date) / 30.44
                     ))
                 ), 0) AS umsatz_ytd
                 FROM programm_verlauf pv
@@ -92,8 +92,7 @@ router.get('/dashboard', auth, requireManagement, async (req, res) => {
                 SELECT COALESCE(SUM(
                     p.monatspreis *
                     GREATEST(0,
-                        EXTRACT(EPOCH FROM (LEAST(COALESCE(pv.geplantes_enddatum, $2::date), $2::date) - GREATEST(pv.start_datum, $1::date)))
-                        / (30.44 * 86400)
+                        (LEAST(COALESCE(pv.geplantes_enddatum, $2::date), $2::date) - GREATEST(pv.start_datum, $1::date)) / 30.44
                     )
                 ), 0) AS umsatz_forecast
                 FROM programm_verlauf pv
@@ -111,15 +110,14 @@ router.get('/dashboard', auth, requireManagement, async (req, res) => {
                     COALESCE(SUM(
                         p.monatspreis *
                         GREATEST(0, LEAST(
-                            EXTRACT(EPOCH FROM (LEAST(NOW(), $2::date) - pv.start_datum)) / (30.44 * 86400),
-                            EXTRACT(EPOCH FROM ($2::date - $1::date)) / (30.44 * 86400)
+                            (LEAST(CURRENT_DATE, $2::date) - pv.start_datum) / 30.44,
+                            ($2::date - $1::date) / 30.44
                         ))
                     ), 0) AS umsatz_ytd,
                     COALESCE(SUM(
                         p.monatspreis *
                         GREATEST(0,
-                            EXTRACT(EPOCH FROM (LEAST(COALESCE(pv.geplantes_enddatum, $3::date), $3::date) - GREATEST(pv.start_datum, $1::date)))
-                            / (30.44 * 86400)
+                            (LEAST(COALESCE(pv.geplantes_enddatum, $3::date), $3::date) - GREATEST(pv.start_datum, $1::date)) / 30.44
                         )
                     ), 0) AS umsatz_forecast
                 FROM programm_verlauf pv
@@ -139,15 +137,14 @@ router.get('/dashboard', auth, requireManagement, async (req, res) => {
                     COALESCE(SUM(
                         p.monatspreis *
                         GREATEST(0, LEAST(
-                            EXTRACT(EPOCH FROM (LEAST(NOW(), $2::date) - pv.start_datum)) / (30.44 * 86400),
-                            EXTRACT(EPOCH FROM ($2::date - $1::date)) / (30.44 * 86400)
+                            (LEAST(CURRENT_DATE, $2::date) - pv.start_datum) / 30.44,
+                            ($2::date - $1::date) / 30.44
                         ))
                     ), 0) AS umsatz_ytd,
                     COALESCE(SUM(
                         p.monatspreis *
                         GREATEST(0,
-                            EXTRACT(EPOCH FROM (LEAST(COALESCE(pv.geplantes_enddatum, $3::date), $3::date) - GREATEST(pv.start_datum, $1::date)))
-                            / (30.44 * 86400)
+                            (LEAST(COALESCE(pv.geplantes_enddatum, $3::date), $3::date) - GREATEST(pv.start_datum, $1::date)) / 30.44
                         )
                     ), 0) AS umsatz_forecast
                 FROM programm_verlauf pv
