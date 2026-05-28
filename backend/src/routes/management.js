@@ -33,6 +33,7 @@ router.get('/dashboard', auth, requireManagement, async (req, res) => {
             umsatzProStandort,
             auslastungProPerson,
             auslastungProStandort,
+            auslastungProRolle,
         ] = await Promise.all([
 
             // Aktive Dossiers total
@@ -215,6 +216,55 @@ router.get('/dashboard', auth, requireManagement, async (req, res) => {
                 GROUP BY st.name, st.kuerzel
                 ORDER BY aktive_klienten DESC
             `),
+
+            // Auslastung pro Rolle (pro Standort + gesamt)
+            db.query(`
+                SELECT
+                    ba.rolle_name,
+                    st.kuerzel AS standort_kuerzel,
+                    st.name AS standort_name,
+                    COUNT(DISTINCT u.user_id) AS anzahl_personen,
+                    COUNT(DISTINCT ku.klient_id) FILTER (WHERE ku.aktiv = TRUE) AS aktive_klienten_total,
+                    COALESCE(SUM(ba.max_klienten), 0) AS kapazitaet_total,
+                    CASE
+                        WHEN COALESCE(SUM(ba.max_klienten), 0) = 0 THEN NULL
+                        ELSE ROUND(
+                            COUNT(DISTINCT ku.klient_id) FILTER (WHERE ku.aktiv = TRUE)::NUMERIC
+                            / SUM(ba.max_klienten) * 100
+                        )
+                    END AS auslastung_pct
+                FROM benutzer u
+                JOIN benutzer_aufgabe ba ON ba.user_id = u.user_id
+                JOIN benutzer_standort bst ON bst.user_id = u.user_id
+                JOIN standort st ON st.standort_id = bst.standort_id
+                LEFT JOIN klient_user ku ON ku.user_id = u.user_id
+                WHERE u.aktiv = TRUE
+                GROUP BY ba.rolle_name, st.standort_id, st.kuerzel, st.name
+
+                UNION ALL
+
+                SELECT
+                    ba.rolle_name,
+                    NULL::text AS standort_kuerzel,
+                    NULL::text AS standort_name,
+                    COUNT(DISTINCT u.user_id) AS anzahl_personen,
+                    COUNT(DISTINCT ku.klient_id) FILTER (WHERE ku.aktiv = TRUE) AS aktive_klienten_total,
+                    COALESCE(SUM(ba.max_klienten), 0) AS kapazitaet_total,
+                    CASE
+                        WHEN COALESCE(SUM(ba.max_klienten), 0) = 0 THEN NULL
+                        ELSE ROUND(
+                            COUNT(DISTINCT ku.klient_id) FILTER (WHERE ku.aktiv = TRUE)::NUMERIC
+                            / SUM(ba.max_klienten) * 100
+                        )
+                    END AS auslastung_pct
+                FROM benutzer u
+                JOIN benutzer_aufgabe ba ON ba.user_id = u.user_id
+                LEFT JOIN klient_user ku ON ku.user_id = u.user_id
+                WHERE u.aktiv = TRUE
+                GROUP BY ba.rolle_name
+
+                ORDER BY rolle_name, standort_kuerzel NULLS FIRST
+            `),
         ]);
 
         res.json({
@@ -248,6 +298,13 @@ router.get('/dashboard', auth, requireManagement, async (req, res) => {
                 pro_standort: auslastungProStandort.rows.map(r => ({
                     ...r,
                     aktive_klienten: parseInt(r.aktive_klienten),
+                    kapazitaet_total: parseInt(r.kapazitaet_total),
+                    auslastung_pct: r.auslastung_pct !== null ? parseInt(r.auslastung_pct) : null,
+                })),
+                pro_rolle: auslastungProRolle.rows.map(r => ({
+                    ...r,
+                    anzahl_personen: parseInt(r.anzahl_personen),
+                    aktive_klienten_total: parseInt(r.aktive_klienten_total),
                     kapazitaet_total: parseInt(r.kapazitaet_total),
                     auslastung_pct: r.auslastung_pct !== null ? parseInt(r.auslastung_pct) : null,
                 })),
