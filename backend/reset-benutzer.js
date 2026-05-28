@@ -110,6 +110,23 @@ async function main() {
         console.log('\nLösche bestehende Benutzer…');
         await db.query(`DELETE FROM benutzer_aufgabe`);
         await db.query(`DELETE FROM klient_user`);
+
+        // FK-Referenzen auf zu löschende Benutzer neutralisieren
+        const simonRes = await db.query(`SELECT user_id FROM benutzer WHERE email = 'simon@iv-crm.ch'`);
+        const simonId = simonRes.rows[0]?.user_id;
+        const anderen = `(SELECT user_id FROM benutzer WHERE email != 'simon@iv-crm.ch')`;
+        if (simonId) {
+            // journal_eintrag: NOT NULL → auf simon umhängen
+            await db.query(`UPDATE journal_eintrag SET user_id = $1 WHERE user_id IN ${anderen}`, [simonId]);
+        }
+        // Nullable Felder → NULL setzen
+        await db.query(`UPDATE zeitachse_eintrag   SET user_id          = NULL WHERE user_id          IN ${anderen}`);
+        await db.query(`UPDATE task                SET user_id          = NULL WHERE user_id          IN ${anderen}`);
+        await db.query(`UPDATE dokument            SET user_id          = NULL WHERE user_id          IN ${anderen}`);
+        await db.query(`UPDATE praesenz_eintrag    SET erfasst_von      = NULL WHERE erfasst_von      IN ${anderen}`);
+        await db.query(`UPDATE ferienplanung       SET abgesprochen_mit = NULL WHERE abgesprochen_mit IN ${anderen}`);
+        await db.query(`UPDATE kriterium_status    SET erfuellt_von     = NULL WHERE erfuellt_von     IN ${anderen}`);
+
         await db.query(`DELETE FROM benutzer WHERE email != 'simon@iv-crm.ch'`);
         console.log('  ✓ Benutzer gelöscht (simon@iv-crm.ch bleibt)');
 
@@ -155,6 +172,13 @@ async function main() {
                         [user_id, a.rolle_name, a.max_klienten]
                     );
                 }
+
+                // benutzer_standort (für N:M Standort-Filter)
+                await db.query(
+                    `INSERT INTO benutzer_standort (user_id, standort_id)
+                     VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                    [user_id, standort_id]
+                );
 
                 // Index befüllen für spätere Zuweisung
                 if (b.typ === 'KF' || b.typ === 'KF+FP') benutzerIndex[kuerzel].KF.push(user_id);
