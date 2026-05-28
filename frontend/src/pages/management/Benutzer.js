@@ -144,6 +144,7 @@ export default function Benutzer() {
                                 <TH>System-Rolle</TH>
                                 <TH>Standorte</TH>
                                 <TH>Rollen</TH>
+                                <TH>Programme</TH>
                                 <TH right>Pensum</TH>
                                 <TH>Status</TH>
                                 <TH></TH>
@@ -152,7 +153,7 @@ export default function Benutzer() {
                         <tbody>
                             {gefiltert.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#A09D97', fontSize: 12 }}>
+                                    <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#A09D97', fontSize: 12 }}>
                                         Keine Benutzer gefunden
                                     </td>
                                 </tr>
@@ -183,6 +184,16 @@ export default function Benutzer() {
                                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                                             {(b.rollen || []).length === 0 && <span style={{ fontSize: 11, color: '#A09D97' }}>—</span>}
                                             {(b.rollen || []).map((r, ri) => <RolleBadge key={ri} name={r.rolle_name} />)}
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '9px 12px' }}>
+                                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                            {(b.programme || []).length === 0 && <span style={{ fontSize: 11, color: '#A09D97' }}>—</span>}
+                                            {(b.programme || []).map((p, pi) => (
+                                                <span key={pi} style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 10, background: (p.farbe_hex || '#6B6860') + '22', color: p.farbe_hex || '#6B6860', border: `1px solid ${(p.farbe_hex || '#6B6860')}33`, whiteSpace: 'nowrap', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }}>
+                                                    {p.name}
+                                                </span>
+                                            ))}
                                         </div>
                                     </td>
                                     <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', color: '#6B6860' }}>{b.pensum_pct}%</td>

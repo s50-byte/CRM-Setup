@@ -50,11 +50,23 @@ router.get('/', auth, async (req, res) => {
                         )
                     ) FILTER (WHERE st2.standort_id IS NOT NULL),
                     '[]'
-                ) AS standorte
+                ) AS standorte,
+                COALESCE(
+                    JSON_AGG(DISTINCT
+                        JSONB_BUILD_OBJECT(
+                            'programm_id', p.programm_id,
+                            'name', p.name,
+                            'farbe_hex', p.farbe_hex
+                        )
+                    ) FILTER (WHERE p.programm_id IS NOT NULL),
+                    '[]'
+                ) AS programme
              FROM benutzer u
              LEFT JOIN benutzer_aufgabe r ON r.user_id = u.user_id
              LEFT JOIN benutzer_standort bs ON bs.user_id = u.user_id
              LEFT JOIN standort st2 ON st2.standort_id = bs.standort_id
+             LEFT JOIN benutzer_berechtigung bb ON bb.user_id = u.user_id
+             LEFT JOIN programm p ON p.programm_id = bb.programm_id
              WHERE ($1 OR u.aktiv = TRUE)
              GROUP BY u.user_id
              ORDER BY u.full_name`,
