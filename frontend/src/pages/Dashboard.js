@@ -124,14 +124,11 @@ export default function Dashboard() {
                             }}>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontSize: 11.5, fontWeight: 600, color: '#1A1917', marginBottom: 5 }}>
-                                        {new Date(m.datum + 'T12:00:00').toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-                                        {m.created_at && (
-                                            <span style={{ fontWeight: 400, color: '#A09D97', marginLeft: 8 }}>
-                                                {new Date(m.created_at).toLocaleString('de-CH', { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                        )}
+                                        {new Date(m.created_at).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'long' })}
+                                        <span style={{ fontWeight: 400, color: '#A09D97', marginLeft: 6 }}>
+                                            · {new Date(m.created_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })} Uhr
+                                        </span>
                                     </div>
-                                    {console.log('Meldung:', m)}
                                     {(m.aenderungen || []).map((a, i) => (
                                         <div key={i} style={{ fontSize: 12, color: '#1A1917', marginTop: 3 }}>
                                             <strong>{a.name}</strong>
