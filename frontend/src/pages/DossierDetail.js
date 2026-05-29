@@ -210,7 +210,7 @@ export default function DossierDetail() {
             {/* ── HEADER ─────────────────────────────────── */}
             <div style={{ ...CARD, padding: '1.125rem 1.25rem', marginBottom: '.875rem' }}>
                 {/* Row 1: Avatar + Name + Badges */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 }}>
                     <div style={{
                         width: 44, height: 44, borderRadius: 11, background: '#EEF3FE',
                         color: '#1D4ED8', display: 'flex', alignItems: 'center',
@@ -298,23 +298,28 @@ export default function DossierDetail() {
                         </div>
                     </div>
 
-                    {/* Rechte Spalte (25%): Buttons */}
-                    <div style={{ flex: '0 0 25%', display: 'flex', flexDirection: 'column', gap: 6, alignSelf: 'flex-start' }}>
-                        <button onClick={() => { setJFormOpen(true); setAktTab('journal'); }} style={{
-                            minWidth: 160, padding: '7px 14px', fontSize: 12.5, fontWeight: 500,
-                            cursor: 'pointer', border: 'none', borderRadius: 6,
-                            background: '#2563EB', color: '#fff', fontFamily: 'inherit'
-                        }}>+ Journal-Eintrag</button>
-                        <button onClick={() => setFelderModal(true)} style={{
-                            minWidth: 160, padding: '7px 14px', fontSize: 12.5,
-                            cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                            background: '#fff', fontFamily: 'inherit', color: '#1A1917'
-                        }}>Arbeitsort ändern</button>
-                        <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
-                            minWidth: 160, padding: '7px 14px', fontSize: 12.5,
-                            cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                            background: '#fff', fontFamily: 'inherit', color: '#6B6860'
-                        }}>Stammdaten →</button>
+                    {/* Rechte Spalte: Buttons */}
+                    <div style={{ width: 'auto', alignSelf: 'flex-start' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+                            <button onClick={() => { setJFormOpen(true); setAktTab('journal'); }} style={{
+                                display: 'inline-block', width: 'auto', whiteSpace: 'nowrap',
+                                minWidth: 160, padding: '7px 14px', fontSize: 12.5, fontWeight: 500,
+                                cursor: 'pointer', border: 'none', borderRadius: 6,
+                                background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                            }}>+ Journal-Eintrag</button>
+                            <button onClick={() => setFelderModal(true)} style={{
+                                display: 'inline-block', width: 'auto', whiteSpace: 'nowrap',
+                                minWidth: 160, padding: '7px 14px', fontSize: 12.5,
+                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                                background: '#fff', fontFamily: 'inherit', color: '#1A1917'
+                            }}>Arbeitsort ändern</button>
+                            <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
+                                display: 'inline-block', width: 'auto', whiteSpace: 'nowrap',
+                                minWidth: 160, padding: '7px 14px', fontSize: 12.5,
+                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                                background: '#fff', fontFamily: 'inherit', color: '#6B6860'
+                            }}>Stammdaten →</button>
+                        </div>
                     </div>
                 </div>
 
