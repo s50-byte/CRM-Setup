@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
+import NeueAufgabeModal from '../components/NeueAufgabeModal';
+import NeuerTerminModal from '../components/NeuerTerminModal';
+import DokumentModal from '../components/DokumentModal';
+import StandortWechselModal from '../components/StandortWechselModal';
 
 const STATUS_STYLE = {
     'Ausstehend': { bg: '#FFFBEB', color: '#B45309' },
@@ -8,7 +12,6 @@ const STATUS_STYLE = {
     'Geplant':    { bg: '#EEF3FE', color: '#1D4ED8' },
     'Abgesagt':   { bg: '#FEF2F2', color: '#B91C1C' },
 };
-
 
 const TYP_FARBEN = {
     'IV-Stelle':        '#2563EB',
@@ -18,6 +21,17 @@ const TYP_FARBEN = {
     'Arzt / Therapeut': '#0891B2',
     'Schule':           '#EA580C',
     'Sonstiges':        '#6B6860',
+};
+
+const DOK_FARBEN = {
+    'IV-Verfügung':          '#7C3AED',
+    'Lebenslauf':            '#2563EB',
+    'Arztbericht':           '#0891B2',
+    'Anmeldeformular':       '#16A34A',
+    'Leistungsvereinbarung': '#D97706',
+    'Abschlussbericht':      '#B91C1C',
+    'Erstgesprächsprotokoll':'#EA580C',
+    'Sonstiges':             '#6B6860',
 };
 
 const CARD = {
@@ -30,6 +44,14 @@ const CARD = {
 const SECTION_HDR = {
     fontSize: 10.5, fontWeight: 600, color: '#6B6860',
     textTransform: 'uppercase', letterSpacing: '.06em',
+};
+
+const BTN_PLUS = {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    fontSize: 11, padding: '3px 8px', borderRadius: 5,
+    border: '1px solid rgba(37,99,235,.25)', background: '#EEF3FE',
+    color: '#1D4ED8', cursor: 'pointer', fontFamily: 'inherit',
+    fontWeight: 500, flexShrink: 0,
 };
 
 function fmt(dateStr) {
@@ -50,13 +72,18 @@ function KriteriumTypBadge({ typ, pflicht }) {
 export default function DossierPhase() {
     const { id, phase_id } = useParams();
     const navigate = useNavigate();
-    console.log('[DossierPhase] MOUNT id:', id, 'phase_id:', phase_id);
 
     const [dossier, setDossier] = useState(null);
     const [kriterien, setKriterien] = useState([]);
     const [tasks, setTasks] = useState([]);
     const [termine, setTermine] = useState([]);
+    const [dokumente, setDokumente] = useState([]);
     const [laden, setLaden] = useState(true);
+
+    const [aufgabeModal, setAufgabeModal] = useState(false);
+    const [terminModal, setTerminModal] = useState(false);
+    const [dokumentModal, setDokumentModal] = useState(false);
+    const [standortModal, setStandortModal] = useState(false);
 
     const ladeDaten = useCallback(async () => {
         try {
@@ -64,21 +91,18 @@ export default function DossierPhase() {
             const dos = dosRes.data;
             setDossier(dos);
 
-            console.log('[DossierPhase] phase_id:', phase_id);
-
-            const [krRes, taskRes, termRes] = await Promise.all([
+            const [krRes, taskRes, termRes, dokRes] = await Promise.all([
                 client.get(`/dossiers/${id}/phase/${phase_id}/kriterien`),
                 dos.klient_id ? client.get(`/tasks/klient/${dos.klient_id}`) : Promise.resolve({ data: [] }),
                 dos.klient_id ? client.get(`/termine?klient_id=${dos.klient_id}`) : Promise.resolve({ data: [] }),
+                dos.klient_id ? client.get(`/dokumente?klient_id=${dos.klient_id}&phase_id=${phase_id}`) : Promise.resolve({ data: [] }),
             ]);
 
             const phaseTasks = (taskRes.data || []).filter(t => t.phase_id === phase_id);
-            console.log('[DossierPhase] tasks total:', (taskRes.data || []).length, '| this phase:', phaseTasks.length, '| sample:', (taskRes.data || []).slice(0, 3).map(t => ({ phase_id: t.phase_id, text: t.text })));
-            console.log('[DossierPhase] kriterien:', krRes.data);
-
             setKriterien(krRes.data);
             setTasks(phaseTasks);
             setTermine(termRes.data || []);
+            setDokumente(dokRes.data || []);
         } catch (err) {
             console.error(err);
         } finally {
@@ -106,6 +130,14 @@ export default function DossierPhase() {
         } catch (err) { console.error(err); }
     }
 
+    async function deleteDokument(dokument_id) {
+        if (!window.confirm('Dokument wirklich löschen?')) return;
+        try {
+            await client.delete(`/dokumente/${dokument_id}`);
+            setDokumente(prev => prev.filter(d => d.dokument_id !== dokument_id));
+        } catch (err) { console.error(err); }
+    }
+
     if (laden) return <div style={{ padding: '2rem', color: '#6B6860', fontSize: 13 }}>Laden…</div>;
     if (!dossier) return <div style={{ padding: '2rem', color: '#B91C1C', fontSize: 13 }}>Dossier nicht gefunden</div>;
 
@@ -117,19 +149,25 @@ export default function DossierPhase() {
     const erledigtCount = kriterien.filter(k => k.erfuellt).length;
     const offeneTasks = tasks.filter(t => !t.erledigt).length;
 
-
     return (
         <div>
-            {/* Back */}
-            <button onClick={() => navigate(`/dossiers/${id}`)} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12,
-                color: '#6B6860', cursor: 'pointer', background: 'none', border: 'none',
-                marginBottom: '.875rem', fontFamily: 'inherit', padding: 0
-            }}>← Zurück zum Dossier</button>
+            {/* Back + Standort-Button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '.875rem' }}>
+                <button onClick={() => navigate(`/dossiers/${id}`)} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12,
+                    color: '#6B6860', cursor: 'pointer', background: 'none', border: 'none',
+                    fontFamily: 'inherit', padding: 0
+                }}>← Zurück zum Dossier</button>
+                <button onClick={() => setStandortModal(true)} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    fontSize: 11, padding: '3px 9px', borderRadius: 5,
+                    border: '1px solid rgba(0,0,0,.12)', background: '#F5F4F0',
+                    color: '#6B6860', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+                }}>📍 Standort wechseln</button>
+            </div>
 
             {/* ── HEADER ─────────────────────────────────── */}
             <div style={{ ...CARD, padding: '1.125rem 1.25rem', marginBottom: '.875rem' }}>
-                {/* Breadcrumb */}
                 <div style={{ fontSize: 11.5, color: '#A09D97', marginBottom: 6, display: 'flex', gap: 5, alignItems: 'center' }}>
                     <span style={{ fontWeight: 500, color: '#6B6860' }}>{dossier.vorname} {dossier.nachname}</span>
                     <span>·</span>
@@ -138,16 +176,13 @@ export default function DossierPhase() {
                     <span style={{ fontWeight: 600, color: '#1A1917' }}>{aktPhase?.label || '—'}</span>
                 </div>
 
-                {/* Phasenname */}
                 <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.4px', marginBottom: '1rem' }}>
                     {aktPhase?.label || 'Phase'}
                 </div>
 
-                {/* Phasen-Stepper */}
                 {phasen.length > 0 && (
                     <div style={{ display: 'flex', overflowX: 'auto', paddingBottom: 4 }}>
                         {phasen.map((ph, i, arr) => {
-                            const viewIdx = arr.findIndex(p => p.phase_id === phase_id);
                             const aktIdx = arr.findIndex(p => p.phase_id === dossier.akt_phase_id);
                             const done = i < aktIdx;
                             const active = ph.phase_id === phase_id;
@@ -190,12 +225,6 @@ export default function DossierPhase() {
 
                 {/* LINKE SPALTE */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.875rem', minWidth: 0 }}>
-
-                    {tasks.length === 0 && kriterien.length === 0 ? (
-                        <div style={{ ...CARD, padding: '2rem 1.5rem', textAlign: 'center', color: '#A09D97', fontSize: 13 }}>
-                            Noch keine Inhalte für diese Phase erfasst
-                        </div>
-                    ) : <>
 
                     {/* Kriterien / Checkliste */}
                     <div style={{ ...CARD, overflow: 'hidden' }}>
@@ -241,10 +270,11 @@ export default function DossierPhase() {
                     {/* Tasks dieser Phase */}
                     <div style={{ ...CARD, overflow: 'hidden' }}>
                         <div style={{ padding: '.65rem 1rem', borderBottom: '1px solid rgba(0,0,0,.05)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={SECTION_HDR}>Aufgaben dieser Phase</span>
+                            <span style={{ ...SECTION_HDR, flex: 1 }}>Aufgaben dieser Phase</span>
                             {offeneTasks > 0 && (
-                                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: '#FFFBEB', color: '#B45309', border: '1px solid rgba(217,119,6,.15)', fontFamily: 'monospace', marginLeft: 4 }}>{offeneTasks} offen</span>
+                                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: '#FFFBEB', color: '#B45309', border: '1px solid rgba(217,119,6,.15)', fontFamily: 'monospace' }}>{offeneTasks} offen</span>
                             )}
+                            <button style={BTN_PLUS} onClick={() => setAufgabeModal(true)}>+ Aufgabe</button>
                         </div>
                         <div style={{ padding: '1rem' }}>
                             {tasks.length === 0 ? (
@@ -277,19 +307,50 @@ export default function DossierPhase() {
                         </div>
                     </div>
 
-                    </>}
+                    {/* Dokumente */}
+                    <div style={{ ...CARD, overflow: 'hidden' }}>
+                        <div style={{ padding: '.65rem 1rem', borderBottom: '1px solid rgba(0,0,0,.05)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ ...SECTION_HDR, flex: 1 }}>📄 Dokumente</span>
+                            {dokumente.length > 0 && (
+                                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.09)', fontFamily: 'monospace' }}>{dokumente.length}</span>
+                            )}
+                            <button style={BTN_PLUS} onClick={() => setDokumentModal(true)}>+ Dokument</button>
+                        </div>
+                        <div style={{ padding: '1rem' }}>
+                            {dokumente.length === 0 ? (
+                                <div style={{ fontSize: 12, color: '#A09D97', fontStyle: 'italic' }}>Keine Dokumente für diese Phase</div>
+                            ) : dokumente.map(d => {
+                                const farbe = DOK_FARBEN[d.typ] || '#6B6860';
+                                return (
+                                    <div key={d.dokument_id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 6, border: '1px solid rgba(0,0,0,.09)', background: '#F5F4F0', marginBottom: 5 }}>
+                                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: farbe + '22', color: farbe, border: `1px solid ${farbe}33`, fontFamily: 'monospace', flexShrink: 0 }}>{d.typ || '—'}</span>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.dateiname}</div>
+                                            <div style={{ fontSize: 10.5, color: '#6B6860' }}>{d.erstellt_von_name || '—'} · {fmt(d.erstellt_am)}</div>
+                                        </div>
+                                        <button
+                                            onClick={() => deleteDokument(d.dokument_id)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A09D97', fontSize: 13, padding: '2px 4px', flexShrink: 0 }}
+                                            title="Löschen"
+                                        >✕</button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
 
                 {/* RECHTE SPALTE */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.875rem' }}>
 
-                    {/* Termine dieser Phase */}
+                    {/* Termine */}
                     <div style={{ ...CARD, overflow: 'hidden' }}>
                         <div style={{ padding: '.65rem 1rem', borderBottom: '1px solid rgba(0,0,0,.05)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={SECTION_HDR}>📅 Termine</span>
+                            <span style={{ ...SECTION_HDR, flex: 1 }}>📅 Termine</span>
                             {termine.length > 0 && (
-                                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.09)', fontFamily: 'monospace', marginLeft: 4 }}>{termine.length}</span>
+                                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.09)', fontFamily: 'monospace' }}>{termine.length}</span>
                             )}
+                            <button style={BTN_PLUS} onClick={() => setTerminModal(true)}>+ Termin</button>
                         </div>
                         <div style={{ padding: '1rem' }}>
                             {termine.length === 0 ? (
@@ -307,7 +368,7 @@ export default function DossierPhase() {
                                             </div>
                                             <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 20, background: ss.bg, color: ss.color, fontFamily: 'monospace', flexShrink: 0 }}>{t.status}</span>
                                         </div>
-                                        {t.notiz && <div style={{ fontSize: 11, color: '#6B6860', marginTop: 4, paddingLeft: 0, fontStyle: 'italic' }}>{t.notiz}</div>}
+                                        {t.notiz && <div style={{ fontSize: 11, color: '#6B6860', marginTop: 4, fontStyle: 'italic' }}>{t.notiz}</div>}
                                         {(t.personen || []).length > 0 && (
                                             <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
                                                 {t.personen.map((p, pi) => (
@@ -364,6 +425,35 @@ export default function DossierPhase() {
                     )}
                 </div>
             </div>
+
+            {/* MODALS */}
+            <NeueAufgabeModal
+                open={aufgabeModal}
+                onClose={() => setAufgabeModal(false)}
+                onSaved={ladeDaten}
+                klientId={dossier.klient_id}
+                phaseId={phase_id}
+            />
+            <NeuerTerminModal
+                open={terminModal}
+                onClose={() => setTerminModal(false)}
+                onSaved={ladeDaten}
+                klientId={dossier.klient_id}
+            />
+            <DokumentModal
+                open={dokumentModal}
+                onClose={() => setDokumentModal(false)}
+                onSaved={ladeDaten}
+                klientId={dossier.klient_id}
+                phaseId={phase_id}
+            />
+            <StandortWechselModal
+                open={standortModal}
+                onClose={() => setStandortModal(false)}
+                onSaved={ladeDaten}
+                dossierId={id}
+                dossier={dossier}
+            />
         </div>
     );
 }

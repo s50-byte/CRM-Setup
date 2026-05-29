@@ -373,6 +373,69 @@ router.delete('/:id/ziele/:ziel_id', auth, async (req, res) => {
     }
 });
 
+// PUT /api/dossiers/:id/standort — Standortwechsel
+router.put('/:id/standort', auth, async (req, res) => {
+    const { standort_id, neuer_user_id, alter_user_id, bemerkung } = req.body;
+    if (!standort_id) return res.status(400).json({ error: 'standort_id erforderlich' });
+
+    const cl = await require('../db').connect();
+    try {
+        await cl.query('BEGIN');
+
+        const dosRes = await cl.query(
+            `SELECT d.klient_id, st.name AS alter_standort
+             FROM dossier d
+             LEFT JOIN standort st ON st.standort_id = d.standort_id
+             WHERE d.dossier_id = $1`,
+            [req.params.id]
+        );
+        if (dosRes.rows.length === 0) {
+            await cl.query('ROLLBACK');
+            return res.status(404).json({ error: 'Dossier nicht gefunden' });
+        }
+        const { klient_id, alter_standort } = dosRes.rows[0];
+
+        const neuerStRes = await cl.query(`SELECT name FROM standort WHERE standort_id = $1`, [standort_id]);
+        const neuer_standort = neuerStRes.rows[0]?.name || '';
+
+        await cl.query(
+            `UPDATE dossier SET standort_id = $1, updated_at = NOW() WHERE dossier_id = $2`,
+            [standort_id, req.params.id]
+        );
+
+        if (alter_user_id) {
+            await cl.query(
+                `UPDATE klient_user SET aktiv = FALSE WHERE klient_id = $1 AND user_id = $2`,
+                [klient_id, alter_user_id]
+            );
+        }
+        if (neuer_user_id) {
+            await cl.query(
+                `INSERT INTO klient_user (klient_id, user_id, rolle_im_fall, stellvertretung)
+                 VALUES ($1, $2, 'Klientenführung', FALSE)
+                 ON CONFLICT (klient_id, user_id) DO UPDATE SET aktiv = TRUE, rolle_im_fall = 'Klientenführung'`,
+                [klient_id, neuer_user_id]
+            );
+        }
+
+        const titel = `Standortwechsel${alter_standort ? ` von ${alter_standort}` : ''} nach ${neuer_standort}${bemerkung ? ` — ${bemerkung}` : ''}`;
+        await cl.query(
+            `INSERT INTO zeitachse_eintrag (klient_id, user_id, typ, titel, auto_generated)
+             VALUES ($1, $2, 'Verlauf', $3, TRUE)`,
+            [klient_id, req.user.user_id, titel]
+        );
+
+        await cl.query('COMMIT');
+        res.json({ message: 'Standort gewechselt' });
+    } catch (err) {
+        await cl.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Standortwechsel' });
+    } finally {
+        cl.release();
+    }
+});
+
 // PUT /api/dossiers/:id/arbeitgeber — Arbeitgeber zuweisen
 router.put('/:id/arbeitgeber', auth, async (req, res) => {
     const { arbeitgeber_id } = req.body;

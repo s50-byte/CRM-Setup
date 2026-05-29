@@ -5,19 +5,20 @@ import client from '../api/client';
 
 const TYPEN = ['Erstgespräch', 'Schnuppereinsatz', 'Standortgespräch', 'Programmstart', 'Abschlussgespräch'];
 
-export default function NeuerTerminModal({ open, onClose, onSaved }) {
+export default function NeuerTerminModal({ open, onClose, onSaved, klientId }) {
     const [form, setForm] = useState({
-        klient_id: '', typ: 'Erstgespräch', datum: '', zeit: '', notiz: ''
+        klient_id: klientId || '', typ: 'Erstgespräch', datum: '', zeit: '', notiz: ''
     });
     const [klienten, setKlienten] = useState([]);
     const [laden, setLaden] = useState(false);
     const [fehler, setFehler] = useState('');
 
     useEffect(() => {
-        if (open) {
+        if (open && !klientId) {
             client.get('/klienten').then(r => setKlienten(r.data)).catch(console.error);
         }
-    }, [open]);
+        if (klientId) setForm(prev => ({ ...prev, klient_id: klientId }));
+    }, [open, klientId]);
 
     function set(field, value) {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -40,7 +41,7 @@ export default function NeuerTerminModal({ open, onClose, onSaved }) {
             });
             onSaved();
             onClose();
-            setForm({ klient_id: '', typ: 'Erstgespräch', datum: '', zeit: '', notiz: '' });
+            setForm({ klient_id: klientId || '', typ: 'Erstgespräch', datum: '', zeit: '', notiz: '' });
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Speichern');
         } finally {
@@ -57,14 +58,16 @@ export default function NeuerTerminModal({ open, onClose, onSaved }) {
                     color: '#B91C1C', marginBottom: 12
                 }}>{fehler}</div>
             )}
-            <FormField label="Klient/in *">
-                <select style={inputStyle} value={form.klient_id} onChange={e => set('klient_id', e.target.value)}>
-                    <option value="">— Klient auswählen —</option>
-                    {klienten.map(k => (
-                        <option key={k.klient_id} value={k.klient_id}>{k.nachname} {k.vorname}</option>
-                    ))}
-                </select>
-            </FormField>
+            {!klientId && (
+                <FormField label="Klient/in *">
+                    <select style={inputStyle} value={form.klient_id} onChange={e => set('klient_id', e.target.value)}>
+                        <option value="">— Klient auswählen —</option>
+                        {klienten.map(k => (
+                            <option key={k.klient_id} value={k.klient_id}>{k.nachname} {k.vorname}</option>
+                        ))}
+                    </select>
+                </FormField>
+            )}
             <FormField label="Typ">
                 <select style={inputStyle} value={form.typ} onChange={e => set('typ', e.target.value)}>
                     {TYPEN.map(t => <option key={t}>{t}</option>)}

@@ -5,9 +5,9 @@ import client from '../api/client';
 
 const PRIORITAETEN = ['Hoch', 'Mittel', 'Niedrig'];
 
-export default function NeueAufgabeModal({ open, onClose, onSaved, klientId }) {
+export default function NeueAufgabeModal({ open, onClose, onSaved, klientId, phaseId }) {
     const [form, setForm] = useState({
-        klient_id: klientId || '', text: '', prioritaet: 'Mittel', faellig_am: ''
+        klient_id: klientId || '', text: '', prioritaet: 'Mittel', faellig_am: '', phase_id: phaseId || ''
     });
     const [klienten, setKlienten] = useState([]);
     const [laden, setLaden] = useState(false);
@@ -18,7 +18,8 @@ export default function NeueAufgabeModal({ open, onClose, onSaved, klientId }) {
             client.get('/klienten').then(r => setKlienten(r.data)).catch(console.error);
         }
         if (klientId) setForm(prev => ({ ...prev, klient_id: klientId }));
-    }, [open, klientId]);
+        if (phaseId) setForm(prev => ({ ...prev, phase_id: phaseId }));
+    }, [open, klientId, phaseId]);
 
     function set(field, value) {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -37,10 +38,11 @@ export default function NeueAufgabeModal({ open, onClose, onSaved, klientId }) {
                 text: form.text,
                 prioritaet: form.prioritaet,
                 faellig_am: form.faellig_am || null,
+                phase_id: form.phase_id || null,
             });
             onSaved();
             onClose();
-            setForm({ klient_id: klientId || '', text: '', prioritaet: 'Mittel', faellig_am: '' });
+            setForm({ klient_id: klientId || '', text: '', prioritaet: 'Mittel', faellig_am: '', phase_id: phaseId || '' });
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Speichern');
         } finally {
