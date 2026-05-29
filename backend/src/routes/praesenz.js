@@ -184,29 +184,18 @@ router.post('/', auth, async (req, res) => {
                     kommentar: kommentar || null,
                 };
 
-                for (const kader of kaderResult.rows) {
-                    const vorhandene = await db.query(
-                        `SELECT meldung_id, aenderungen FROM dashboard_meldung
-                         WHERE empfaenger_id = $1 AND datum = $2 AND acknowledged = FALSE`,
-                        [kader.user_id, datum]
-                    );
+                const aenderungMitTimestamp = {
+                    ...aenderung,
+                    timestamp: new Date().toISOString(),
+                };
 
-                    if (vorhandene.rows.length > 0) {
-                        const bestehend = vorhandene.rows[0];
-                        const liste = bestehend.aenderungen.filter(a => a.klient_id !== klient_id);
-                        liste.push(aenderung);
-                        await db.query(
-                            `UPDATE dashboard_meldung SET aenderungen = $1::jsonb WHERE meldung_id = $2`,
-                            [JSON.stringify(liste), bestehend.meldung_id]
-                        );
-                    } else {
-                        await db.query(
-                            `INSERT INTO dashboard_meldung
-                                (empfaenger_id, datum, aenderungen, erstellt_von)
-                             VALUES ($1, $2, $3::jsonb, $4)`,
-                            [kader.user_id, datum, JSON.stringify([aenderung]), req.user.user_id]
-                        );
-                    }
+                for (const kader of kaderResult.rows) {
+                    await db.query(
+                        `INSERT INTO dashboard_meldung
+                            (empfaenger_id, datum, aenderungen, erstellt_von)
+                         VALUES ($1, $2, $3::jsonb, $4)`,
+                        [kader.user_id, datum, JSON.stringify([aenderungMitTimestamp]), req.user.user_id]
+                    );
                 }
             }
         }
