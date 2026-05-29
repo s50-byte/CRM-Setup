@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
 import Modal from '../components/Modal';
 
+const UEBERSICHT = '__uebersicht__';
+
 const CARD = {
     background: '#fff',
     border: '1px solid rgba(0,0,0,.09)',
@@ -73,6 +75,37 @@ function DokListe({ docs, onDelete }) {
     );
 }
 
+function ProgrammFormFelder({ form, onChange }) {
+    return (
+        <>
+            {[
+                { label: 'Name', key: 'name', type: 'text' },
+                { label: 'Tarif pro Tag (CHF)', key: 'tarif_pro_tag', type: 'number' },
+                { label: 'Ø Dauer (Tage)', key: 'avg_dauer_tage', type: 'number' },
+                { label: 'Aufwand (h/Monat)', key: 'aufwand_h_monat', type: 'number' },
+            ].map(f => (
+                <div key={f.key} style={{ marginBottom: 14 }}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>{f.label}</label>
+                    <input
+                        type={f.type}
+                        value={form[f.key]}
+                        onChange={e => onChange(f.key, e.target.value)}
+                        style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                </div>
+            ))}
+            <div style={{ marginBottom: 18 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>Farbe</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {['#2563EB', '#0891B2', '#0D9488', '#16A34A', '#7C3AED', '#D97706', '#DC2626'].map(c => (
+                        <div key={c} onClick={() => onChange('farbe_hex', c)} style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: 'pointer', border: form.farbe_hex === c ? '3px solid #1A1917' : '2px solid transparent', transition: 'border .1s' }} />
+                    ))}
+                </div>
+            </div>
+        </>
+    );
+}
+
 export default function Programme() {
     const { benutzer } = useAuth();
     const istLeitungsteam = ['teamleitung', 'management'].includes(benutzer?.system_rolle);
@@ -88,8 +121,10 @@ export default function Programme() {
     const [neuePhaseForm, setNeuePhaseForm] = useState({});
     const [dokModal, setDokModal] = useState(null);
     const [dokForm, setDokForm] = useState({ dateiname: '', typ: 'Sonstiges' });
+    const [fehler, setFehler] = useState('');
     const [neuesProgrammOffen, setNeuesProgrammOffen] = useState(false);
     const [npForm, setNpForm] = useState({ name: '', farbe_hex: '#2563EB', tarif_pro_tag: '', avg_dauer_tage: 60, aufwand_h_monat: 10 });
+    const [editProgramm, setEditProgramm] = useState(null);
     const [busy, setBusy] = useState(false);
 
     const ladeProgramme = useCallback(async () => {
@@ -101,17 +136,25 @@ export default function Programme() {
     useEffect(() => { ladeProgramme(); }, [ladeProgramme]);
 
     async function loadProgDoks(programm_id) {
+        console.log('[loadProgDoks] GET /dokumente/programm/' + programm_id);
         try {
             const r = await client.get(`/dokumente/programm/${programm_id}`);
+            console.log('[loadProgDoks] response:', r.data);
             setProgDoks(prev => ({ ...prev, [programm_id]: r.data }));
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error('[loadProgDoks] error:', err.response?.data || err);
+        }
     }
 
     async function loadPhaseDoks(phase_id) {
+        console.log('[loadPhaseDoks] GET /dokumente/phase/' + phase_id);
         try {
             const r = await client.get(`/dokumente/phase/${phase_id}`);
+            console.log('[loadPhaseDoks] response:', r.data);
             setPhaseDoks(prev => ({ ...prev, [phase_id]: r.data }));
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error('[loadPhaseDoks] error:', err.response?.data || err);
+        }
     }
 
     function toggleProgramm(prog) {
@@ -119,114 +162,163 @@ export default function Programme() {
         setExpanded(prev => ({ ...prev, [prog.programm_id]: isNowOpen }));
         if (isNowOpen) {
             loadProgDoks(prog.programm_id);
-            const phasen = prog.phasen || [];
-            if (phasen.length > 0 && !activePhase[prog.programm_id]) {
-                const first = phasen[0];
-                setActivePhase(prev => ({ ...prev, [prog.programm_id]: first.phase_id }));
-                loadPhaseDoks(first.phase_id);
+            if (!activePhase[prog.programm_id]) {
+                setActivePhase(prev => ({ ...prev, [prog.programm_id]: UEBERSICHT }));
             }
         }
     }
 
-    function selectPhase(programm_id, phase) {
-        setActivePhase(prev => ({ ...prev, [programm_id]: phase.phase_id }));
-        if (phaseDoks[phase.phase_id] === undefined) loadPhaseDoks(phase.phase_id);
+    function selectPhase(programm_id, phase_id) {
+        setActivePhase(prev => ({ ...prev, [programm_id]: phase_id }));
+        setFehler('');
         setRenamePhase(null);
+        if (phase_id !== UEBERSICHT && phaseDoks[phase_id] === undefined) {
+            loadPhaseDoks(phase_id);
+        }
     }
 
     async function phaseUmbenennen() {
         if (!renamePhase?.label.trim()) { setRenamePhase(null); return; }
         const prog = programme.find(p => p.phasen?.some(ph => ph.phase_id === renamePhase.phase_id));
         if (!prog) return;
+        console.log('[phaseUmbenennen] PUT:', { programm_id: prog.programm_id, phase_id: renamePhase.phase_id, label: renamePhase.label });
         try {
             await client.put(`/programme/${prog.programm_id}/phasen/${renamePhase.phase_id}`, { label: renamePhase.label.trim() });
             setRenamePhase(null);
             await ladeProgramme();
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error('[phaseUmbenennen] error:', err.response?.data || err);
+            setFehler(err.response?.data?.error || 'Fehler beim Umbenennen');
+        }
     }
 
     async function phaseHinzufuegen(programm_id) {
         const text = (neuePhaseForm[programm_id]?.text || '').trim();
         if (!text) return;
+        console.log('[phaseHinzufuegen] POST:', { programm_id, label: text });
         setBusy(true);
+        setFehler('');
         try {
             const r = await client.post(`/programme/${programm_id}/phasen`, { label: text });
+            console.log('[phaseHinzufuegen] response:', r.data);
             setNeuePhaseForm(prev => ({ ...prev, [programm_id]: { open: false, text: '' } }));
             await ladeProgramme();
             if (r.data?.phase_id) {
                 setActivePhase(prev => ({ ...prev, [programm_id]: r.data.phase_id }));
                 loadPhaseDoks(r.data.phase_id);
             }
-        } catch (err) { console.error(err); }
-        finally { setBusy(false); }
+        } catch (err) {
+            console.error('[phaseHinzufuegen] error:', err.response?.data || err);
+            setFehler(err.response?.data?.error || 'Fehler beim Hinzufügen der Phase');
+        } finally { setBusy(false); }
     }
 
     async function phaseLoeschen(phase_id, programm_id) {
         if (!window.confirm('Phase und alle ihre Kriterien löschen?')) return;
+        console.log('[phaseLoeschen] DELETE /programme/phasen/' + phase_id);
+        setFehler('');
         try {
             await client.delete(`/programme/phasen/${phase_id}`);
-            setActivePhase(prev => prev[programm_id] === phase_id ? { ...prev, [programm_id]: null } : prev);
+            setActivePhase(prev => prev[programm_id] === phase_id ? { ...prev, [programm_id]: UEBERSICHT } : prev);
             await ladeProgramme();
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error('[phaseLoeschen] error:', err.response?.data || err);
+            setFehler(err.response?.data?.error || 'Fehler beim Löschen der Phase');
+        }
     }
 
     async function kriteriumHinzufuegen(phase_id) {
         const form = neuerKForm[phase_id] || {};
         const text = (form.text || '').trim();
         if (!text) return;
+        console.log('[kriteriumHinzufuegen] POST /programme/phasen/' + phase_id + '/kriterien:', { text, pflicht: form.pflicht || false });
         setBusy(true);
+        setFehler('');
         try {
-            await client.post(`/programme/phasen/${phase_id}/kriterien`, { text, pflicht: form.pflicht || false });
+            const r = await client.post(`/programme/phasen/${phase_id}/kriterien`, { text, pflicht: form.pflicht || false });
+            console.log('[kriteriumHinzufuegen] response:', r.data);
             setNeuerKForm(prev => ({ ...prev, [phase_id]: { text: '', pflicht: false } }));
             await ladeProgramme();
-        } catch (err) { console.error(err); }
-        finally { setBusy(false); }
+        } catch (err) {
+            console.error('[kriteriumHinzufuegen] error:', err.response?.data || err);
+            setFehler(err.response?.data?.error || 'Fehler beim Hinzufügen des Kriteriums');
+        } finally { setBusy(false); }
     }
 
     async function kriteriumLoeschen(kriterium_id) {
+        console.log('[kriteriumLoeschen] DELETE /programme/kriterien/' + kriterium_id);
+        setFehler('');
         try {
             await client.delete(`/programme/kriterien/${kriterium_id}`);
             await ladeProgramme();
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error('[kriteriumLoeschen] error:', err.response?.data || err);
+            setFehler(err.response?.data?.error || 'Fehler beim Löschen');
+        }
     }
 
     async function dokumentHochladen() {
         if (!dokForm.dateiname.trim() || !dokModal) return;
+        console.log('[dokumentHochladen] POST /dokumente/programm:', { ...dokModal, ...dokForm });
         setBusy(true);
+        setFehler('');
         try {
-            await client.post('/dokumente/programm', {
+            const r = await client.post('/dokumente/programm', {
                 programm_id: dokModal.programm_id,
                 phase_id: dokModal.phase_id || null,
                 dateiname: dokForm.dateiname.trim(),
                 typ: dokForm.typ,
             });
+            console.log('[dokumentHochladen] response:', r.data);
             if (dokModal.phase_id) await loadPhaseDoks(dokModal.phase_id);
             else await loadProgDoks(dokModal.programm_id);
             setDokModal(null);
             setDokForm({ dateiname: '', typ: 'Sonstiges' });
-        } catch (err) { console.error(err); }
-        finally { setBusy(false); }
+        } catch (err) {
+            console.error('[dokumentHochladen] error:', err.response?.data || err);
+            setFehler(err.response?.data?.error || 'Fehler beim Hochladen');
+        } finally { setBusy(false); }
     }
 
     async function dokumentLoeschen(pdok_id, programm_id, phase_id) {
         if (!window.confirm('Dokument löschen?')) return;
+        console.log('[dokumentLoeschen] DELETE /dokumente/programm/' + pdok_id);
+        setFehler('');
         try {
             await client.delete(`/dokumente/programm/${pdok_id}`);
             if (phase_id) setPhaseDoks(prev => ({ ...prev, [phase_id]: (prev[phase_id] || []).filter(d => d.pdok_id !== pdok_id) }));
             else setProgDoks(prev => ({ ...prev, [programm_id]: (prev[programm_id] || []).filter(d => d.pdok_id !== pdok_id) }));
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error('[dokumentLoeschen] error:', err.response?.data || err);
+            setFehler(err.response?.data?.error || 'Fehler beim Löschen');
+        }
     }
 
     async function programmErstellen() {
         if (!npForm.name || !npForm.tarif_pro_tag) return;
+        console.log('[programmErstellen] POST /programme:', npForm);
         setBusy(true);
         try {
             await client.post('/programme', npForm);
             setNeuesProgrammOffen(false);
             setNpForm({ name: '', farbe_hex: '#2563EB', tarif_pro_tag: '', avg_dauer_tage: 60, aufwand_h_monat: 10 });
             await ladeProgramme();
-        } catch (err) { console.error(err); }
-        finally { setBusy(false); }
+        } catch (err) {
+            console.error('[programmErstellen] error:', err.response?.data || err);
+        } finally { setBusy(false); }
+    }
+
+    async function programmSpeichern() {
+        if (!editProgramm?.name || !editProgramm?.tarif_pro_tag) return;
+        console.log('[programmSpeichern] PUT /programme/' + editProgramm.programm_id + ':', editProgramm);
+        setBusy(true);
+        try {
+            await client.put(`/programme/${editProgramm.programm_id}`, editProgramm);
+            setEditProgramm(null);
+            await ladeProgramme();
+        } catch (err) {
+            console.error('[programmSpeichern] error:', err.response?.data || err);
+        } finally { setBusy(false); }
     }
 
     if (laden) return <div style={{ color: '#6B6860', fontSize: 12 }}>Laden…</div>;
@@ -257,8 +349,8 @@ export default function Programme() {
             {programme.map(p => {
                 const isOpen = !!expanded[p.programm_id];
                 const phasen = p.phasen || [];
-                const activePhasId = activePhase[p.programm_id];
-                const activePhaseObj = phasen.find(ph => ph.phase_id === activePhasId);
+                const activePhasId = activePhase[p.programm_id] || UEBERSICHT;
+                const activePhaseObj = activePhasId === UEBERSICHT ? null : phasen.find(ph => ph.phase_id === activePhasId);
 
                 return (
                     <div key={p.programm_id} style={{ ...CARD, marginBottom: '.875rem', overflow: 'hidden' }}>
@@ -283,7 +375,23 @@ export default function Programme() {
 
                                 {/* LEFT: Phase navigation */}
                                 <div style={{ width: 220, borderRight: '1px solid rgba(0,0,0,.06)', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-                                    <div style={{ padding: '10px 0', flex: 1 }}>
+                                    <div style={{ flex: 1 }}>
+                                        {/* Übersicht — fixer erster Eintrag */}
+                                        <div
+                                            onClick={() => selectPhase(p.programm_id, UEBERSICHT)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 8,
+                                                padding: '8px 14px', cursor: 'pointer',
+                                                borderLeft: `3px solid ${activePhasId === UEBERSICHT ? p.farbe_hex : 'transparent'}`,
+                                                background: activePhasId === UEBERSICHT ? p.farbe_hex + '12' : 'transparent',
+                                                borderBottom: '1px solid rgba(0,0,0,.05)',
+                                            }}
+                                        >
+                                            <span style={{ fontSize: 13 }}>◎</span>
+                                            <span style={{ fontSize: 12.5, fontWeight: activePhasId === UEBERSICHT ? 600 : 400, color: activePhasId === UEBERSICHT ? '#1A1917' : '#6B6860' }}>Übersicht</span>
+                                        </div>
+
+                                        {/* Phase-Liste */}
                                         {phasen.length === 0 && (
                                             <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic', padding: '8px 14px' }}>Noch keine Phasen</div>
                                         )}
@@ -293,7 +401,7 @@ export default function Programme() {
                                             return (
                                                 <div
                                                     key={ph.phase_id}
-                                                    onClick={() => selectPhase(p.programm_id, ph)}
+                                                    onClick={() => selectPhase(p.programm_id, ph.phase_id)}
                                                     style={{
                                                         display: 'flex', alignItems: 'center', gap: 8,
                                                         padding: '7px 14px', cursor: 'pointer',
@@ -365,92 +473,58 @@ export default function Programme() {
                                     )}
                                 </div>
 
-                                {/* RIGHT: Phase content */}
+                                {/* RIGHT: Content */}
                                 <div style={{ flex: 1, padding: '16px 20px', overflowY: 'auto', maxHeight: 520 }}>
-                                    {!activePhaseObj ? (
-                                        <div style={{ fontSize: 12, color: '#A09D97', fontStyle: 'italic', paddingTop: 8 }}>
-                                            {phasen.length === 0 ? 'Noch keine Phasen vorhanden' : '← Phase auswählen'}
+                                    {/* Fehleranzeige */}
+                                    {fehler && (
+                                        <div style={{ background: '#FEF2F2', border: '1px solid rgba(220,38,38,.2)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#B91C1C', marginBottom: 14 }}>
+                                            {fehler}
                                         </div>
-                                    ) : (
+                                    )}
+
+                                    {/* ── Übersicht ── */}
+                                    {activePhasId === UEBERSICHT && (
                                         <>
-                                            {/* Phase-Kopfzeile */}
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                                                <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{activePhaseObj.label}</div>
+                                            {/* Programm-Infos */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                                                <div style={{ width: 14, height: 14, borderRadius: 4, background: p.farbe_hex, flexShrink: 0 }} />
+                                                <div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>{p.name}</div>
                                                 {istLeitungsteam && (
-                                                    <>
-                                                        <button style={BTN_ADD} onClick={() => setRenamePhase({ phase_id: activePhaseObj.phase_id, label: activePhaseObj.label })}>
-                                                            Umbenennen
-                                                        </button>
-                                                        <button
-                                                            style={{ ...BTN_ADD, border: '1px solid rgba(220,38,38,.25)', background: '#FEF2F2', color: '#B91C1C' }}
-                                                            onClick={() => phaseLoeschen(activePhaseObj.phase_id, p.programm_id)}
-                                                        >
-                                                            Löschen
-                                                        </button>
-                                                    </>
+                                                    <button style={BTN_ADD} onClick={() => setEditProgramm({ ...p })}>
+                                                        Bearbeiten
+                                                    </button>
                                                 )}
                                             </div>
+                                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+                                                <span style={{ ...BADGE, fontSize: 12 }}>CHF {p.tarif_pro_tag}/Tag</span>
+                                                <span style={{ ...BADGE, fontSize: 12 }}>Ø {p.avg_dauer_tage} Tage</span>
+                                                <span style={{ ...BADGE, fontSize: 12 }}>{p.aufwand_h_monat} h/Mt.</span>
+                                            </div>
 
-                                            {/* Kriterien */}
-                                            <Section title="Kriterien">
-                                                {(activePhaseObj.kriterien || []).length === 0 && (
-                                                    <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic', marginBottom: 8 }}>Keine Kriterien definiert</div>
-                                                )}
-                                                {(activePhaseObj.kriterien || []).map(k => (
-                                                    <div key={k.kriterium_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
-                                                        <span style={{ flex: 1, fontSize: 12.5 }}>{k.text}</span>
-                                                        <span style={{
-                                                            fontSize: 10, padding: '1px 6px', borderRadius: 8, fontFamily: 'monospace', flexShrink: 0,
-                                                            background: k.pflicht ? '#FEF2F2' : '#F5F4F0',
-                                                            color: k.pflicht ? '#B91C1C' : '#A09D97',
-                                                            border: `1px solid ${k.pflicht ? 'rgba(220,38,38,.15)' : 'rgba(0,0,0,.09)'}`,
-                                                        }}>{k.pflicht ? 'Pflicht' : 'Optional'}</span>
-                                                        {istLeitungsteam && (
-                                                            <button style={BTN_DEL_SM} onClick={() => kriteriumLoeschen(k.kriterium_id)}>×</button>
-                                                        )}
+                                            {/* Phasen-Chips */}
+                                            {phasen.length > 0 && (
+                                                <Section title="Phasen">
+                                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                        {phasen.map((ph, i) => (
+                                                            <button
+                                                                key={ph.phase_id}
+                                                                onClick={() => selectPhase(p.programm_id, ph.phase_id)}
+                                                                style={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                                    padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                                                                    fontSize: 12, fontFamily: 'inherit', fontWeight: 500,
+                                                                    background: p.farbe_hex + '15',
+                                                                    color: p.farbe_hex,
+                                                                    border: `1px solid ${p.farbe_hex}30`,
+                                                                }}
+                                                            >
+                                                                <span style={{ fontSize: 10, fontFamily: 'monospace', opacity: .8 }}>{i + 1}</span>
+                                                                {ph.label}
+                                                            </button>
+                                                        ))}
                                                     </div>
-                                                ))}
-                                                {istLeitungsteam && (
-                                                    <div style={{ display: 'flex', gap: 7, marginTop: 10, alignItems: 'center' }}>
-                                                        <input
-                                                            value={neuerKForm[activePhaseObj.phase_id]?.text || ''}
-                                                            onChange={e => setNeuerKForm(prev => ({ ...prev, [activePhaseObj.phase_id]: { ...prev[activePhaseObj.phase_id], text: e.target.value } }))}
-                                                            onKeyDown={e => e.key === 'Enter' && kriteriumHinzufuegen(activePhaseObj.phase_id)}
-                                                            placeholder="Kriterium eingeben…"
-                                                            style={{ ...INPUT_S, flex: 1 }}
-                                                        />
-                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: '#6B6860', cursor: 'pointer', flexShrink: 0, userSelect: 'none' }}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={neuerKForm[activePhaseObj.phase_id]?.pflicht || false}
-                                                                onChange={e => setNeuerKForm(prev => ({ ...prev, [activePhaseObj.phase_id]: { ...prev[activePhaseObj.phase_id], pflicht: e.target.checked } }))}
-                                                            />
-                                                            Pflicht
-                                                        </label>
-                                                        <button
-                                                            onClick={() => kriteriumHinzufuegen(activePhaseObj.phase_id)}
-                                                            disabled={busy || !(neuerKForm[activePhaseObj.phase_id]?.text || '').trim()}
-                                                            style={{ padding: '5px 12px', fontSize: 12, cursor: 'pointer', border: 'none', borderRadius: 5, background: '#2563EB', color: '#fff', fontFamily: 'inherit', fontWeight: 500 }}
-                                                        >+</button>
-                                                    </div>
-                                                )}
-                                            </Section>
-
-                                            {/* Phasen-Dokumente */}
-                                            <Section
-                                                title="Phasen-Dokumente"
-                                                headerRight={istLeitungsteam && (
-                                                    <button style={BTN_ADD} onClick={() => {
-                                                        setDokModal({ programm_id: p.programm_id, phase_id: activePhaseObj.phase_id });
-                                                        setDokForm({ dateiname: '', typ: 'Sonstiges' });
-                                                    }}>+ Dokument</button>
-                                                )}
-                                            >
-                                                <DokListe
-                                                    docs={phaseDoks[activePhaseObj.phase_id]}
-                                                    onDelete={istLeitungsteam ? id => dokumentLoeschen(id, p.programm_id, activePhaseObj.phase_id) : null}
-                                                />
-                                            </Section>
+                                                </Section>
+                                            )}
 
                                             {/* Programm-Dokumente */}
                                             <Section
@@ -468,6 +542,94 @@ export default function Programme() {
                                                 />
                                             </Section>
                                         </>
+                                    )}
+
+                                    {/* ── Phase-Inhalt ── */}
+                                    {activePhasId !== UEBERSICHT && (
+                                        activePhaseObj ? (
+                                            <>
+                                                {/* Phase-Kopfzeile */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                                                    <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{activePhaseObj.label}</div>
+                                                    {istLeitungsteam && (
+                                                        <>
+                                                            <button style={BTN_ADD} onClick={() => setRenamePhase({ phase_id: activePhaseObj.phase_id, label: activePhaseObj.label })}>
+                                                                Umbenennen
+                                                            </button>
+                                                            <button
+                                                                style={{ ...BTN_ADD, border: '1px solid rgba(220,38,38,.25)', background: '#FEF2F2', color: '#B91C1C' }}
+                                                                onClick={() => phaseLoeschen(activePhaseObj.phase_id, p.programm_id)}
+                                                            >
+                                                                Löschen
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+
+                                                {/* Kriterien */}
+                                                <Section title="Kriterien">
+                                                    {(activePhaseObj.kriterien || []).length === 0 && (
+                                                        <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic', marginBottom: 8 }}>Keine Kriterien definiert</div>
+                                                    )}
+                                                    {(activePhaseObj.kriterien || []).map(k => (
+                                                        <div key={k.kriterium_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
+                                                            <span style={{ flex: 1, fontSize: 12.5 }}>{k.text}</span>
+                                                            <span style={{
+                                                                fontSize: 10, padding: '1px 6px', borderRadius: 8, fontFamily: 'monospace', flexShrink: 0,
+                                                                background: k.pflicht ? '#FEF2F2' : '#F5F4F0',
+                                                                color: k.pflicht ? '#B91C1C' : '#A09D97',
+                                                                border: `1px solid ${k.pflicht ? 'rgba(220,38,38,.15)' : 'rgba(0,0,0,.09)'}`,
+                                                            }}>{k.pflicht ? 'Pflicht' : 'Optional'}</span>
+                                                            {istLeitungsteam && (
+                                                                <button style={BTN_DEL_SM} onClick={() => kriteriumLoeschen(k.kriterium_id)}>×</button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {istLeitungsteam && (
+                                                        <div style={{ display: 'flex', gap: 7, marginTop: 10, alignItems: 'center' }}>
+                                                            <input
+                                                                value={neuerKForm[activePhaseObj.phase_id]?.text || ''}
+                                                                onChange={e => setNeuerKForm(prev => ({ ...prev, [activePhaseObj.phase_id]: { ...prev[activePhaseObj.phase_id], text: e.target.value } }))}
+                                                                onKeyDown={e => e.key === 'Enter' && kriteriumHinzufuegen(activePhaseObj.phase_id)}
+                                                                placeholder="Kriterium eingeben…"
+                                                                style={{ ...INPUT_S, flex: 1 }}
+                                                            />
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: '#6B6860', cursor: 'pointer', flexShrink: 0, userSelect: 'none' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={neuerKForm[activePhaseObj.phase_id]?.pflicht || false}
+                                                                    onChange={e => setNeuerKForm(prev => ({ ...prev, [activePhaseObj.phase_id]: { ...prev[activePhaseObj.phase_id], pflicht: e.target.checked } }))}
+                                                                />
+                                                                Pflicht
+                                                            </label>
+                                                            <button
+                                                                onClick={() => kriteriumHinzufuegen(activePhaseObj.phase_id)}
+                                                                disabled={busy || !(neuerKForm[activePhaseObj.phase_id]?.text || '').trim()}
+                                                                style={{ padding: '5px 12px', fontSize: 12, cursor: 'pointer', border: 'none', borderRadius: 5, background: '#2563EB', color: '#fff', fontFamily: 'inherit', fontWeight: 500 }}
+                                                            >+</button>
+                                                        </div>
+                                                    )}
+                                                </Section>
+
+                                                {/* Phasen-Dokumente */}
+                                                <Section
+                                                    title="Phasen-Dokumente"
+                                                    headerRight={istLeitungsteam && (
+                                                        <button style={BTN_ADD} onClick={() => {
+                                                            setDokModal({ programm_id: p.programm_id, phase_id: activePhaseObj.phase_id });
+                                                            setDokForm({ dateiname: '', typ: 'Sonstiges' });
+                                                        }}>+ Dokument</button>
+                                                    )}
+                                                >
+                                                    <DokListe
+                                                        docs={phaseDoks[activePhaseObj.phase_id]}
+                                                        onDelete={istLeitungsteam ? id => dokumentLoeschen(id, p.programm_id, activePhaseObj.phase_id) : null}
+                                                    />
+                                                </Section>
+                                            </>
+                                        ) : (
+                                            <div style={{ fontSize: 12, color: '#A09D97', fontStyle: 'italic', paddingTop: 8 }}>← Phase auswählen</div>
+                                        )
                                     )}
                                 </div>
                             </div>
@@ -523,32 +685,26 @@ export default function Programme() {
                 </div>
             </Modal>
 
+            {/* Programm bearbeiten Modal */}
+            {editProgramm && (
+                <Modal open={true} onClose={() => setEditProgramm(null)} title="Programm bearbeiten" width={440}>
+                    <ProgrammFormFelder
+                        form={editProgramm}
+                        onChange={(key, val) => setEditProgramm(prev => ({ ...prev, [key]: val }))}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                        <button onClick={() => setEditProgramm(null)} style={{ padding: '7px 14px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}>Abbrechen</button>
+                        <button onClick={programmSpeichern} disabled={busy || !editProgramm.name || !editProgramm.tarif_pro_tag} style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', opacity: (!editProgramm.name || !editProgramm.tarif_pro_tag) ? .5 : 1 }}>Speichern</button>
+                    </div>
+                </Modal>
+            )}
+
             {/* Neues Programm Modal */}
             <Modal open={neuesProgrammOffen} onClose={() => setNeuesProgrammOffen(false)} title="Neues Programm erstellen" width={440}>
-                {[
-                    { label: 'Name', key: 'name', type: 'text' },
-                    { label: 'Tarif pro Tag (CHF)', key: 'tarif_pro_tag', type: 'number' },
-                    { label: 'Ø Dauer (Tage)', key: 'avg_dauer_tage', type: 'number' },
-                    { label: 'Aufwand (h/Monat)', key: 'aufwand_h_monat', type: 'number' },
-                ].map(f => (
-                    <div key={f.key} style={{ marginBottom: 14 }}>
-                        <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>{f.label}</label>
-                        <input
-                            type={f.type}
-                            value={npForm[f.key]}
-                            onChange={e => setNpForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                            style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                        />
-                    </div>
-                ))}
-                <div style={{ marginBottom: 18 }}>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>Farbe</label>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {['#2563EB', '#0891B2', '#0D9488', '#16A34A', '#7C3AED', '#D97706', '#DC2626'].map(c => (
-                            <div key={c} onClick={() => setNpForm(prev => ({ ...prev, farbe_hex: c }))} style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: 'pointer', border: npForm.farbe_hex === c ? '3px solid #1A1917' : '2px solid transparent', transition: 'border .1s' }} />
-                        ))}
-                    </div>
-                </div>
+                <ProgrammFormFelder
+                    form={npForm}
+                    onChange={(key, val) => setNpForm(prev => ({ ...prev, [key]: val }))}
+                />
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                     <button onClick={() => setNeuesProgrammOffen(false)} style={{ padding: '7px 14px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}>Abbrechen</button>
                     <button onClick={programmErstellen} disabled={busy || !npForm.name || !npForm.tarif_pro_tag} style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', opacity: (!npForm.name || !npForm.tarif_pro_tag) ? .5 : 1 }}>Erstellen</button>

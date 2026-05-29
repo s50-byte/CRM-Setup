@@ -5,6 +5,9 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
+// kriterium.typ war NOT NULL — nullable machen (idempotent)
+db.query(`ALTER TABLE kriterium ALTER COLUMN typ DROP NOT NULL`).catch(() => {});
+
 // GET /api/programme — Alle Programme mit Phasen
 router.get('/', auth, async (req, res) => {
     try {
@@ -97,6 +100,26 @@ router.post('/', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Erstellen' });
+    }
+});
+
+// PUT /api/programme/:id — Programm bearbeiten
+router.put('/:id', auth, async (req, res) => {
+    if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+    const { name, farbe_hex, tarif_pro_tag, avg_dauer_tage, aufwand_h_monat } = req.body;
+    if (!name || !tarif_pro_tag) return res.status(400).json({ error: 'Name und Tarif erforderlich' });
+    try {
+        await db.query(
+            `UPDATE programm SET name=$1, farbe_hex=$2, tarif_pro_tag=$3, avg_dauer_tage=$4, aufwand_h_monat=$5
+             WHERE programm_id=$6`,
+            [name, farbe_hex || '#2563EB', tarif_pro_tag, avg_dauer_tage || 30, aufwand_h_monat || 10, req.params.id]
+        );
+        res.json({ message: 'Programm aktualisiert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren' });
     }
 });
 
