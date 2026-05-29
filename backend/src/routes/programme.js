@@ -100,4 +100,68 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
+// POST /api/programme/:id/phasen — Phase hinzufügen
+router.post('/:id/phasen', auth, async (req, res) => {
+    const { label, avg_dauer_tage } = req.body;
+    if (!label?.trim()) return res.status(400).json({ error: 'Label erforderlich' });
+    try {
+        const count = await db.query(
+            `SELECT COUNT(*) FROM phase WHERE programm_id = $1`, [req.params.id]
+        );
+        const reihenfolge = parseInt(count.rows[0].count);
+        const result = await db.query(
+            `INSERT INTO phase (programm_id, label, reihenfolge, avg_dauer_tage)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [req.params.id, label.trim(), reihenfolge, avg_dauer_tage || null]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Erstellen der Phase' });
+    }
+});
+
+// DELETE /api/programme/phasen/:phase_id — Phase löschen
+router.delete('/phasen/:phase_id', auth, async (req, res) => {
+    try {
+        await db.query(`DELETE FROM phase WHERE phase_id = $1`, [req.params.phase_id]);
+        res.json({ message: 'Phase gelöscht' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Löschen' });
+    }
+});
+
+// POST /api/programme/phasen/:phase_id/kriterien — Kriterium hinzufügen
+router.post('/phasen/:phase_id/kriterien', auth, async (req, res) => {
+    const { text, typ, pflicht } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'Text erforderlich' });
+    try {
+        const count = await db.query(
+            `SELECT COUNT(*) FROM kriterium WHERE phase_id = $1`, [req.params.phase_id]
+        );
+        const reihenfolge = parseInt(count.rows[0].count);
+        const result = await db.query(
+            `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge)
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [req.params.phase_id, text.trim(), typ || null, pflicht || false, reihenfolge]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Erstellen' });
+    }
+});
+
+// DELETE /api/programme/kriterien/:kriterium_id — Kriterium löschen
+router.delete('/kriterien/:kriterium_id', auth, async (req, res) => {
+    try {
+        await db.query(`DELETE FROM kriterium WHERE kriterium_id = $1`, [req.params.kriterium_id]);
+        res.json({ message: 'Kriterium gelöscht' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Löschen' });
+    }
+});
+
 module.exports = router;
