@@ -22,6 +22,11 @@ router.get('/', auth, async (req, res) => {
                 ag.vorname AS arbeitgeber_vorname,
                 ag.nachname AS arbeitgeber_nachname,
                 ag.firma AS arbeitgeber_firma,
+                zp.person_id AS zuweisende_person_id,
+                zp.vorname AS zuweisende_person_vorname,
+                zp.nachname AS zuweisende_person_nachname,
+                zp.firma AS zuweisende_person_firma,
+                d.abteilung,
                 -- Zugewiesene Personen
                 COALESCE(
                     JSON_AGG(
@@ -77,6 +82,7 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN task t ON t.klient_id = k.klient_id
              LEFT JOIN standort st ON st.standort_id = d.standort_id
              LEFT JOIN externe_person ag ON ag.person_id = d.arbeitgeber_id
+             LEFT JOIN externe_person zp ON zp.person_id = d.zuweisende_person_id
              WHERE k.aktiv = TRUE
              AND ($1::uuid IS NULL OR EXISTS (
                  SELECT 1 FROM klient_user ku2
@@ -87,7 +93,9 @@ router.get('/', auth, async (req, res) => {
              GROUP BY d.dossier_id, k.klient_id, k.nachname, k.vorname,
                       p.name, p.farbe_hex, p.avg_dauer_tage, ph.label,
                       d.standort_id, st.name, st.kuerzel,
-                      ag.person_id, ag.vorname, ag.nachname, ag.firma
+                      ag.person_id, ag.vorname, ag.nachname, ag.firma,
+                      zp.person_id, zp.vorname, zp.nachname, zp.firma,
+                      d.abteilung
              ORDER BY k.nachname, k.vorname`,
             [req.query.meine === 'true' ? req.user.user_id : null]
         );
@@ -109,13 +117,18 @@ router.get('/:id', auth, async (req, res) => {
                     ag.person_id AS arbeitgeber_id,
                     ag.vorname AS arbeitgeber_vorname,
                     ag.nachname AS arbeitgeber_nachname,
-                    ag.firma AS arbeitgeber_firma
+                    ag.firma AS arbeitgeber_firma,
+                    zp.person_id AS zuweisende_person_id,
+                    zp.vorname AS zuweisende_person_vorname,
+                    zp.nachname AS zuweisende_person_nachname,
+                    zp.firma AS zuweisende_person_firma
              FROM dossier d
              JOIN klient k ON k.klient_id = d.klient_id
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
              LEFT JOIN phase ph ON ph.phase_id = d.akt_phase_id
              LEFT JOIN standort st ON st.standort_id = d.standort_id
              LEFT JOIN externe_person ag ON ag.person_id = d.arbeitgeber_id
+             LEFT JOIN externe_person zp ON zp.person_id = d.zuweisende_person_id
              LEFT JOIN LATERAL (
                  SELECT pensum_pct FROM leistungsvereinbarung
                  WHERE klient_id = d.klient_id
@@ -448,6 +461,21 @@ router.put('/:id/arbeitgeber', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Setzen des Arbeitgebers' });
+    }
+});
+
+// PUT /api/dossiers/:id/felder — Zuweisende Person + Abteilung
+router.put('/:id/felder', auth, async (req, res) => {
+    const { zuweisende_person_id, abteilung } = req.body;
+    try {
+        await db.query(
+            `UPDATE dossier SET zuweisende_person_id = $1, abteilung = $2 WHERE dossier_id = $3`,
+            [zuweisende_person_id || null, abteilung || null, req.params.id]
+        );
+        res.json({ message: 'Felder aktualisiert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren der Felder' });
     }
 });
 

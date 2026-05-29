@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import ZuweisungModal from '../components/ZuweisungModal';
 import Modal from '../components/Modal';
 import ExterneZuweisungModal from '../components/ExterneZuweisungModal';
+import DossierFelderModal from '../components/DossierFelderModal';
 
 const LABEL_FARBEN = {
     'LE': { bg: '#ECFDF5', color: '#15803D' },
@@ -78,6 +79,7 @@ export default function DossierDetail() {
     const [zuweisungModal, setZuweisungModal] = useState(false);
     const [externeModal, setExterneModal] = useState(false);
     const [agModal, setAgModal] = useState(false);
+    const [felderModal, setFelderModal] = useState(false);
     const [agListe, setAgListe] = useState([]);
     const [agAuswahl, setAgAuswahl] = useState('');
 
@@ -207,25 +209,20 @@ export default function DossierDetail() {
 
             {/* ── HEADER ─────────────────────────────────── */}
             <div style={{ ...CARD, padding: '1.125rem 1.25rem', marginBottom: '.875rem' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                    {/* Avatar */}
+                {/* Row 1: Avatar + Name + Badges */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                     <div style={{
-                        width: 48, height: 48, borderRadius: 12, background: '#EEF3FE',
+                        width: 44, height: 44, borderRadius: 11, background: '#EEF3FE',
                         color: '#1D4ED8', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontSize: 15, fontWeight: 600, flexShrink: 0
+                        justifyContent: 'center', fontSize: 14, fontWeight: 600, flexShrink: 0
                     }}>
                         {(dossier.vorname?.[0] || '') + (dossier.nachname?.[0] || '')}
                     </div>
-
-                    {/* Name + Badges + Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                        {/* Name */}
-                        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.4px', lineHeight: 1.2 }}>
+                        <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-.4px', lineHeight: 1.2 }}>
                             {dossier.vorname} {dossier.nachname}
                         </div>
-
-                        {/* Badges */}
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
                             {dossier.phase_label && (
                                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#F5F3FF', color: '#5B21B6', border: '1px solid rgba(124,58,237,.15)', fontFamily: 'monospace' }}>
                                     {dossier.phase_label}
@@ -245,72 +242,123 @@ export default function DossierDetail() {
                                 </span>
                             )}
                         </div>
+                    </div>
+                </div>
 
-                        {/* Info-Zeile 1: Stelle · Standort · Pensum */}
-                        <div style={{ fontSize: 12, color: '#6B6860', marginTop: 7, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                            {dossier.auftraggeber && <span>{dossier.auftraggeber}</span>}
-                            {dossier.standort_name && (<><span style={{ color: '#D1D0CB' }}>·</span><span>{dossier.standort_name}</span></>)}
-                            {dossier.pensum_pct && (<><span style={{ color: '#D1D0CB' }}>·</span><span>{dossier.pensum_pct}% Pensum</span></>)}
-                        </div>
-
-                        {/* Info-Zeile 2: Programm · Start · Ende */}
-                        <div style={{ fontSize: 12, color: '#6B6860', marginTop: 3, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                            {dossier.programm_name && (
-                                <span style={{ fontWeight: 500, color: '#1A1917' }}>{dossier.programm_name}</span>
-                            )}
-                            {dossier.laufend_start_datum && (
-                                <><span style={{ color: '#D1D0CB' }}>·</span><span>Start: {fmt(dossier.laufend_start_datum)}</span></>
-                            )}
-                            {dossier.geplantes_enddatum && (
-                                <><span style={{ color: '#D1D0CB' }}>·</span><span>Ende: {fmt(dossier.geplantes_enddatum)}</span></>
-                            )}
-                        </div>
-
-                        {/* Extern / Intern */}
-                        <div style={{ fontSize: 12, color: '#6B6860', marginTop: 3 }}>
-                            {dossier.arbeitgeber_firma
-                                ? <span>🏢 Extern bei: <span style={{ fontWeight: 500, color: '#1A1917' }}>{dossier.arbeitgeber_firma}</span></span>
-                                : <span style={{ color: '#A09D97' }}>Intern</span>
-                            }
-                        </div>
-
-                        {/* Warn-Banner */}
-                        {tageVerbleibend !== null && tageVerbleibend < 28 && (
-                            <div style={{
-                                marginTop: 8, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                                display: 'inline-flex', alignItems: 'center', gap: 5,
-                                background: tageVerbleibend < 14 ? '#FEF2F2' : '#FFFBEB',
-                                color: tageVerbleibend < 14 ? '#B91C1C' : '#B45309',
-                                border: `1px solid ${tageVerbleibend < 14 ? 'rgba(220,38,38,.2)' : 'rgba(217,119,6,.2)'}`,
-                            }}>
-                                ⚠ {tageVerbleibend < 0
-                                    ? 'Programmende überschritten'
-                                    : tageVerbleibend < 14
-                                    ? `Programmende in ${tageVerbleibend} Tag${tageVerbleibend === 1 ? '' : 'en'} — Abschlussbericht fällig`
-                                    : `Programmende in ${Math.ceil(tageVerbleibend / 7)} Woche${Math.ceil(tageVerbleibend / 7) === 1 ? '' : 'n'}`}
+                {/* Row 2: Info-Grid (2 Spalten) + Buttons rechts */}
+                <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                    {/* Info-Grid */}
+                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', minWidth: 0 }}>
+                        {/* Linke Spalte */}
+                        {dossier.programm_name && (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Programm</span>
+                                <span style={{ fontSize: 12.5, fontWeight: 500, color: '#1A1917' }}>{dossier.programm_name}</span>
                             </div>
                         )}
+                        {/* Rechte Spalte — Pensum */}
+                        {dossier.pensum_pct ? (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Pensum</span>
+                                <span style={{ fontSize: 12.5, fontWeight: 500, color: '#1A1917' }}>{dossier.pensum_pct}%</span>
+                            </div>
+                        ) : <div />}
+
+                        {dossier.auftraggeber && (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0, whiteSpace: 'nowrap' }}>Zuweisende Stelle</span>
+                                <span style={{ fontSize: 12.5, color: '#1A1917', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dossier.auftraggeber}</span>
+                            </div>
+                        )}
+                        {/* Rechte Spalte — Start */}
+                        {dossier.laufend_start_datum ? (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Start</span>
+                                <span style={{ fontSize: 12.5, color: '#1A1917' }}>{fmt(dossier.laufend_start_datum)}</span>
+                            </div>
+                        ) : <div />}
+
+                        {(dossier.zuweisende_person_vorname || dossier.zuweisende_person_nachname) ? (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0, whiteSpace: 'nowrap' }}>Zuweisende Person</span>
+                                <span style={{ fontSize: 12.5, color: '#1A1917' }}>
+                                    {dossier.zuweisende_person_vorname} {dossier.zuweisende_person_nachname}
+                                    {dossier.zuweisende_person_firma && <span style={{ color: '#6B6860' }}> · {dossier.zuweisende_person_firma}</span>}
+                                </span>
+                            </div>
+                        ) : <div />}
+                        {/* Rechte Spalte — Ende */}
+                        {dossier.geplantes_enddatum ? (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0, whiteSpace: 'nowrap' }}>Ende (geplant)</span>
+                                <span style={{ fontSize: 12.5, color: '#1A1917' }}>{fmt(dossier.geplantes_enddatum)}</span>
+                            </div>
+                        ) : <div />}
+
+                        {dossier.standort_name && (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Standort</span>
+                                <span style={{ fontSize: 12.5, color: '#1A1917' }}>{dossier.standort_name}</span>
+                            </div>
+                        )}
+                        {/* Rechte Spalte — Intern/Extern */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {dossier.abteilung && (
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                    <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Intern</span>
+                                    <span style={{ fontSize: 12.5, color: '#1A1917' }}>{dossier.abteilung}</span>
+                                </div>
+                            )}
+                            {dossier.arbeitgeber_firma && (
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                    <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Extern</span>
+                                    <span style={{ fontSize: 12.5, color: '#1A1917', fontWeight: 500 }}>{dossier.arbeitgeber_firma}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Buttons */}
-                    <div style={{ display: 'flex', gap: 7, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {/* Buttons vertikal */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, minWidth: 148 }}>
                         <button onClick={() => { setJFormOpen(true); setAktTab('journal'); }} style={{
-                            padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                            padding: '7px 14px', fontSize: 12.5, fontWeight: 500,
                             cursor: 'pointer', border: 'none', borderRadius: 6,
-                            background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                            background: '#2563EB', color: '#fff', fontFamily: 'inherit', textAlign: 'center'
                         }}>+ Journal-Eintrag</button>
                         <button onClick={oeffneAgModal} style={{
-                            padding: '7px 14px', fontSize: 13,
+                            padding: '7px 14px', fontSize: 12.5,
                             cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                            background: '#fff', fontFamily: 'inherit', color: '#1A1917'
-                        }}>🏢 Arbeitgeber</button>
+                            background: '#fff', fontFamily: 'inherit', color: '#1A1917', textAlign: 'center'
+                        }}>Arbeitgeber zuweisen</button>
+                        <button onClick={() => setFelderModal(true)} style={{
+                            padding: '7px 14px', fontSize: 12.5,
+                            cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                            background: '#fff', fontFamily: 'inherit', color: '#1A1917', textAlign: 'center'
+                        }}>Felder bearbeiten</button>
                         <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
-                            padding: '7px 14px', fontSize: 13,
+                            padding: '7px 14px', fontSize: 12.5,
                             cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                            background: '#fff', fontFamily: 'inherit', color: '#6B6860'
+                            background: '#fff', fontFamily: 'inherit', color: '#6B6860', textAlign: 'center'
                         }}>Stammdaten →</button>
                     </div>
                 </div>
+
+                {/* Warn-Banner */}
+                {tageVerbleibend !== null && tageVerbleibend < 28 && (
+                    <div style={{
+                        marginTop: 12, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        background: tageVerbleibend < 14 ? '#FEF2F2' : '#FFFBEB',
+                        color: tageVerbleibend < 14 ? '#B91C1C' : '#B45309',
+                        border: `1px solid ${tageVerbleibend < 14 ? 'rgba(220,38,38,.2)' : 'rgba(217,119,6,.2)'}`,
+                    }}>
+                        ⚠ {tageVerbleibend < 0
+                            ? 'Programmende überschritten'
+                            : tageVerbleibend < 14
+                            ? `Programmende in ${tageVerbleibend} Tag${tageVerbleibend === 1 ? '' : 'en'} — Abschlussbericht fällig`
+                            : `Programmende in ${Math.ceil(tageVerbleibend / 7)} Woche${Math.ceil(tageVerbleibend / 7) === 1 ? '' : 'n'}`}
+                    </div>
+                )}
             </div>
 
             {/* ── PHASEN-STEPPER ──────────────────────────── */}
@@ -631,6 +679,14 @@ export default function DossierDetail() {
                 dossierId={id}
                 zugewieseneExterne={dossier.externe_personen || []}
                 onSaved={() => { setExterneModal(false); reloadDossier(); }}
+            />
+
+            <DossierFelderModal
+                open={felderModal}
+                onClose={() => setFelderModal(false)}
+                dossierId={id}
+                dossier={dossier}
+                onSaved={() => { setFelderModal(false); reloadDossier(); }}
             />
 
             <Modal open={agModal} onClose={() => setAgModal(false)} title="Arbeitgeber / Partnerfirma zuweisen" width={480}>
