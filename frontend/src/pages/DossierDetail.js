@@ -208,18 +208,20 @@ export default function DossierDetail() {
             }}>← Alle Dossiers</button>
 
             {/* ── HEADER ─────────────────────────────────── */}
-            <div style={{ ...CARD, padding: '1.125rem 1.25rem', marginBottom: '.875rem' }}>
-                {/* Row 1: Avatar + Name + Badges */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 }}>
+            <div style={{ ...CARD, padding: '1rem 1.25rem', marginBottom: '.875rem' }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    {/* Avatar */}
                     <div style={{
                         width: 44, height: 44, borderRadius: 11, background: '#EEF3FE',
                         color: '#1D4ED8', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontSize: 14, fontWeight: 600, flexShrink: 0
+                        justifyContent: 'center', fontSize: 14, fontWeight: 600, flexShrink: 0, marginTop: 2
                     }}>
                         {(dossier.vorname?.[0] || '') + (dossier.nachname?.[0] || '')}
                     </div>
+
+                    {/* Name + Badges + Buttons */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-.4px', lineHeight: 1.2 }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-.3px', lineHeight: 1.2 }}>
                             {dossier.vorname} {dossier.nachname}
                         </div>
                         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
@@ -242,91 +244,52 @@ export default function DossierDetail() {
                                 </span>
                             )}
                         </div>
-                    </div>
-                </div>
-
-                {/* Row 2: drei Spalten — 40% | 35% | 25% */}
-                <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-                    {/* Linke Spalte (40%): Programm, Zuweisende Stelle, Zuweisende Person, Standort */}
-                    <div style={{ flex: '0 0 40%', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 11, color: '#6B6860' }}>Programm</span>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{dossier.programm_name || '—'}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 11, color: '#6B6860' }}>Zuweisende Stelle</span>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{dossier.auftraggeber || '—'}</span>
-                        </div>
-                        {(dossier.zuweisende_person_vorname || dossier.zuweisende_person_nachname) && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <span style={{ fontSize: 11, color: '#6B6860' }}>Zuweisende Person</span>
-                                <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>
-                                    {dossier.zuweisende_person_vorname} {dossier.zuweisende_person_nachname}
-                                    {dossier.zuweisende_person_firma && <span style={{ fontWeight: 400, color: '#6B6860' }}> · {dossier.zuweisende_person_firma}</span>}
-                                </span>
-                            </div>
-                        )}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 11, color: '#6B6860' }}>Standort</span>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{dossier.standort_name || '—'}</span>
-                        </div>
-                    </div>
-
-                    {/* Mittlere Spalte (35%): Pensum, Start, Ende, Arbeitsort */}
-                    <div style={{ flex: '0 0 35%', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 11, color: '#6B6860' }}>Pensum</span>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{dossier.pensum_pct ? `${dossier.pensum_pct}%` : '—'}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 11, color: '#6B6860' }}>Start</span>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{fmt(dossier.laufend_start_datum)}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 11, color: '#6B6860' }}>Ende (geplant)</span>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{fmt(dossier.geplantes_enddatum)}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 11, color: '#6B6860' }}>Arbeitsort</span>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>
-                                {dossier.abteilung
-                                    ? `Intern: ${dossier.abteilung}`
-                                    : dossier.arbeitgeber_firma
-                                    ? `Extern: ${dossier.arbeitgeber_firma}`
-                                    : '—'}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Rechte Spalte: Buttons */}
-                    <div style={{ width: 'auto', alignSelf: 'flex-start' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+                        {/* Buttons horizontal, kompakt */}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
                             <button onClick={() => { setJFormOpen(true); setAktTab('journal'); }} style={{
-                                display: 'inline-block', width: 'auto', whiteSpace: 'nowrap',
-                                minWidth: 160, padding: '7px 14px', fontSize: 12.5, fontWeight: 500,
-                                cursor: 'pointer', border: 'none', borderRadius: 6,
+                                padding: '5px 12px', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap',
+                                cursor: 'pointer', border: 'none', borderRadius: 5,
                                 background: '#2563EB', color: '#fff', fontFamily: 'inherit'
                             }}>+ Journal-Eintrag</button>
                             <button onClick={() => setFelderModal(true)} style={{
-                                display: 'inline-block', width: 'auto', whiteSpace: 'nowrap',
-                                minWidth: 160, padding: '7px 14px', fontSize: 12.5,
-                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                                padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
+                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
                                 background: '#fff', fontFamily: 'inherit', color: '#1A1917'
                             }}>Arbeitsort ändern</button>
                             <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
-                                display: 'inline-block', width: 'auto', whiteSpace: 'nowrap',
-                                minWidth: 160, padding: '7px 14px', fontSize: 12.5,
-                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                                padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
+                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
                                 background: '#fff', fontFamily: 'inherit', color: '#6B6860'
                             }}>Stammdaten →</button>
                         </div>
+                    </div>
+
+                    {/* Info-Grid zweispaltig, rechts */}
+                    <div style={{ flexShrink: 0, display: 'grid', gridTemplateColumns: 'auto auto', gap: '7px 20px', alignSelf: 'flex-start' }}>
+                        {[
+                            { label: 'Programm',          value: dossier.programm_name },
+                            { label: 'Pensum',             value: dossier.pensum_pct ? `${dossier.pensum_pct}%` : null },
+                            { label: 'Zuweisende Stelle',  value: dossier.auftraggeber },
+                            { label: 'Start',              value: dossier.laufend_start_datum ? fmt(dossier.laufend_start_datum) : null },
+                            (dossier.zuweisende_person_nachname
+                                ? { label: 'Zuweisende Person', value: `${dossier.zuweisende_person_vorname || ''} ${dossier.zuweisende_person_nachname}`.trim() + (dossier.zuweisende_person_firma ? ` · ${dossier.zuweisende_person_firma}` : '') }
+                                : null),
+                            { label: 'Ende (geplant)',     value: dossier.geplantes_enddatum ? fmt(dossier.geplantes_enddatum) : null },
+                            { label: 'Standort',           value: dossier.standort_name },
+                            { label: 'Arbeitsort',         value: dossier.abteilung ? `Intern: ${dossier.abteilung}` : dossier.arbeitgeber_firma ? `Extern: ${dossier.arbeitgeber_firma}` : null },
+                        ].filter(Boolean).map((f, i) => (
+                            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                <span style={{ fontSize: 10.5, color: '#A09D97', whiteSpace: 'nowrap' }}>{f.label}</span>
+                                <span style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap' }}>{f.value || '—'}</span>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
                 {/* Warn-Banner */}
                 {tageVerbleibend !== null && tageVerbleibend < 28 && (
                     <div style={{
-                        marginTop: 12, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                        marginTop: 10, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500,
                         display: 'inline-flex', alignItems: 'center', gap: 5,
                         background: tageVerbleibend < 14 ? '#FEF2F2' : '#FFFBEB',
                         color: tageVerbleibend < 14 ? '#B91C1C' : '#B45309',
