@@ -121,6 +121,19 @@ router.post('/:id/phasen', auth, async (req, res) => {
     }
 });
 
+// PUT /api/programme/:id/phasen/:phase_id — Phase umbenennen
+router.put('/:id/phasen/:phase_id', auth, async (req, res) => {
+    const { label } = req.body;
+    if (!label?.trim()) return res.status(400).json({ error: 'Label erforderlich' });
+    try {
+        await db.query(`UPDATE phase SET label = $1 WHERE phase_id = $2`, [label.trim(), req.params.phase_id]);
+        res.json({ message: 'Phase umbenannt' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Umbenennen' });
+    }
+});
+
 // DELETE /api/programme/phasen/:phase_id — Phase löschen
 router.delete('/phasen/:phase_id', auth, async (req, res) => {
     try {
