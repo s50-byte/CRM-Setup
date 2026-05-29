@@ -237,6 +237,40 @@ router.put('/passwort', auth, async (req, res) => {
     }
 });
 
+// GET /api/benutzer/einstellung/:schluessel — Eigene Einstellung laden
+router.get('/einstellung/:schluessel', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT wert FROM benutzer_einstellung WHERE user_id = $1 AND schluessel = $2`,
+            [req.user.user_id, req.params.schluessel]
+        );
+        if (result.rows.length === 0) {
+            return res.json({ wert: null });
+        }
+        res.json({ wert: result.rows[0].wert });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der Einstellung' });
+    }
+});
+
+// PUT /api/benutzer/einstellung/:schluessel — Eigene Einstellung speichern
+router.put('/einstellung/:schluessel', auth, async (req, res) => {
+    const { wert } = req.body;
+    try {
+        await db.query(
+            `INSERT INTO benutzer_einstellung (user_id, schluessel, wert)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (user_id, schluessel) DO UPDATE SET wert = $3`,
+            [req.user.user_id, req.params.schluessel, wert ?? null]
+        );
+        res.json({ message: 'Einstellung gespeichert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern der Einstellung' });
+    }
+});
+
 // GET /api/benutzer/:id — Einzelner Benutzer mit vollem Profil
 router.get('/:id', auth, requireManagement, async (req, res) => {
     try {

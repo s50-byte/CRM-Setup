@@ -22,6 +22,7 @@ app.use('/api/benutzer',  require('./src/routes/benutzer'));
 app.use('/api/standorte',   require('./src/routes/standorte'));
 app.use('/api/management', require('./src/routes/management'));
 app.use('/api/dokumente',  require('./src/routes/dokumente'));
+app.use('/api/meldungen',  require('./src/routes/meldungen'));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
