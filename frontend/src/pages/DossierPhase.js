@@ -191,6 +191,12 @@ export default function DossierPhase() {
                 {/* LINKE SPALTE */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.875rem', minWidth: 0 }}>
 
+                    {tasks.length === 0 && kriterien.length === 0 ? (
+                        <div style={{ ...CARD, padding: '2rem 1.5rem', textAlign: 'center', color: '#A09D97', fontSize: 13 }}>
+                            Noch keine Inhalte für diese Phase erfasst
+                        </div>
+                    ) : <>
+
                     {/* Kriterien / Checkliste */}
                     <div style={{ ...CARD, overflow: 'hidden' }}>
                         <div style={{ padding: '.65rem 1rem', borderBottom: '1px solid rgba(0,0,0,.05)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -271,6 +277,7 @@ export default function DossierPhase() {
                         </div>
                     </div>
 
+                    </>}
                 </div>
 
                 {/* RECHTE SPALTE */}

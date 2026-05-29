@@ -63,13 +63,36 @@ async function main() {
     try {
         await db.query('BEGIN');
 
+        // Sicherstellen dass kriterium-Tabellen existieren (Migrations-Guard)
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS kriterium (
+                kriterium_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                phase_id     UUID NOT NULL REFERENCES phase(phase_id) ON DELETE CASCADE,
+                text         TEXT NOT NULL,
+                typ          TEXT,
+                pflicht      BOOLEAN NOT NULL DEFAULT FALSE,
+                reihenfolge  INTEGER NOT NULL DEFAULT 0,
+                created_at   TIMESTAMPTZ DEFAULT NOW()
+            )
+        `);
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS kriterium_status (
+                kriterium_id UUID NOT NULL REFERENCES kriterium(kriterium_id) ON DELETE CASCADE,
+                klient_id    UUID NOT NULL REFERENCES klient(klient_id) ON DELETE CASCADE,
+                erfuellt     BOOLEAN NOT NULL DEFAULT FALSE,
+                erfuellt_am  DATE,
+                erfuellt_von UUID REFERENCES benutzer(user_id),
+                PRIMARY KEY (kriterium_id, klient_id)
+            )
+        `);
+
         // ── 1. LÖSCHEN ──────────────────────────────────────────────────
         console.log('Lösche bestehende Testdaten…');
         await db.query('UPDATE benutzer SET standort_id = NULL');
         const zuLoeschen = [
             'praesenz_eintrag', 'ferienplanung', 'journal_eintrag',
             'zeitachse_eintrag', 'task', 'termin_user', 'termin',
-            'kriterium_status', 'klient_user', 'externe_person_dossier',
+            'kriterium_status', 'kriterium', 'klient_user', 'externe_person_dossier',
             'programm_verlauf', 'dossier', 'externe_person',
             'leistungsvereinbarung', 'klient', 'benutzer_standort', 'standort',
         ];
@@ -150,7 +173,39 @@ async function main() {
         const programme = Object.values(programmeMap);
         console.log(`  ${programme.length} Programme, ${progRows.rows.length} Phasen total`);
 
-        // ── 5. KLIENTEN + DOSSIERS + LV + JOURNAL + TASKS + TERMINE ─────
+        // ── 5. KRITERIEN PRO PHASE ───────────────────────────────────────
+        console.log('\nErstelle Phasen-Kriterien…');
+        const KRITERIEN_POOL = [
+            { text: 'Erstgespräch durchgeführt',            pflicht: true  },
+            { text: 'Dokumente vollständig',                pflicht: true  },
+            { text: 'IV-Verfügung vorhanden',               pflicht: false },
+            { text: 'Ziele gemeinsam definiert',            pflicht: true  },
+            { text: 'Verlaufsbericht erstellt',             pflicht: true  },
+            { text: 'Arbeitgeber kontaktiert',              pflicht: false },
+            { text: 'Abschlussgespräch terminiert',         pflicht: false },
+            { text: 'Kostengutsprache erhalten',            pflicht: true  },
+            { text: 'Fähigkeitsprofil aktualisiert',        pflicht: false },
+            { text: 'Schnuppereinsatz abgeschlossen',       pflicht: false },
+            { text: 'Standortgespräch mit Arbeitgeber',     pflicht: true  },
+            { text: 'Abschlussbericht eingereicht',         pflicht: true  },
+        ];
+        let kriteriumAnz = 0;
+        for (const prog of programme) {
+            for (const [phIdx, phase] of prog.phasen.entries()) {
+                for (let k = 0; k < 3; k++) {
+                    const kr = pick(KRITERIEN_POOL, phIdx * 3 + k);
+                    await db.query(
+                        `INSERT INTO kriterium (phase_id, text, pflicht, reihenfolge)
+                         VALUES ($1, $2, $3, $4)`,
+                        [phase.phase_id, kr.text, kr.pflicht, k]
+                    );
+                    kriteriumAnz++;
+                }
+                process.stdout.write(`  ✓ ${prog.name} / ${phase.label}\n`);
+            }
+        }
+
+        // ── 6. KLIENTEN + DOSSIERS + LV + JOURNAL + TASKS + TERMINE ─────
         console.log('\nErstelle Klienten, Dossiers, LVs, Journal, Tasks, Termine…');
 
         const JOURNAL_POOL = [
@@ -274,16 +329,16 @@ async function main() {
                         journalAnz++;
                     }
 
-                    // Tasks (2–3)
+                    // Tasks (2–3) — mit phase_id der aktuellen Phase
                     const anzT = 2 + (counter % 2);
                     for (let t = 0; t < anzT; t++) {
                         const task     = pick(TASKS_POOL, counter + t * 4);
                         const erledigt = (t === 0 && counter % 3 === 0);
                         await db.query(
-                            `INSERT INTO task (klient_id, user_id, text, prioritaet, faellig_am, typ, erledigt)
-                             VALUES ($1,$2,$3,$4::task_prioritaet,$5,'individuell',$6)`,
+                            `INSERT INTO task (klient_id, user_id, text, prioritaet, faellig_am, typ, erledigt, phase_id)
+                             VALUES ($1,$2,$3,$4::task_prioritaet,$5,'individuell',$6,$7)`,
                             [klient_id, user_id, task.text, task.prioritaet,
-                             zukunftDatum(7 + (counter % 21)), erledigt]
+                             zukunftDatum(7 + (counter % 21)), erledigt, phase.phase_id]
                         );
                         taskAnz++;
                     }
@@ -316,6 +371,7 @@ async function main() {
         console.log(`  Leistungsver.:      ${lvAnz}`);
         console.log(`  Journal-Einträge:   ${journalAnz}`);
         console.log(`  Tasks:              ${taskAnz}`);
+        console.log(`  Kriterien:          ${kriteriumAnz}`);
         console.log(`  Termine:            ${terminAnz}`);
         console.log('════════════════════════════════════════');
 
