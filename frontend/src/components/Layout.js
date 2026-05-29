@@ -19,7 +19,7 @@ import ManagementDashboard from '../pages/management/ManagementDashboard';
 import Auslastung from '../pages/management/Auslastung';
 import Benutzer from '../pages/management/Benutzer';
 
-const MANAGEMENT_ROLLEN = ['management', 'admin', 'teamleitung'];
+const MANAGEMENT_ROLLEN = ['management', 'teamleitung', 'kader', 'leitungsteam'];
 
 const NAV = [
     { section: 'Mein Bereich' },
@@ -35,7 +35,7 @@ const NAV = [
     { path: '/klienten',  label: 'Klienten',           icon: '👥' },
     { path: '/externe',   label: 'Externe Personen',   icon: '🏢' },
     { section: 'Verwaltung' },
-    { path: '/programme', label: 'Programme',          icon: '⚙' },
+    { path: '/programme', label: 'Programmübersicht',   icon: '⚙' },
     { path: '/profil',    label: 'Mein Profil',        icon: '👤' },
     { path: '/standorte', label: 'Standorte',          icon: '📍' },
 ];

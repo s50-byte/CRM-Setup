@@ -3,11 +3,8 @@ import client from '../api/client';
 import Modal from './Modal';
 
 const SYSTEM_ROLLEN = [
-    { value: 'mitarbeitende', label: 'Mitarbeitende' },
-    { value: 'teamleitung',   label: 'Teamleitung' },
-    { value: 'management',    label: 'Management' },
-    { value: 'kader',         label: 'Kader' },
-    { value: 'admin',         label: 'Admin' },
+    { value: 'kader',        label: 'Kader' },
+    { value: 'leitungsteam', label: 'Leitungsteam' },
 ];
 
 const ROLLEN_LISTE = ['Klientenführung', 'Job Coach', 'Fachperson'];
@@ -74,7 +71,7 @@ export default function BenutzerModal({ open, onClose, onSaved, benutzer }) {
     const [vorname, setVorname] = useState('');
     const [nachname, setNachname] = useState('');
     const [email, setEmail] = useState('');
-    const [systemRolle, setSystemRolle] = useState('mitarbeitende');
+    const [systemRolle, setSystemRolle] = useState('kader');
     const [passwort, setPasswort] = useState('');
     const [pensum, setPensum] = useState(100);
     const [selectedStandorte, setSelectedStandorte] = useState(new Set());
@@ -109,7 +106,7 @@ export default function BenutzerModal({ open, onClose, onSaved, benutzer }) {
                 setVorname(teile[0] || '');
                 setNachname(teile.slice(1).join(' ') || '');
                 setEmail(d.email || '');
-                setSystemRolle(d.system_rolle || 'mitarbeitende');
+                setSystemRolle(d.system_rolle || 'kader');
                 setPensum(d.pensum_pct || 100);
                 setSelectedStandorte(new Set((d.standorte || []).map(s => s.standort_id)));
                 setSelectedRollen(new Set((d.rollen || []).map(r => r.rolle_name)));
@@ -119,7 +116,7 @@ export default function BenutzerModal({ open, onClose, onSaved, benutzer }) {
             setVorname('');
             setNachname('');
             setEmail('');
-            setSystemRolle('mitarbeitende');
+            setSystemRolle('kader');
             setPensum(100);
             setSelectedStandorte(new Set());
             setSelectedRollen(new Set());

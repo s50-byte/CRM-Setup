@@ -116,11 +116,13 @@ export default function Praesenz() {
                     borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28
                 }}>
                     <option value="">Alle Programme</option>
-                    <option>IV-Massnahme</option>
-                    <option>Erstmalige berufliche Ausbildung</option>
-                    <option>Beratung & Coaching</option>
                     <option>Erstmalige berufliche Abklärung</option>
                     <option>Gezielte Vorbereitung</option>
+                    <option>Erstmalige berufliche Ausbildung</option>
+                    <option>IM für Jugendliche</option>
+                    <option>Aufbautraining</option>
+                    <option>Arbeitstraining</option>
+                    <option>Beratung & Coaching</option>
                 </select>
             </div>
 

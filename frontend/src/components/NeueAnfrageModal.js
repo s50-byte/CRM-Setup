@@ -4,23 +4,29 @@ import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } fro
 import client from '../api/client';
 
 const PROGRAMME = [
-    'Erstmalige berufliche Ausbildung',
-    'Beratung & Coaching',
     'Erstmalige berufliche Abklärung',
     'Gezielte Vorbereitung',
+    'Erstmalige berufliche Ausbildung',
+    'IM für Jugendliche',
+    'Aufbautraining',
+    'Arbeitstraining',
+    'Beratung & Coaching',
 ];
 const KANAELE = ['Telefon', 'E-Mail', 'Online-Formular', 'Direkt'];
 const LABELS = ['', 'LE', 'TN', 'MA'];
 const LABEL_DEFAULT = {
-    'Erstmalige berufliche Ausbildung':'LE',
-    'Beratung & Coaching':             'TN',
     'Erstmalige berufliche Abklärung': 'TN',
     'Gezielte Vorbereitung':           'TN',
+    'Erstmalige berufliche Ausbildung':'LE',
+    'IM für Jugendliche':              'LE',
+    'Aufbautraining':                  'TN',
+    'Arbeitstraining':                 'TN',
+    'Beratung & Coaching':             'TN',
 };
 
 export default function NeueAnfrageModal({ open, onClose, onSaved }) {
     const [form, setForm] = useState({
-        nachname: '', vorname: '', programm: 'Erstmalige berufliche Ausbildung',
+        nachname: '', vorname: '', programm: 'Erstmalige berufliche Abklärung',
         auftraggeber: '', kanal: 'Telefon', klient_label: 'TN',
         start: '', ende: '', notiz: '', standort_id: ''
     });
@@ -71,7 +77,7 @@ export default function NeueAnfrageModal({ open, onClose, onSaved }) {
 
             onSaved();
             onClose();
-            setForm({ nachname: '', vorname: '', programm: 'Erstmalige berufliche Ausbildung', auftraggeber: '', kanal: 'Telefon', klient_label: 'TN', start: '', ende: '', notiz: '', standort_id: '' });
+            setForm({ nachname: '', vorname: '', programm: 'Erstmalige berufliche Abklärung', auftraggeber: '', kanal: 'Telefon', klient_label: 'TN', start: '', ende: '', notiz: '', standort_id: '' });
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Speichern');
         } finally {
@@ -99,7 +105,7 @@ export default function NeueAnfrageModal({ open, onClose, onSaved }) {
             <FormField label="Programmtyp">
                 <select style={inputStyle} value={form.programm} onChange={e => {
                     const p = e.target.value;
-                    setForm(prev => ({ ...prev, programm: p, klient_label: LABEL_DEFAULT[p] || 'Teilnehmer' }));
+                    setForm(prev => ({ ...prev, programm: p, klient_label: LABEL_DEFAULT[p] || 'TN' }));
                 }}>
                     {PROGRAMME.map(p => <option key={p}>{p}</option>)}
                 </select>

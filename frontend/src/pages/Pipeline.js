@@ -5,9 +5,13 @@ import NeueAnfrageModal from '../components/NeueAnfrageModal';
 
 const STAGES = ['Erstkontakt', 'In Abklärung', 'Erstgespräch', 'Schnupper', 'Programmstart'];
 const FARBEN = {
-    'Erstmalige berufliche Ausbildung': '#16A34A',
-    'Beratung & Coaching': '#7C3AED', 'Erstmalige berufliche Abklärung': '#EA580C',
-    'Gezielte Vorbereitung': '#D97706'
+    'Erstmalige berufliche Abklärung': '#EA580C',
+    'Gezielte Vorbereitung':           '#D97706',
+    'Erstmalige berufliche Ausbildung':'#16A34A',
+    'IM für Jugendliche':              '#DC2626',
+    'Aufbautraining':                  '#0D9488',
+    'Arbeitstraining':                 '#0891B2',
+    'Beratung & Coaching':             '#7C3AED',
 };
 
 export default function Pipeline() {

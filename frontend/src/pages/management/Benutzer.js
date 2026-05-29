@@ -11,11 +11,10 @@ const ROLLEN_FARBEN = {
 };
 
 const SYSTEM_ROLLEN_FARBEN = {
-    'mitarbeitende': { bg: '#F5F4F0', color: '#6B6860' },
+    'kader':         { bg: '#EFF6FF', color: '#1E40AF' },
+    'leitungsteam':  { bg: '#FFF7ED', color: '#C2410C' },
     'teamleitung':   { bg: '#FFF7ED', color: '#C2410C' },
     'management':    { bg: '#FDF4FF', color: '#7E22CE' },
-    'kader':         { bg: '#EFF6FF', color: '#1E40AF' },
-    'admin':         { bg: '#FEF2F2', color: '#B91C1C' },
 };
 
 const TH = ({ children, right }) => (
