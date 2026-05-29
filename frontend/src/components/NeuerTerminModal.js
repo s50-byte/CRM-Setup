@@ -25,7 +25,9 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId }) {
     }
 
     async function speichern() {
-        if (!form.klient_id || !form.datum) {
+        const effectiveKlientId = klientId || form.klient_id;
+        console.log('[NeuerTerminModal] form vor POST:', form, '| effective klient_id:', effectiveKlientId);
+        if (!effectiveKlientId || !form.datum) {
             setFehler('Klient und Datum sind Pflichtfelder');
             return;
         }
@@ -33,7 +35,7 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId }) {
         setLaden(true);
         try {
             await client.post('/termine', {
-                klient_id: form.klient_id,
+                klient_id: effectiveKlientId,
                 typ: form.typ,
                 datum: form.datum,
                 zeit: form.zeit || null,

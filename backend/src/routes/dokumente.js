@@ -2,9 +2,9 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-// Tabelle beim ersten Start anlegen
+// Separate Tabelle (nicht die schema.sql-Tabelle 'dokument', die dateipfad NOT NULL hat)
 db.query(`
-    CREATE TABLE IF NOT EXISTS dokument (
+    CREATE TABLE IF NOT EXISTS phase_dokument (
         dokument_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         klient_id    UUID NOT NULL REFERENCES klient(klient_id) ON DELETE CASCADE,
         phase_id     UUID REFERENCES phase(phase_id) ON DELETE SET NULL,
@@ -13,7 +13,7 @@ db.query(`
         erstellt_am  TIMESTAMPTZ DEFAULT NOW(),
         erstellt_von UUID REFERENCES benutzer(user_id)
     )
-`).catch(err => console.error('dokument table init:', err));
+`).catch(err => console.error('phase_dokument table init:', err));
 
 // GET /api/dokumente?klient_id=...&phase_id=...
 router.get('/', auth, async (req, res) => {
@@ -23,7 +23,7 @@ router.get('/', auth, async (req, res) => {
         const result = await db.query(
             `SELECT d.dokument_id, d.dateiname, d.typ, d.erstellt_am,
                     u.full_name AS erstellt_von_name
-             FROM dokument d
+             FROM phase_dokument d
              LEFT JOIN benutzer u ON u.user_id = d.erstellt_von
              WHERE d.klient_id = $1
                AND ($2::uuid IS NULL OR d.phase_id = $2)
@@ -40,12 +40,13 @@ router.get('/', auth, async (req, res) => {
 // POST /api/dokumente
 router.post('/', auth, async (req, res) => {
     const { klient_id, phase_id, dateiname, typ } = req.body;
+    console.log('[POST /api/dokumente] body:', req.body);
     if (!klient_id || !dateiname?.trim()) {
         return res.status(400).json({ error: 'klient_id und dateiname erforderlich' });
     }
     try {
         const result = await db.query(
-            `INSERT INTO dokument (klient_id, phase_id, dateiname, typ, erstellt_von)
+            `INSERT INTO phase_dokument (klient_id, phase_id, dateiname, typ, erstellt_von)
              VALUES ($1, $2, $3, $4, $5) RETURNING *`,
             [klient_id, phase_id || null, dateiname.trim(), typ || null, req.user.user_id]
         );
@@ -59,7 +60,7 @@ router.post('/', auth, async (req, res) => {
 // DELETE /api/dokumente/:id
 router.delete('/:id', auth, async (req, res) => {
     try {
-        await db.query(`DELETE FROM dokument WHERE dokument_id = $1`, [req.params.id]);
+        await db.query(`DELETE FROM phase_dokument WHERE dokument_id = $1`, [req.params.id]);
         res.json({ message: 'Dokument gelöscht' });
     } catch (err) {
         console.error(err);

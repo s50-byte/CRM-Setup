@@ -30,6 +30,7 @@ export default function StandortWechselModal({ open, onClose, onSaved, dossierId
     const zugewiesen = dossier?.zugewiesen || [];
 
     async function speichern() {
+        console.log('[StandortWechselModal] form vor PUT:', form);
         if (!form.standort_id) {
             setFehler('Bitte neuen Standort auswählen');
             return;

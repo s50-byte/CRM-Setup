@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Modal from './Modal';
-import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } from './FormField';
+import FormField, { inputStyle, btnRow, btnPrimary, btnSecondary } from './FormField';
 import client from '../api/client';
 
 const TYPEN = [
@@ -25,6 +25,7 @@ export default function DokumentModal({ open, onClose, onSaved, klientId, phaseI
     }
 
     async function speichern() {
+        console.log('[DokumentModal] POST:', { klientId, phaseId, ...form });
         if (!form.dateiname.trim()) {
             setFehler('Dateiname erforderlich');
             return;

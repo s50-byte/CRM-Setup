@@ -26,7 +26,10 @@ export default function NeueAufgabeModal({ open, onClose, onSaved, klientId, pha
     }
 
     async function speichern() {
-        if (!form.klient_id || !form.text) {
+        const effectiveKlientId = klientId || form.klient_id;
+        const effectivePhaseId = phaseId || form.phase_id || null;
+        console.log('[NeueAufgabeModal] form vor POST:', form, '| effective klient_id:', effectiveKlientId);
+        if (!effectiveKlientId || !form.text) {
             setFehler('Klient und Aufgabe sind Pflichtfelder');
             return;
         }
@@ -34,11 +37,11 @@ export default function NeueAufgabeModal({ open, onClose, onSaved, klientId, pha
         setLaden(true);
         try {
             await client.post('/tasks', {
-                klient_id: form.klient_id,
+                klient_id: effectiveKlientId,
                 text: form.text,
                 prioritaet: form.prioritaet,
                 faellig_am: form.faellig_am || null,
-                phase_id: form.phase_id || null,
+                phase_id: effectivePhaseId,
             });
             onSaved();
             onClose();

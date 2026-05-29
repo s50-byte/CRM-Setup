@@ -421,7 +421,7 @@ router.put('/:id/standort', auth, async (req, res) => {
         const titel = `Standortwechsel${alter_standort ? ` von ${alter_standort}` : ''} nach ${neuer_standort}${bemerkung ? ` — ${bemerkung}` : ''}`;
         await cl.query(
             `INSERT INTO zeitachse_eintrag (klient_id, user_id, typ, titel, auto_generated)
-             VALUES ($1, $2, 'Verlauf', $3, TRUE)`,
+             VALUES ($1, $2, 'System', $3, TRUE)`,
             [klient_id, req.user.user_id, titel]
         );
 
