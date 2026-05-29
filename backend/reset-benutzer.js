@@ -10,38 +10,41 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD,
 });
 
-const PASSWORT   = 'Test2025!';
+const PASSWORT     = 'Test2025!';
 const EMAIL_DOMAIN = 'kft-prototyp.ch';
 
-// 7 Benutzer pro Standort — je 3 Standorte → 21 Einträge
-// Typen: KF = Klientenführung, JC = Job Coach, FP = Fachperson, KF+FP = beide Rollen
+// NOTE: system_rolle 'leitungsteam' erfordert Migration add-enum-updates.sql.
+// Solange die Migration nicht eingespielt ist, wird 'teamleitung' verwendet.
+const ROLLE_TL = 'teamleitung'; // → 'leitungsteam' nach Migration
+
+// 7 Benutzer pro Standort: 5 kader, 1 leitungsteam, 1 leitungsteam (management-Ebene)
 const BENUTZER_PRO_STANDORT = {
     ZH: [
-        { vorname: 'Eva',      nachname: 'Schweizer', typ: 'KF',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Martin',   nachname: 'Zahnd',     typ: 'KF',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Sonja',    nachname: 'Ritter',    typ: 'JC',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Felix',    nachname: 'Nauer',     typ: 'FP',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Petra',    nachname: 'Lenz',      typ: 'KF+FP',   system_rolle: 'mitarbeitende' },
-        { vorname: 'Barbara',  nachname: 'Vogt',      typ: 'TL',      system_rolle: 'teamleitung'   },
-        { vorname: 'Werner',   nachname: 'Haas',      typ: 'MG',      system_rolle: 'management'    },
+        { vorname: 'Eva',      nachname: 'Schweizer', typ: 'KF',    system_rolle: 'kader'  },
+        { vorname: 'Martin',   nachname: 'Zahnd',     typ: 'KF',    system_rolle: 'kader'  },
+        { vorname: 'Sonja',    nachname: 'Ritter',    typ: 'JC',    system_rolle: 'kader'  },
+        { vorname: 'Felix',    nachname: 'Nauer',     typ: 'FP',    system_rolle: 'kader'  },
+        { vorname: 'Petra',    nachname: 'Lenz',      typ: 'KF+FP', system_rolle: 'kader'  },
+        { vorname: 'Barbara',  nachname: 'Vogt',      typ: 'TL',    system_rolle: ROLLE_TL },
+        { vorname: 'Werner',   nachname: 'Haas',      typ: 'TL',    system_rolle: ROLLE_TL },
     ],
     WI: [
-        { vorname: 'Kathrin',  nachname: 'Bosshard',  typ: 'KF',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Reto',     nachname: 'Egger',     typ: 'KF',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Cornelia', nachname: 'Mäder',     typ: 'JC',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Adrian',   nachname: 'Flück',     typ: 'FP',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Sabine',   nachname: 'Frei',      typ: 'KF+FP',   system_rolle: 'mitarbeitende' },
-        { vorname: 'Christian',nachname: 'Studer',    typ: 'TL',      system_rolle: 'teamleitung'   },
-        { vorname: 'Elisabeth',nachname: 'Hofer',     typ: 'MG',      system_rolle: 'management'    },
+        { vorname: 'Kathrin',  nachname: 'Bosshard',  typ: 'KF',    system_rolle: 'kader'  },
+        { vorname: 'Reto',     nachname: 'Egger',     typ: 'KF',    system_rolle: 'kader'  },
+        { vorname: 'Cornelia', nachname: 'Mäder',     typ: 'JC',    system_rolle: 'kader'  },
+        { vorname: 'Adrian',   nachname: 'Flück',     typ: 'FP',    system_rolle: 'kader'  },
+        { vorname: 'Sabine',   nachname: 'Frei',      typ: 'KF+FP', system_rolle: 'kader'  },
+        { vorname: 'Christian',nachname: 'Studer',    typ: 'TL',    system_rolle: ROLLE_TL },
+        { vorname: 'Elisabeth',nachname: 'Hofer',     typ: 'TL',    system_rolle: ROLLE_TL },
     ],
     RI: [
-        { vorname: 'Franziska',nachname: 'Blum',      typ: 'KF',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Patrick',  nachname: 'Wyss',      typ: 'KF',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Nadine',   nachname: 'Spälti',    typ: 'JC',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Samuel',   nachname: 'Gut',       typ: 'FP',      system_rolle: 'mitarbeitende' },
-        { vorname: 'Miriam',   nachname: 'Senn',      typ: 'KF+FP',   system_rolle: 'mitarbeitende' },
-        { vorname: 'Thomas',   nachname: 'Binder',    typ: 'TL',      system_rolle: 'teamleitung'   },
-        { vorname: 'Daniela',  nachname: 'Wirth',     typ: 'MG',      system_rolle: 'management'    },
+        { vorname: 'Franziska',nachname: 'Blum',      typ: 'KF',    system_rolle: 'kader'  },
+        { vorname: 'Patrick',  nachname: 'Wyss',      typ: 'KF',    system_rolle: 'kader'  },
+        { vorname: 'Nadine',   nachname: 'Spälti',    typ: 'JC',    system_rolle: 'kader'  },
+        { vorname: 'Samuel',   nachname: 'Gut',       typ: 'FP',    system_rolle: 'kader'  },
+        { vorname: 'Miriam',   nachname: 'Senn',      typ: 'KF+FP', system_rolle: 'kader'  },
+        { vorname: 'Thomas',   nachname: 'Binder',    typ: 'TL',    system_rolle: ROLLE_TL },
+        { vorname: 'Daniela',  nachname: 'Wirth',     typ: 'TL',    system_rolle: ROLLE_TL },
     ],
 };
 
@@ -56,6 +59,15 @@ const PROG_ROLLEN = {
     'Beratung & Coaching':              ['JC'],
 };
 
+// Programme für benutzer_berechtigung nach Typ
+const PROG_BERECHTIGUNG = {
+    KF:    ['Erstmalige berufliche Abklärung','Gezielte Vorbereitung','Erstmalige berufliche Ausbildung','IM für Jugendliche','Aufbautraining','Arbeitstraining'],
+    JC:    ['Beratung & Coaching'],
+    FP:    ['Erstmalige berufliche Abklärung','Gezielte Vorbereitung','Erstmalige berufliche Ausbildung','IM für Jugendliche'],
+    'KF+FP': ['Erstmalige berufliche Abklärung','Gezielte Vorbereitung','Erstmalige berufliche Ausbildung','IM für Jugendliche','Aufbautraining','Arbeitstraining'],
+    TL:    null, // alle Programme
+};
+
 // benutzer_aufgabe-Einträge pro Typ
 const AUFGABEN = {
     KF:    [{ rolle_name: 'Klientenführung', max_klienten: 15 }],
@@ -65,8 +77,7 @@ const AUFGABEN = {
                { rolle_name: 'Klientenführung', max_klienten: 15 },
                { rolle_name: 'Fachperson',      max_klienten: 10 },
              ],
-    TL:    [{ rolle_name: 'Teamleitung',     max_klienten:  8 }],
-    MG:    [{ rolle_name: 'Management',      max_klienten:  5 }],
+    TL:    [{ rolle_name: 'Leitungsteam',    max_klienten:  8 }],
 };
 
 function email(vorname, nachname) {
@@ -86,40 +97,19 @@ async function main() {
     try {
         await db.query('BEGIN');
 
-        // ── 1. IV-MASSNAHME LÖSCHEN ──────────────────────────────────────────
-        console.log('Entferne IV-Massnahme…');
-        await db.query(`
-            UPDATE dossier SET akt_programm_id = NULL
-            WHERE akt_programm_id = (SELECT programm_id FROM programm WHERE name = 'IV-Massnahme')`);
-        await db.query(`
-            UPDATE dossier SET akt_phase_id = NULL
-            WHERE akt_phase_id IN (
-                SELECT phase_id FROM phase
-                WHERE programm_id = (SELECT programm_id FROM programm WHERE name = 'IV-Massnahme')
-            )`);
-        await db.query(`
-            DELETE FROM programm_verlauf
-            WHERE programm_id = (SELECT programm_id FROM programm WHERE name = 'IV-Massnahme')`);
-        await db.query(`
-            DELETE FROM phase
-            WHERE programm_id = (SELECT programm_id FROM programm WHERE name = 'IV-Massnahme')`);
-        await db.query(`DELETE FROM programm WHERE name = 'IV-Massnahme'`);
-        console.log('  ✓ IV-Massnahme gelöscht');
-
-        // ── 2. BENUTZER LÖSCHEN ──────────────────────────────────────────────
-        console.log('\nLösche bestehende Benutzer…');
+        // ── 1. BENUTZER LÖSCHEN ──────────────────────────────────────────
+        console.log('Lösche bestehende Benutzer…');
         await db.query(`DELETE FROM benutzer_aufgabe`);
         await db.query(`DELETE FROM klient_user`);
+        await db.query(`DELETE FROM benutzer_berechtigung`);
 
         // FK-Referenzen auf zu löschende Benutzer neutralisieren
         const simonRes = await db.query(`SELECT user_id FROM benutzer WHERE email = 'simon@iv-crm.ch'`);
         const simonId = simonRes.rows[0]?.user_id;
         const anderen = `(SELECT user_id FROM benutzer WHERE email != 'simon@iv-crm.ch')`;
         if (simonId) {
-            // journal_eintrag: NOT NULL → auf simon umhängen
             await db.query(`UPDATE journal_eintrag SET user_id = $1 WHERE user_id IN ${anderen}`, [simonId]);
         }
-        // Nullable Felder → NULL setzen
         await db.query(`UPDATE zeitachse_eintrag   SET user_id          = NULL WHERE user_id          IN ${anderen}`);
         await db.query(`UPDATE task                SET user_id          = NULL WHERE user_id          IN ${anderen}`);
         await db.query(`UPDATE dokument            SET user_id          = NULL WHERE user_id          IN ${anderen}`);
@@ -130,10 +120,8 @@ async function main() {
         await db.query(`DELETE FROM benutzer WHERE email != 'simon@iv-crm.ch'`);
         console.log('  ✓ Benutzer gelöscht (simon@iv-crm.ch bleibt)');
 
-        // ── 3. STANDORTE laden ───────────────────────────────────────────────
-        const standortRes = await db.query(
-            `SELECT standort_id, kuerzel FROM standort ORDER BY kuerzel`
-        );
+        // ── 2. STANDORTE laden ───────────────────────────────────────────
+        const standortRes = await db.query(`SELECT standort_id, kuerzel FROM standort ORDER BY kuerzel`);
         const standortMap = {};
         for (const s of standortRes.rows) standortMap[s.kuerzel] = s.standort_id;
 
@@ -142,17 +130,24 @@ async function main() {
             throw new Error(`Standorte fehlen in DB: ${fehlend.join(', ')} — zuerst reset-testdaten.js ausführen`);
         }
 
-        // ── 4. BENUTZER ERSTELLEN ────────────────────────────────────────────
+        // ── 3. PROGRAMME laden ───────────────────────────────────────────
+        const programmRes = await db.query(`SELECT programm_id, name FROM programm WHERE aktiv = TRUE AND name != 'IV-Massnahme'`);
+        const programmNamen = {};
+        for (const p of programmRes.rows) programmNamen[p.name] = p.programm_id;
+        const alleProgIds = programmRes.rows.map(p => p.programm_id);
+        console.log(`  ${alleProgIds.length} Programme geladen`);
+
+        // ── 4. BENUTZER ERSTELLEN ────────────────────────────────────────
         console.log('\nErstelle Benutzer…');
         // benutzerIndex: kuerzel → { KF: [...], FP: [...], JC: [...], TL: user, MG: user }
         const benutzerIndex = {};
 
         for (const [kuerzel, liste] of Object.entries(BENUTZER_PRO_STANDORT)) {
             const standort_id = standortMap[kuerzel];
-            benutzerIndex[kuerzel] = { KF: [], FP: [], JC: [], TL: null, MG: null };
+            benutzerIndex[kuerzel] = { KF: [], FP: [], JC: [], TL: null };
 
             for (const b of liste) {
-                const mail = email(b.vorname, b.nachname);
+                const mail  = email(b.vorname, b.nachname);
                 const inits = initials(b.vorname, b.nachname);
 
                 const r = await db.query(
@@ -164,7 +159,7 @@ async function main() {
                 );
                 const user_id = r.rows[0].user_id;
 
-                // benutzer_aufgabe Einträge
+                // benutzer_aufgabe
                 for (const a of AUFGABEN[b.typ]) {
                     await db.query(
                         `INSERT INTO benutzer_aufgabe (user_id, rolle_name, max_klienten)
@@ -173,25 +168,36 @@ async function main() {
                     );
                 }
 
-                // benutzer_standort (für N:M Standort-Filter)
+                // benutzer_standort
                 await db.query(
                     `INSERT INTO benutzer_standort (user_id, standort_id)
                      VALUES ($1, $2) ON CONFLICT DO NOTHING`,
                     [user_id, standort_id]
                 );
 
-                // Index befüllen für spätere Zuweisung
+                // benutzer_berechtigung — Programme nach Typ
+                const progNamen = PROG_BERECHTIGUNG[b.typ];
+                const progIds   = progNamen === null
+                    ? alleProgIds
+                    : progNamen.map(n => programmNamen[n]).filter(Boolean);
+                for (const programm_id of progIds) {
+                    await db.query(
+                        `INSERT INTO benutzer_berechtigung (user_id, programm_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                        [user_id, programm_id]
+                    );
+                }
+
+                // Index für Dossier-Zuweisung
                 if (b.typ === 'KF' || b.typ === 'KF+FP') benutzerIndex[kuerzel].KF.push(user_id);
                 if (b.typ === 'FP' || b.typ === 'KF+FP') benutzerIndex[kuerzel].FP.push(user_id);
                 if (b.typ === 'JC')  benutzerIndex[kuerzel].JC.push(user_id);
                 if (b.typ === 'TL')  benutzerIndex[kuerzel].TL = user_id;
-                if (b.typ === 'MG')  benutzerIndex[kuerzel].MG = user_id;
 
-                console.log(`  ✓ [${kuerzel}] ${b.vorname} ${b.nachname} (${b.typ})`);
+                console.log(`  ✓ [${kuerzel}] ${b.vorname} ${b.nachname} (${b.typ} / ${b.system_rolle})`);
             }
         }
 
-        // ── 5. DOSSIERS ZUWEISEN ─────────────────────────────────────────────
+        // ── 5. DOSSIERS ZUWEISEN ─────────────────────────────────────────
         console.log('\nWeise Dossiers zu…');
 
         const dossierRes = await db.query(
@@ -203,7 +209,6 @@ async function main() {
         );
 
         const zuweisungenProStandort = { ZH: 0, WI: 0, RI: 0 };
-        // Rotations-Zähler pro Standort + Rolle
         const rot = { ZH: { KF: 0, FP: 0, JC: 0 }, WI: { KF: 0, FP: 0, JC: 0 }, RI: { KF: 0, FP: 0, JC: 0 } };
 
         for (const d of dossierRes.rows) {
@@ -212,23 +217,23 @@ async function main() {
             const idx      = benutzerIndex[kuerzel];
             if (!idx) continue;
 
-            const rollen = PROG_ROLLEN[progName] || ['KF'];
-            const zuweisen = []; // { user_id, rolle_im_fall }
+            const rollen   = PROG_ROLLEN[progName] || ['KF'];
+            const zuweisen = [];
 
             for (const rolle of rollen) {
                 const pool_r = idx[rolle];
                 if (!pool_r || pool_r.length === 0) continue;
-                const user_id = pool_r[rot[kuerzel][rolle] % pool_r.length];
+                const uid = pool_r[rot[kuerzel][rolle] % pool_r.length];
                 rot[kuerzel][rolle]++;
                 const rolleName = rolle === 'KF' ? 'Klientenführung'
                                 : rolle === 'FP' ? 'Fachperson'
                                 : 'Job Coach';
-                zuweisen.push({ user_id, rolle_im_fall: rolleName });
+                zuweisen.push({ user_id: uid, rolle_im_fall: rolleName });
             }
 
-            // Teamleitung immer hinzu (wenn noch nicht drin)
+            // Leitungsteam immer hinzu
             if (idx.TL && !zuweisen.find(z => z.user_id === idx.TL)) {
-                zuweisen.push({ user_id: idx.TL, rolle_im_fall: 'Teamleitung' });
+                zuweisen.push({ user_id: idx.TL, rolle_im_fall: 'Leitungsteam' });
             }
 
             for (const z of zuweisen) {
@@ -253,6 +258,10 @@ async function main() {
         console.log(`  Zuweisungen RI:    ${zuweisungenProStandort.RI}`);
         console.log(`  Passwort:          ${PASSWORT}`);
         console.log('════════════════════════════════════════');
+        console.log('');
+        console.log('HINWEIS: system_rolle "leitungsteam" benötigt Migration:');
+        console.log('  psql -U postgres -d iv_crm -f backend/add-enum-updates.sql');
+        console.log('  → Danach ROLLE_TL in reset-benutzer.js auf "leitungsteam" setzen');
 
     } catch (err) {
         await db.query('ROLLBACK');

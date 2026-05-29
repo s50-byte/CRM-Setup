@@ -12,7 +12,10 @@ const pool = new Pool({
 const VORNAMEN  = ['Anna','Peter','Maria','Thomas','Lisa','Hans','Sandra','Michael','Claudia','Daniel','Ursula','Stefan','Monika','Andreas','Petra','Roland','Brigitte','Markus','Nicole','Beat'];
 const NACHNAMEN = ['Müller','Schmid','Keller','Weber','Zimmermann','Meier','Huber','Steiner','Brunner','Widmer','Berger','Fischer','Baumann','Schneider','Koch','Bürki','Wenger','Gerber','Lüthi','Graf'];
 const KANAELE   = ['Telefon', 'E-Mail', 'Direkt'];
-const LABELS    = ['LE', 'TN', 'MA'];
+const LABELS    = ['LE', 'TN', 'TN', 'MA', 'TN'];  // TN häufiger
+
+// Pipeline-Status rotiert durch alle 5 Werte
+const PIPELINE_STATUS = ['Erstkontakt', 'In Abklärung', 'Erstgespräch', 'Schnupper', 'Programmstart'];
 
 const ORTE = [
     { plz: '8001', ort: 'Zürich' },    { plz: '8004', ort: 'Zürich' },
@@ -40,15 +43,15 @@ function zukunftDatum(tage) {
 
 function geburtsdatum(i) {
     const d = new Date();
-    d.setFullYear(d.getFullYear() - (25 + (i % 30)));
+    d.setFullYear(d.getFullYear() - (22 + (i % 35)));
     d.setMonth(i % 12);
     d.setDate(1 + (i % 28));
     return d.toISOString().slice(0, 10);
 }
 
 function ahvNummer(i) {
-    const a = String(1000 + i).slice(0, 4);
-    const b = String(2000 + i * 3).slice(0, 4);
+    const a = String(1000 + i).padStart(4, '0').slice(0, 4);
+    const b = String(2000 + i * 3).padStart(4, '0').slice(0, 4);
     const c = String(10 + (i % 87)).padStart(2, '0');
     return `756.${a}.${b}.${c}`;
 }
@@ -63,7 +66,7 @@ async function main() {
     try {
         await db.query('BEGIN');
 
-        // Sicherstellen dass kriterium-Tabellen existieren (Migrations-Guard)
+        // Sicherstellen dass Kriterium-Tabellen existieren
         await db.query(`
             CREATE TABLE IF NOT EXISTS kriterium (
                 kriterium_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -86,9 +89,10 @@ async function main() {
             )
         `);
 
-        // ── 1. LÖSCHEN ──────────────────────────────────────────────────
+        // ── 1. LÖSCHEN ───────────────────────────────────────────────────
         console.log('Lösche bestehende Testdaten…');
         await db.query('UPDATE benutzer SET standort_id = NULL');
+        // vereinbarungsziel cascaded via programm_verlauf ON DELETE CASCADE
         const zuLoeschen = [
             'praesenz_eintrag', 'ferienplanung', 'journal_eintrag',
             'zeitachse_eintrag', 'task', 'termin_user', 'termin',
@@ -103,7 +107,7 @@ async function main() {
 
         // ── Benutzer laden (für Journal/Task-Zuweisung) ──────────────────
         const benutzerRes = await db.query('SELECT user_id FROM benutzer WHERE aktiv = TRUE ORDER BY full_name LIMIT 1');
-        if (benutzerRes.rows.length === 0) throw new Error('Kein aktiver Benutzer vorhanden — zuerst einen Benutzer anlegen');
+        if (benutzerRes.rows.length === 0) throw new Error('Kein aktiver Benutzer vorhanden — zuerst reset-benutzer.js ausführen');
         const user_id = benutzerRes.rows[0].user_id;
 
         // ── 2. STANDORTE ─────────────────────────────────────────────────
@@ -127,19 +131,20 @@ async function main() {
         // ── 3. EXTERNE PERSONEN ──────────────────────────────────────────
         console.log('\nErstelle externe Personen…');
         const externeDaten = [
-            { nachname: 'Brunner',      vorname: 'Christine', funktion: 'Sachbearbeiterin',              typ: 'IV-Stelle',          firma: 'IV-Stelle Kanton Zürich',                       telefon: '+41 44 448 58 00', email: 'c.brunner@ivzh.ch',          adresse: 'Schaffhauserstrasse 72, 8090 Zürich'     },
-            { nachname: 'Schwarz',      vorname: 'Hanspeter',  funktion: 'Fallführer',                   typ: 'IV-Stelle',          firma: 'IV-Stelle Kanton Zürich – Filiale Winterthur', telefon: '+41 52 234 56 78', email: 'hp.schwarz@ivzh.ch',         adresse: 'Technikumstrasse 1, 8401 Winterthur'     },
-            { nachname: 'Frei',         vorname: 'Sabine',     funktion: 'Beraterin Integration',        typ: 'IV-Stelle',          firma: 'IV-Stelle Kanton Zürich – Region See',          telefon: '+41 44 787 30 00', email: 's.frei@ivzh.ch',             adresse: 'Seestrasse 55, 8805 Richterswil'         },
-            { nachname: 'Pfister',      vorname: 'Roland',     funktion: 'Arbeitsvermittler',            typ: 'RAV',                firma: 'RAV Zürich Aussersihl',                         telefon: '+41 43 259 10 00', email: 'r.pfister@rav-zh.ch',        adresse: 'Stauffacherstrasse 46, 8004 Zürich'      },
-            { nachname: 'Hauenstein',   vorname: 'Martina',    funktion: 'Beraterin',                    typ: 'RAV',                firma: 'RAV Winterthur',                                telefon: '+41 52 267 40 00', email: 'm.hauenstein@rav-wt.ch',     adresse: 'Zürcherstrasse 177, 8406 Winterthur'     },
-            { nachname: 'Weidmann',     vorname: 'Urs',        funktion: 'Sozialarbeiter',               typ: 'Sozialdienst',       firma: 'Sozialdienst der Stadt Zürich',                 telefon: '+41 44 412 60 00', email: 'u.weidmann@sozialamt.ch',    adresse: 'Werdstrasse 75, 8004 Zürich'             },
-            { nachname: 'Baumann',      vorname: 'Regula',     funktion: 'Sozialberaterin',              typ: 'Sozialdienst',       firma: 'Sozialdienst Winterthur',                       telefon: '+41 52 267 50 00', email: 'r.baumann@winterthur.ch',    adresse: 'Pionierstrasse 9, 8400 Winterthur'       },
-            { nachname: 'Huber',        vorname: 'Ernst',      funktion: 'Inhaber',                      typ: 'Arbeitgeber',        firma: 'Schreinerei Huber & Söhne GmbH',                telefon: '+41 44 741 23 45', email: 'e.huber@schreinerei-huber.ch', adresse: 'Industriestrasse 14, 8712 Stäfa'        },
-            { nachname: 'Meier',        vorname: 'Doris',      funktion: 'Betriebsleiterin',             typ: 'Arbeitgeber',        firma: 'Bäckerei Meier AG',                             telefon: '+41 52 212 34 56', email: 'd.meier@baeckerei-meier.ch', adresse: 'Marktgasse 22, 8400 Winterthur'          },
-            { nachname: 'Keller',       vorname: 'Bruno',      funktion: 'HR-Manager',                   typ: 'Arbeitgeber',        firma: 'Lagerlogistik Zürich GmbH',                     telefon: '+41 44 882 11 22', email: 'b.keller@llzh.ch',           adresse: 'Freilagerstrasse 98, 8047 Zürich'        },
-            { nachname: 'Zimmermann',   vorname: 'Petra',      funktion: 'Geschäftsführerin',            typ: 'Arbeitgeber',        firma: 'Büroservice Zimmermann',                        telefon: '+41 44 531 60 70', email: 'p.zimmermann@bueroservice.ch', adresse: 'Langstrasse 200, 8004 Zürich'           },
-            { nachname: 'Müller',       vorname: 'Andreas',    funktion: 'Facharzt für Psychiatrie',     typ: 'Arzt / Therapeut',   firma: 'Psychiatrische Praxis Zürich',                  telefon: '+41 44 362 14 50', email: 'a.mueller@psychiatrie-zh.ch', adresse: 'Frankengasse 3, 8001 Zürich'            },
-            { nachname: 'Röthlisberger',vorname: 'Claudia',    funktion: 'Physiotherapeutin',            typ: 'Arzt / Therapeut',   firma: 'PhysioVital Winterthur',                        telefon: '+41 52 213 44 55', email: 'c.roethlisberger@physiovital.ch', adresse: 'Rudolfstrasse 22, 8400 Winterthur'    },
+            { nachname: 'Brunner',       vorname: 'Christine',  funktion: 'Sachbearbeiterin',         typ: 'IV-Stelle',        firma: 'IV-Stelle Kanton Zürich',                       telefon: '+41 44 448 58 00', email: 'c.brunner@ivzh.ch',             adresse: 'Schaffhauserstrasse 72, 8090 Zürich'     },
+            { nachname: 'Schwarz',       vorname: 'Hanspeter',  funktion: 'Fallführer',               typ: 'IV-Stelle',        firma: 'IV-Stelle Kanton Zürich – Filiale Winterthur',  telefon: '+41 52 234 56 78', email: 'hp.schwarz@ivzh.ch',            adresse: 'Technikumstrasse 1, 8401 Winterthur'     },
+            { nachname: 'Frei',          vorname: 'Sabine',     funktion: 'Beraterin Integration',    typ: 'IV-Stelle',        firma: 'IV-Stelle Kanton Zürich – Region See',          telefon: '+41 44 787 30 00', email: 's.frei@ivzh.ch',                adresse: 'Seestrasse 55, 8805 Richterswil'         },
+            { nachname: 'Pfister',       vorname: 'Roland',     funktion: 'Arbeitsvermittler',        typ: 'RAV',              firma: 'RAV Zürich Aussersihl',                         telefon: '+41 43 259 10 00', email: 'r.pfister@rav-zh.ch',           adresse: 'Stauffacherstrasse 46, 8004 Zürich'      },
+            { nachname: 'Hauenstein',    vorname: 'Martina',    funktion: 'Beraterin',                typ: 'RAV',              firma: 'RAV Winterthur',                                telefon: '+41 52 267 40 00', email: 'm.hauenstein@rav-wt.ch',        adresse: 'Zürcherstrasse 177, 8406 Winterthur'     },
+            { nachname: 'Weidmann',      vorname: 'Urs',        funktion: 'Sozialarbeiter',           typ: 'Sozialdienst',     firma: 'Sozialdienst der Stadt Zürich',                 telefon: '+41 44 412 60 00', email: 'u.weidmann@sozialamt.ch',       adresse: 'Werdstrasse 75, 8004 Zürich'             },
+            { nachname: 'Baumann',       vorname: 'Regula',     funktion: 'Sozialberaterin',          typ: 'Sozialdienst',     firma: 'Sozialdienst Winterthur',                       telefon: '+41 52 267 50 00', email: 'r.baumann@winterthur.ch',       adresse: 'Pionierstrasse 9, 8400 Winterthur'       },
+            { nachname: 'Huber',         vorname: 'Ernst',      funktion: 'Inhaber',                  typ: 'Arbeitgeber',      firma: 'Schreinerei Huber & Söhne GmbH',                telefon: '+41 44 741 23 45', email: 'e.huber@schreinerei-huber.ch',  adresse: 'Industriestrasse 14, 8712 Stäfa'         },
+            { nachname: 'Meier',         vorname: 'Doris',      funktion: 'Betriebsleiterin',         typ: 'Arbeitgeber',      firma: 'Bäckerei Meier AG',                             telefon: '+41 52 212 34 56', email: 'd.meier@baeckerei-meier.ch',    adresse: 'Marktgasse 22, 8400 Winterthur'          },
+            { nachname: 'Keller',        vorname: 'Bruno',      funktion: 'HR-Manager',               typ: 'Arbeitgeber',      firma: 'Lagerlogistik Zürich GmbH',                     telefon: '+41 44 882 11 22', email: 'b.keller@llzh.ch',              adresse: 'Freilagerstrasse 98, 8047 Zürich'        },
+            { nachname: 'Zimmermann',    vorname: 'Petra',      funktion: 'Geschäftsführerin',        typ: 'Arbeitgeber',      firma: 'Büroservice Zimmermann',                        telefon: '+41 44 531 60 70', email: 'p.zimmermann@bueroservice.ch',  adresse: 'Langstrasse 200, 8004 Zürich'            },
+            { nachname: 'Müller',        vorname: 'Andreas',    funktion: 'Facharzt für Psychiatrie', typ: 'Arzt / Therapeut', firma: 'Psychiatrische Praxis Zürich',                  telefon: '+41 44 362 14 50', email: 'a.mueller@psychiatrie-zh.ch',   adresse: 'Frankengasse 3, 8001 Zürich'             },
+            { nachname: 'Röthlisberger', vorname: 'Claudia',    funktion: 'Physiotherapeutin',        typ: 'Arzt / Therapeut', firma: 'PhysioVital Winterthur',                        telefon: '+41 52 213 44 55', email: 'c.roethlisberger@physiovital.ch', adresse: 'Rudolfstrasse 22, 8400 Winterthur'     },
+            { nachname: 'Anderegg',      vorname: 'Kurt',       funktion: 'Rechtsanwalt',             typ: 'Gesetzl. Vertreter', firma: 'Anderegg & Partner Rechtsanwälte',            telefon: '+41 44 211 10 20', email: 'k.anderegg@anderegg-law.ch',   adresse: 'Pelikanstrasse 12, 8001 Zürich'          },
         ];
         const externePersonen = [];
         for (const ep of externeDaten) {
@@ -153,14 +158,14 @@ async function main() {
         }
         const arbeitgeber = externePersonen.filter(p => p.typ === 'Arbeitgeber');
 
-        // ── 4. PROGRAMME + PHASEN ────────────────────────────────────────
+        // ── 4. PROGRAMME + PHASEN aus DB laden ──────────────────────────
         console.log('\nLade Programme und Phasen aus DB…');
         const progRows = await db.query(
             `SELECT p.programm_id, p.name AS prog_name,
                     ph.phase_id, ph.label AS phase_label, ph.reihenfolge
              FROM programm p
              JOIN phase ph ON ph.programm_id = p.programm_id
-             WHERE p.aktiv = TRUE
+             WHERE p.aktiv = TRUE AND p.name != 'IV-Massnahme'
              ORDER BY p.name, ph.reihenfolge`
         );
         const programmeMap = {};
@@ -176,18 +181,18 @@ async function main() {
         // ── 5. KRITERIEN PRO PHASE ───────────────────────────────────────
         console.log('\nErstelle Phasen-Kriterien…');
         const KRITERIEN_POOL = [
-            { text: 'Erstgespräch durchgeführt',            pflicht: true  },
-            { text: 'Dokumente vollständig',                pflicht: true  },
-            { text: 'IV-Verfügung vorhanden',               pflicht: false },
-            { text: 'Ziele gemeinsam definiert',            pflicht: true  },
-            { text: 'Verlaufsbericht erstellt',             pflicht: true  },
-            { text: 'Arbeitgeber kontaktiert',              pflicht: false },
-            { text: 'Abschlussgespräch terminiert',         pflicht: false },
-            { text: 'Kostengutsprache erhalten',            pflicht: true  },
-            { text: 'Fähigkeitsprofil aktualisiert',        pflicht: false },
-            { text: 'Schnuppereinsatz abgeschlossen',       pflicht: false },
-            { text: 'Standortgespräch mit Arbeitgeber',     pflicht: true  },
-            { text: 'Abschlussbericht eingereicht',         pflicht: true  },
+            { text: 'Erstgespräch durchgeführt',              pflicht: true  },
+            { text: 'Dokumente vollständig',                  pflicht: true  },
+            { text: 'IV-Verfügung vorhanden',                 pflicht: false },
+            { text: 'Ziele gemeinsam definiert',              pflicht: true  },
+            { text: 'Verlaufsbericht erstellt',               pflicht: true  },
+            { text: 'Arbeitgeber kontaktiert',                pflicht: false },
+            { text: 'Abschlussgespräch terminiert',           pflicht: false },
+            { text: 'Kostengutsprache erhalten',              pflicht: true  },
+            { text: 'Fähigkeitsprofil aktualisiert',          pflicht: false },
+            { text: 'Schnuppereinsatz abgeschlossen',         pflicht: false },
+            { text: 'Standortgespräch mit Arbeitgeber',       pflicht: true  },
+            { text: 'Abschlussbericht eingereicht',           pflicht: true  },
         ];
         let kriteriumAnz = 0;
         for (const prog of programme) {
@@ -201,46 +206,63 @@ async function main() {
                     );
                     kriteriumAnz++;
                 }
-                process.stdout.write(`  ✓ ${prog.name} / ${phase.label}\n`);
             }
         }
+        console.log(`  ✓ ${kriteriumAnz} Kriterien erstellt`);
 
-        // ── 6. KLIENTEN + DOSSIERS + LV + JOURNAL + TASKS + TERMINE ─────
-        console.log('\nErstelle Klienten, Dossiers, LVs, Journal, Tasks, Termine…');
+        // ── 6. KLIENTEN + DOSSIERS + ALLES ──────────────────────────────
+        console.log('\nErstelle Klienten, Dossiers, LVs, Ziele, Journal, Tasks, Termine…');
 
+        // NOTE: 'Abwesenheit' und 'Kommunikation Auftraggeber' sind aktuelle DB-Enum-Werte.
+        // Nach Anwenden von add-enum-updates.sql umbenennen in 'Absenz' / 'Kommunikation zuweisende Stelle'.
         const JOURNAL_POOL = [
-            { kat: 'Standortgespräch',          text: 'Monatliches Standortgespräch durchgeführt. Klient berichtet von guten Fortschritten am Einsatzort. Stimmung stabil, Motivation deutlich vorhanden. Nächste Schritte gemeinsam besprochen.' },
-            { kat: 'Job Coaching',              text: 'Intensives Job-Coaching zur Vorbereitung auf ein Vorstellungsgespräch. Typische Fragen geübt, Auftreten und Körpersprache besprochen. Klient wirkt deutlich selbstsicherer als zu Programmbeginn.' },
-            { kat: 'Kommunikation Auftraggeber',text: 'Telefonisches Gespräch mit der IV-Stelle bezüglich Verlängerung der Massnahme. Kostengutsprache für weitere 3 Monate wurde mündlich bestätigt, schriftliche Bestätigung folgt per Post.' },
-            { kat: 'Beobachtung',               text: 'Besuch am Einsatzort: Klient zeigt gute Integration ins Team. Arbeitstempo und -qualität entsprechen den Erwartungen. Leichte Schwierigkeiten bei komplexen Mehrfachaufgaben beobachtet.' },
-            { kat: 'Zielfortschritt',           text: 'Zwischenevaluation der vereinbarten Ziele: 2 von 3 Zielen auf gutem Weg. Beim dritten Ziel (Pünktlichkeit) besteht weiterhin Handlungsbedarf — konkrete Massnahmen vereinbart.' },
-            { kat: 'Externe Person',            text: 'Koordinationsgespräch mit dem begleitenden Psychiater. Aktuelle Belastbarkeit wird als ausreichend für eine 50%-Beschäftigung beurteilt. Keine Medikationsanpassung vorgesehen.' },
-            { kat: 'Sonstiges',                 text: 'Administrative Arbeiten erledigt: Dossier aktualisiert, Verlaufsbericht erstellt, Korrespondenz abgelegt. Nächster Termin für Standortgespräch wurde vereinbart.' },
-            { kat: 'Standortgespräch',          text: 'Halbjahres-Review mit Klient und Arbeitgeber. Rückmeldung des Arbeitgebers sehr positiv. Klient wünscht schrittweise Erhöhung des Pensums auf 80%. Massnahme wird entsprechend angepasst.' },
-            { kat: 'Abwesenheit',               text: 'Klient war heute unentschuldigt abwesend. Telefonischer Kontakt konnte nicht hergestellt werden. E-Mail mit Bitte um Kontaktaufnahme versendet. Situation wird weiter beobachtet.' },
-            { kat: 'Job Coaching',              text: 'Erarbeitung eines aktualisierten Bewerbungsdossiers. Lebenslauf und Motivationsschreiben überarbeitet. Klient hat konkrete Stellen identifiziert, Bewerbungen werden diese Woche versendet.' },
+            { kat: 'Standortgespräch',           text: 'Monatliches Standortgespräch durchgeführt. Klient berichtet von guten Fortschritten am Einsatzort. Stimmung stabil, Motivation deutlich vorhanden. Nächste Schritte gemeinsam besprochen.' },
+            { kat: 'Job Coaching',               text: 'Intensives Job-Coaching zur Vorbereitung auf ein Vorstellungsgespräch. Typische Fragen geübt, Auftreten und Körpersprache besprochen. Klient wirkt deutlich selbstsicherer als zu Programmbeginn.' },
+            { kat: 'Kommunikation Auftraggeber', text: 'Telefonisches Gespräch mit der IV-Stelle bezüglich Verlängerung der Massnahme. Kostengutsprache für weitere 3 Monate wurde mündlich bestätigt, schriftliche Bestätigung folgt per Post.' },
+            { kat: 'Beobachtung',                text: 'Besuch am Einsatzort: Klient zeigt gute Integration ins Team. Arbeitstempo und -qualität entsprechen den Erwartungen. Leichte Schwierigkeiten bei komplexen Mehrfachaufgaben beobachtet.' },
+            { kat: 'Zielfortschritt',            text: 'Zwischenevaluation der vereinbarten Ziele: 2 von 3 Zielen auf gutem Weg. Beim dritten Ziel (Pünktlichkeit) besteht weiterhin Handlungsbedarf — konkrete Massnahmen vereinbart.' },
+            { kat: 'Externe Person',             text: 'Koordinationsgespräch mit dem begleitenden Psychiater. Aktuelle Belastbarkeit wird als ausreichend für eine 50%-Beschäftigung beurteilt. Keine Medikationsanpassung vorgesehen.' },
+            { kat: 'Sonstiges',                  text: 'Administrative Arbeiten erledigt: Dossier aktualisiert, Verlaufsbericht erstellt, Korrespondenz abgelegt. Nächster Termin für Standortgespräch wurde vereinbart.' },
+            { kat: 'Standortgespräch',           text: 'Halbjahres-Review mit Klient und Arbeitgeber. Rückmeldung des Arbeitgebers sehr positiv. Klient wünscht schrittweise Erhöhung des Pensums auf 80%. Massnahme wird entsprechend angepasst.' },
+            { kat: 'Abwesenheit',                text: 'Klient war heute unentschuldigt abwesend. Telefonischer Kontakt konnte nicht hergestellt werden. E-Mail mit Bitte um Kontaktaufnahme versendet. Situation wird weiter beobachtet.' },
+            { kat: 'Job Coaching',               text: 'Erarbeitung eines aktualisierten Bewerbungsdossiers. Lebenslauf und Motivationsschreiben überarbeitet. Klient hat konkrete Stellen identifiziert, Bewerbungen werden diese Woche versendet.' },
         ];
 
         const TASKS_POOL = [
-            { text: 'Bewerbungsunterlagen überarbeiten',        prioritaet: 'Hoch'    },
-            { text: 'Arztbericht bei Hausarzt anfordern',       prioritaet: 'Hoch'    },
-            { text: 'Schnupperlehre organisieren',              prioritaet: 'Mittel'  },
-            { text: 'Verlaufsbericht an IV-Stelle senden',      prioritaet: 'Hoch'    },
-            { text: 'Klientenakte aktualisieren',               prioritaet: 'Niedrig' },
-            { text: 'Zeugnisse und Diplome kopieren lassen',    prioritaet: 'Mittel'  },
-            { text: 'Nächsten Termin mit RAV vereinbaren',      prioritaet: 'Mittel'  },
-            { text: 'Kostengutsprache schriftlich bestätigen',  prioritaet: 'Hoch'    },
-            { text: 'Zwischenbericht verfassen',                prioritaet: 'Mittel'  },
-            { text: 'Sprachkurs anmelden',                      prioritaet: 'Niedrig' },
-            { text: 'Pensumserhöhung mit Arbeitgeber besprechen', prioritaet: 'Mittel' },
-            { text: 'Notfallkontakt aktualisieren',             prioritaet: 'Niedrig' },
+            { text: 'Bewerbungsunterlagen überarbeiten',          prioritaet: 'Hoch'    },
+            { text: 'Arztbericht bei Hausarzt anfordern',         prioritaet: 'Hoch'    },
+            { text: 'Schnupperlehre organisieren',                prioritaet: 'Mittel'  },
+            { text: 'Verlaufsbericht an IV-Stelle senden',        prioritaet: 'Hoch'    },
+            { text: 'Klientenakte aktualisieren',                 prioritaet: 'Niedrig' },
+            { text: 'Zeugnisse und Diplome kopieren lassen',      prioritaet: 'Mittel'  },
+            { text: 'Nächsten Termin mit RAV vereinbaren',        prioritaet: 'Mittel'  },
+            { text: 'Kostengutsprache schriftlich bestätigen',    prioritaet: 'Hoch'    },
+            { text: 'Zwischenbericht verfassen',                  prioritaet: 'Mittel'  },
+            { text: 'Sprachkurs anmelden',                       prioritaet: 'Niedrig' },
+            { text: 'Pensumserhöhung mit Arbeitgeber besprechen', prioritaet: 'Mittel'  },
+            { text: 'Notfallkontakt aktualisieren',               prioritaet: 'Niedrig' },
+        ];
+
+        const ZIELE_POOL = [
+            'Pünktlichkeit und Zuverlässigkeit am Arbeitsplatz verbessern',
+            'Selbstständige Bearbeitung von Aufgaben ohne Aufforderung',
+            'Belastbarkeit schrittweise auf 80% steigern',
+            'Bewerbungsdossier überarbeiten und 5 Bewerbungen einreichen',
+            'Schnupperwoche bei potenziellem Arbeitgeber absolvieren',
+            'Sprachkenntnisse für den Berufsalltag festigen',
+            'Konflikte am Arbeitsplatz konstruktiv ansprechen',
+            'Tagesstruktur selbständig einhalten',
+            'Fachspezifische Weiterbildung abschliessen',
+            'Kontakte zu Arbeitgebern im Zielbetrieb aufbauen',
+            'Abschlussbericht mit Arbeitgeber erstellen',
+            'Soziale Integration ins Team verbessern',
         ];
 
         const TERMIN_TYPEN = ['Erstgespräch', 'Schnuppereinsatz', 'Standortgespräch', 'Programmstart', 'Abschlussgespräch'];
         const TERMIN_ZEITEN = ['08:30', '09:00', '10:00', '10:30', '11:00', '13:30', '14:00', '15:00', '15:30'];
 
         let counter = 0, klientAnz = 0, dossierAnz = 0, lvAnz = 0;
-        let journalAnz = 0, taskAnz = 0, terminAnz = 0;
+        let journalAnz = 0, taskAnz = 0, terminAnz = 0, zielAnz = 0;
 
         for (const standort of standorte) {
             const auftraggeber = standort.kuerzel === 'WI' ? 'IV-Stelle WI' : 'IV-Stelle ZH';
@@ -252,7 +274,7 @@ async function main() {
                     const kanal    = pick(KANAELE, counter);
                     const label    = pick(LABELS, counter);
                     const start    = zufallsDatumLetzte6Monate();
-                    const pipeline = phase.label === 'Erstkontakt' ? 'Erstkontakt' : 'Programmstart';
+                    const pipeline = pick(PIPELINE_STATUS, counter);
                     const ort      = pick(ORTE, counter);
 
                     // Klient
@@ -277,7 +299,7 @@ async function main() {
                     klientAnz++;
 
                     // Leistungsvereinbarung
-                    const pensum   = [50, 80, 100][counter % 3];
+                    const pensum    = [50, 80, 100][counter % 3];
                     const zeitbasis = counter % 2 === 0 ? 'Ganztagesbasis' : 'Halbtagesbasis';
                     await db.query(
                         `INSERT INTO leistungsvereinbarung
@@ -302,19 +324,34 @@ async function main() {
                     dossierAnz++;
 
                     // Programmverlauf
-                    await db.query(
+                    const verlaufRes = await db.query(
                         `INSERT INTO programm_verlauf
                             (dossier_id, programm_id, phase_id, start_datum, status, klient_label)
-                         VALUES ($1,$2,$3,$4,'Laufend',$5)`,
+                         VALUES ($1,$2,$3,$4,'Laufend',$5)
+                         RETURNING verlauf_id`,
                         [dossier_id, prog.programm_id, phase.phase_id, start, label]
                     );
+                    const verlauf_id = verlaufRes.rows[0].verlauf_id;
 
-                    // Arbeitgeber zuweisen (MA + TN)
+                    // Arbeitgeber zuweisen (MA und TN)
                     if ((label === 'MA' || label === 'TN') && arbeitgeber.length > 0) {
                         await db.query(
                             `UPDATE dossier SET arbeitgeber_id = $1 WHERE dossier_id = $2`,
                             [pick(arbeitgeber, counter).person_id, dossier_id]
                         );
+                    }
+
+                    // Ziele (2–3 pro Dossier)
+                    const anzZ = 2 + (counter % 2);
+                    for (let z = 0; z < anzZ; z++) {
+                        const zielText = pick(ZIELE_POOL, counter + z * 4);
+                        const erreicht = (z === 0 && counter % 4 === 0);
+                        await db.query(
+                            `INSERT INTO vereinbarungsziel (verlauf_id, text, erreicht, reihenfolge)
+                             VALUES ($1, $2, $3, $4)`,
+                            [verlauf_id, zielText, erreicht, z]
+                        );
+                        zielAnz++;
                     }
 
                     // Journal-Einträge (2–3)
@@ -369,6 +406,7 @@ async function main() {
         console.log(`  Klienten:           ${klientAnz}`);
         console.log(`  Dossiers:           ${dossierAnz}`);
         console.log(`  Leistungsver.:      ${lvAnz}`);
+        console.log(`  Ziele:              ${zielAnz}`);
         console.log(`  Journal-Einträge:   ${journalAnz}`);
         console.log(`  Tasks:              ${taskAnz}`);
         console.log(`  Kriterien:          ${kriteriumAnz}`);
