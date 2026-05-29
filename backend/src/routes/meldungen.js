@@ -26,28 +26,42 @@ router.get('/', auth, async (req, res) => {
 });
 
 // GET /api/meldungen/alle — alle Meldungen inkl. acknowledged, filterbar
+// Mit ?datum=YYYY-MM-DD: zeigt alle Meldungen, die der aktuelle User an diesem Tag erstellt hat
+// Ohne datum: zeigt eigene unacknowledged/acknowledged Meldungen als Empfänger
 router.get('/alle', auth, async (req, res) => {
-    const { datum_von, datum_bis, acknowledged } = req.query;
+    const { datum, datum_von, datum_bis, acknowledged } = req.query;
 
-    const bedingungen = ['m.empfaenger_id = $1'];
+    const bedingungen = [];
     const params = [req.user.user_id];
     let p = 2;
 
-    if (datum_von) { bedingungen.push(`m.datum >= $${p++}`); params.push(datum_von); }
-    if (datum_bis) { bedingungen.push(`m.datum <= $${p++}`); params.push(datum_bis); }
-    if (acknowledged === 'true')  { bedingungen.push(`m.acknowledged = TRUE`); }
-    if (acknowledged === 'false') { bedingungen.push(`m.acknowledged = FALSE`); }
+    if (datum) {
+        // Stand-Ansicht: Meldungen die ich heute erstellt habe, für alle Empfänger
+        bedingungen.push(`m.erstellt_von = $1`);
+        bedingungen.push(`DATE(m.created_at) = $${p++}::date`);
+        params.push(datum);
+    } else {
+        // Eigene Meldungen als Empfänger
+        bedingungen.push(`m.empfaenger_id = $1`);
+        if (datum_von) { bedingungen.push(`m.datum >= $${p++}`); params.push(datum_von); }
+        if (datum_bis) { bedingungen.push(`m.datum <= $${p++}`); params.push(datum_bis); }
+        if (acknowledged === 'true')  { bedingungen.push(`m.acknowledged = TRUE`); }
+        if (acknowledged === 'false') { bedingungen.push(`m.acknowledged = FALSE`); }
+    }
 
     try {
         const result = await db.query(
             `SELECT
                 m.meldung_id, m.datum, m.aenderungen, m.created_at,
                 m.acknowledged, m.acknowledged_am,
-                u.full_name AS erstellt_von_name
+                m.empfaenger_id,
+                empf.full_name AS empfaenger_name,
+                u.full_name    AS erstellt_von_name
              FROM dashboard_meldung m
-             LEFT JOIN benutzer u ON u.user_id = m.erstellt_von
+             LEFT JOIN benutzer u    ON u.user_id    = m.erstellt_von
+             LEFT JOIN benutzer empf ON empf.user_id = m.empfaenger_id
              WHERE ${bedingungen.join(' AND ')}
-             ORDER BY m.created_at DESC`,
+             ORDER BY empf.full_name, m.created_at`,
             params
         );
         res.json(result.rows);

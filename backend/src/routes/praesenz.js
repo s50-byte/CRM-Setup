@@ -139,10 +139,11 @@ router.post('/', auth, async (req, res) => {
 
     try {
         const vorher = await db.query(
-            `SELECT eintrag_id, status FROM praesenz_eintrag WHERE klient_id = $1 AND datum = $2`,
+            `SELECT eintrag_id, status, kommentar FROM praesenz_eintrag WHERE klient_id = $1 AND datum = $2`,
             [klient_id, datum]
         );
-        const alterStatus = vorher.rows[0]?.status || null;
+        const alterStatus   = vorher.rows[0]?.status    || null;
+        const alterKommentar = vorher.rows[0]?.kommentar || null;
 
         const result = await db.query(
             `INSERT INTO praesenz_eintrag
@@ -158,13 +159,18 @@ router.post('/', auth, async (req, res) => {
         );
         const eintrag = result.rows[0];
 
-        if (alterStatus !== status) {
-            await db.query(
-                `INSERT INTO praesenz_historie
-                    (eintrag_id, alter_status, neuer_status, kommentar, erfasst_von)
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [eintrag.eintrag_id, alterStatus, status, kommentar || null, req.user.user_id]
-            );
+        const statusGeaendert    = alterStatus !== status;
+        const kommentarGeaendert = (kommentar || null) !== alterKommentar;
+
+        if (statusGeaendert || kommentarGeaendert) {
+            if (statusGeaendert) {
+                await db.query(
+                    `INSERT INTO praesenz_historie
+                        (eintrag_id, alter_status, neuer_status, kommentar, erfasst_von)
+                     VALUES ($1, $2, $3, $4, $5)`,
+                    [eintrag.eintrag_id, alterStatus, status, kommentar || null, req.user.user_id]
+                );
+            }
 
             const kaderResult = await db.query(
                 `SELECT ku.user_id, k.nachname, k.vorname

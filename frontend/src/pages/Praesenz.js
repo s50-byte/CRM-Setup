@@ -57,6 +57,11 @@ export default function Praesenz() {
     const [kommentare, setKommentare] = useState({});
     const [aktTab, setAktTab] = useState('tag');
 
+    // Stand-Popup
+    const [standPopup, setStandPopup] = useState(false);
+    const [standMeldungen, setStandMeldungen] = useState([]);
+    const [standLaden, setStandLaden] = useState(false);
+
     // Verlauf
     const [vFilter, setVFilter] = useState({ datum_von: '', datum_bis: heute, status: '', abteilung: '' });
     const [verlaufData, setVerlaufData] = useState([]);
@@ -114,17 +119,17 @@ export default function Praesenz() {
         }
     }
 
-    async function abschliessen() {
+    async function zeigeMeldungenStand() {
+        setStandPopup(true);
+        setStandLaden(true);
+        setStandMeldungen([]);
         try {
-            const res = await client.post('/praesenz/abschliessen', { datum });
-            const m = res.data.meldungen;
-            if (m.length === 0) {
-                alert('Präsenzkontrolle abgeschlossen. Keine Meldungen nötig.');
-            } else {
-                alert(`Meldungen:\n${m.map(x => `${x.nachname} ${x.vorname} (${x.status})`).join('\n')}`);
-            }
+            const r = await client.get(`/meldungen/alle?datum=${datum}`);
+            setStandMeldungen(r.data);
         } catch (err) {
             console.error(err);
+        } finally {
+            setStandLaden(false);
         }
     }
 
@@ -198,11 +203,11 @@ export default function Praesenz() {
                         {ABTEILUNGEN.map(a => <option key={a}>{a}</option>)}
                     </select>
                     <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={INPUT_S} />
-                    <button onClick={abschliessen} style={{
+                    <button onClick={zeigeMeldungenStand} style={{
                         padding: '7px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
                         border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff',
-                        fontFamily: 'inherit'
-                    }}>Abschliessen</button>
+                        fontFamily: 'inherit', whiteSpace: 'nowrap'
+                    }}>Meldungen senden & Stand anzeigen</button>
                 </div>
             </div>
 
@@ -423,6 +428,68 @@ export default function Praesenz() {
                     )}
                 </div>
             )}
+            {/* Stand-Popup */}
+            {standPopup && (() => {
+            const gruppen = {};
+            standMeldungen.forEach(m => {
+                const key = m.empfaenger_id || '_';
+                if (!gruppen[key]) gruppen[key] = { name: m.empfaenger_name || 'Unbekannt', meldungen: [] };
+                gruppen[key].meldungen.push(m);
+            });
+
+            return (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div style={{ background: '#fff', borderRadius: 12, padding: '1.5rem', width: '100%', maxWidth: 580, maxHeight: '80vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                            <div>
+                                <div style={{ fontSize: 16, fontWeight: 600 }}>Meldungen</div>
+                                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>{fmtDatum(datum)}</div>
+                            </div>
+                            <button onClick={() => setStandPopup(false)} style={{ fontSize: 18, lineHeight: 1, padding: '4px 8px', border: 'none', background: 'none', cursor: 'pointer', color: '#6B6860' }}>✕</button>
+                        </div>
+
+                        {standLaden ? (
+                            <div style={{ textAlign: 'center', padding: '2rem', color: '#6B6860', fontSize: 13 }}>Laden…</div>
+                        ) : Object.keys(gruppen).length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '2rem', color: '#6B6860', fontSize: 13 }}>Keine Meldungen für diesen Tag</div>
+                        ) : Object.values(gruppen).map((gruppe, gi) => (
+                            <div key={gi} style={{ marginBottom: '1.25rem' }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>{gruppe.name}</div>
+                                {gruppe.meldungen.map((m, mi) => (
+                                    (m.aenderungen || []).map((a, ai) => {
+                                        const nurKommentar = a.alter_status === a.neuer_status;
+                                        const statusLabel = s => STATUS_OPTS.find(o => o.value === s)?.label || s || '—';
+                                        return (
+                                            <div key={`${mi}-${ai}`} style={{
+                                                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                                                padding: '7px 10px', marginBottom: 4, borderRadius: 7,
+                                                background: '#F5F4F0', gap: 10
+                                            }}>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <span style={{ fontWeight: 600, fontSize: 12.5 }}>{a.name}</span>
+                                                    <span style={{ fontSize: 12, color: '#1A1917' }}>
+                                                        {nurKommentar
+                                                            ? <span style={{ color: '#6B6860' }}> · Status unverändert ({statusLabel(a.neuer_status)})</span>
+                                                            : <span> · <span style={{ color: '#6B6860' }}>{statusLabel(a.alter_status)}</span> → <strong>{statusLabel(a.neuer_status)}</strong></span>
+                                                        }
+                                                        {a.kommentar && <span style={{ color: '#6B6860' }}> | {a.kommentar}</span>}
+                                                    </span>
+                                                </div>
+                                                <span style={{ fontSize: 11, flexShrink: 0, padding: '2px 7px', borderRadius: 8, fontWeight: 500,
+                                                    background: m.acknowledged ? '#DCFCE7' : '#FEF3C7',
+                                                    color: m.acknowledged ? '#15803D' : '#B45309' }}>
+                                                    {m.acknowledged ? '✓ gelesen' : 'ausstehend'}
+                                                </span>
+                                            </div>
+                                        );
+                                    })
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        })()}
         </div>
     );
 }
