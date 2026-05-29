@@ -214,18 +214,17 @@ async function main() {
         // ── 6. KLIENTEN + DOSSIERS + ALLES ──────────────────────────────
         console.log('\nErstelle Klienten, Dossiers, LVs, Ziele, Journal, Tasks, Termine…');
 
-        // NOTE: 'Abwesenheit' und 'Kommunikation Auftraggeber' sind aktuelle DB-Enum-Werte.
-        // Nach Anwenden von add-enum-updates.sql umbenennen in 'Absenz' / 'Kommunikation zuweisende Stelle'.
+
         const JOURNAL_POOL = [
             { kat: 'Standortgespräch',           text: 'Monatliches Standortgespräch durchgeführt. Klient berichtet von guten Fortschritten am Einsatzort. Stimmung stabil, Motivation deutlich vorhanden. Nächste Schritte gemeinsam besprochen.' },
             { kat: 'Job Coaching',               text: 'Intensives Job-Coaching zur Vorbereitung auf ein Vorstellungsgespräch. Typische Fragen geübt, Auftreten und Körpersprache besprochen. Klient wirkt deutlich selbstsicherer als zu Programmbeginn.' },
-            { kat: 'Kommunikation Auftraggeber', text: 'Telefonisches Gespräch mit der IV-Stelle bezüglich Verlängerung der Massnahme. Kostengutsprache für weitere 3 Monate wurde mündlich bestätigt, schriftliche Bestätigung folgt per Post.' },
+            { kat: 'Kommunikation zuweisende Stelle', text: 'Telefonisches Gespräch mit der IV-Stelle bezüglich Verlängerung der Massnahme. Kostengutsprache für weitere 3 Monate wurde mündlich bestätigt, schriftliche Bestätigung folgt per Post.' },
             { kat: 'Beobachtung',                text: 'Besuch am Einsatzort: Klient zeigt gute Integration ins Team. Arbeitstempo und -qualität entsprechen den Erwartungen. Leichte Schwierigkeiten bei komplexen Mehrfachaufgaben beobachtet.' },
             { kat: 'Zielfortschritt',            text: 'Zwischenevaluation der vereinbarten Ziele: 2 von 3 Zielen auf gutem Weg. Beim dritten Ziel (Pünktlichkeit) besteht weiterhin Handlungsbedarf — konkrete Massnahmen vereinbart.' },
             { kat: 'Externe Person',             text: 'Koordinationsgespräch mit dem begleitenden Psychiater. Aktuelle Belastbarkeit wird als ausreichend für eine 50%-Beschäftigung beurteilt. Keine Medikationsanpassung vorgesehen.' },
             { kat: 'Sonstiges',                  text: 'Administrative Arbeiten erledigt: Dossier aktualisiert, Verlaufsbericht erstellt, Korrespondenz abgelegt. Nächster Termin für Standortgespräch wurde vereinbart.' },
             { kat: 'Standortgespräch',           text: 'Halbjahres-Review mit Klient und Arbeitgeber. Rückmeldung des Arbeitgebers sehr positiv. Klient wünscht schrittweise Erhöhung des Pensums auf 80%. Massnahme wird entsprechend angepasst.' },
-            { kat: 'Abwesenheit',                text: 'Klient war heute unentschuldigt abwesend. Telefonischer Kontakt konnte nicht hergestellt werden. E-Mail mit Bitte um Kontaktaufnahme versendet. Situation wird weiter beobachtet.' },
+            { kat: 'Absenz',                     text: 'Klient war heute unentschuldigt abwesend. Telefonischer Kontakt konnte nicht hergestellt werden. E-Mail mit Bitte um Kontaktaufnahme versendet. Situation wird weiter beobachtet.' },
             { kat: 'Job Coaching',               text: 'Erarbeitung eines aktualisierten Bewerbungsdossiers. Lebenslauf und Motivationsschreiben überarbeitet. Klient hat konkrete Stellen identifiziert, Bewerbungen werden diese Woche versendet.' },
         ];
 
