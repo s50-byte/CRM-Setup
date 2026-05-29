@@ -5,6 +5,8 @@ import Modal from '../components/Modal';
 
 const UEBERSICHT = '__uebersicht__';
 
+const ROLLEN = ['Klientenführung', 'Job Coach', 'Fachperson'];
+
 const CARD = {
     background: '#fff',
     border: '1px solid rgba(0,0,0,.09)',
@@ -294,6 +296,35 @@ export default function Programme() {
         }
     }
 
+    async function toggleProgRolle(programm_id, currentRollen, rolle, checked) {
+        const newRollen = checked ? [...currentRollen, rolle] : currentRollen.filter(r => r !== rolle);
+        console.log('[toggleProgRolle] PUT /programme/' + programm_id + '/rollen:', newRollen);
+        setProgramme(prev => prev.map(p => p.programm_id === programm_id ? { ...p, rollen: newRollen } : p));
+        try {
+            await client.put(`/programme/${programm_id}/rollen`, { rollen: newRollen });
+        } catch (err) {
+            console.error('[toggleProgRolle] error:', err.response?.data || err);
+            setFehler(err.response?.data?.error || 'Fehler beim Speichern der Rollen');
+            await ladeProgramme();
+        }
+    }
+
+    async function togglePhaseRolle(programm_id, phase_id, currentRollen, rolle, checked) {
+        const newRollen = checked ? [...currentRollen, rolle] : currentRollen.filter(r => r !== rolle);
+        console.log('[togglePhaseRolle] PUT /programme/' + programm_id + '/phasen/' + phase_id + '/rollen:', newRollen);
+        setProgramme(prev => prev.map(p => p.programm_id === programm_id ? {
+            ...p,
+            phasen: (p.phasen || []).map(ph => ph.phase_id === phase_id ? { ...ph, rollen: newRollen } : ph)
+        } : p));
+        try {
+            await client.put(`/programme/${programm_id}/phasen/${phase_id}/rollen`, { rollen: newRollen });
+        } catch (err) {
+            console.error('[togglePhaseRolle] error:', err.response?.data || err);
+            setFehler(err.response?.data?.error || 'Fehler beim Speichern der Rollen');
+            await ladeProgramme();
+        }
+    }
+
     async function programmErstellen() {
         if (!npForm.name || !npForm.tarif_pro_tag) return;
         console.log('[programmErstellen] POST /programme:', npForm);
@@ -526,6 +557,24 @@ export default function Programme() {
                                                 </Section>
                                             )}
 
+                                            {/* Zuständige Rollen */}
+                                            <Section title="Zuständige Rollen">
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                                    {ROLLEN.map(rolle => (
+                                                        <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: istLeitungsteam ? 'pointer' : 'default', userSelect: 'none' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={(p.rollen || []).includes(rolle)}
+                                                                onChange={istLeitungsteam ? e => toggleProgRolle(p.programm_id, p.rollen || [], rolle, e.target.checked) : undefined}
+                                                                disabled={!istLeitungsteam}
+                                                                style={{ cursor: istLeitungsteam ? 'pointer' : 'default', accentColor: p.farbe_hex }}
+                                                            />
+                                                            <span style={{ fontSize: 13 }}>{rolle}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </Section>
+
                                             {/* Programm-Dokumente */}
                                             <Section
                                                 title="Programm-Dokumente"
@@ -609,6 +658,24 @@ export default function Programme() {
                                                             >+</button>
                                                         </div>
                                                     )}
+                                                </Section>
+
+                                                {/* Involvierte Rollen */}
+                                                <Section title="Involvierte Rollen">
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                                        {ROLLEN.map(rolle => (
+                                                            <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: istLeitungsteam ? 'pointer' : 'default', userSelect: 'none' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={(activePhaseObj.rollen || []).includes(rolle)}
+                                                                    onChange={istLeitungsteam ? e => togglePhaseRolle(p.programm_id, activePhaseObj.phase_id, activePhaseObj.rollen || [], rolle, e.target.checked) : undefined}
+                                                                    disabled={!istLeitungsteam}
+                                                                    style={{ cursor: istLeitungsteam ? 'pointer' : 'default', accentColor: p.farbe_hex }}
+                                                                />
+                                                                <span style={{ fontSize: 13 }}>{rolle}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
                                                 </Section>
 
                                                 {/* Phasen-Dokumente */}

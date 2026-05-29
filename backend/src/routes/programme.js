@@ -5,18 +5,32 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-// kriterium.typ war NOT NULL — nullable machen (idempotent)
-db.query(`ALTER TABLE kriterium ALTER COLUMN typ DROP NOT NULL`).catch(() => {});
+// Rollen-Tabellen anlegen (crm_user-owned, kein ALTER auf Fremdtabellen nötig)
+db.query(`
+    CREATE TABLE IF NOT EXISTS programm_rolle (
+        programm_id UUID REFERENCES programm(programm_id) ON DELETE CASCADE,
+        rolle_name  VARCHAR(50) NOT NULL,
+        PRIMARY KEY (programm_id, rolle_name)
+    )
+`).catch(err => console.error('programm_rolle table init:', err));
 
-// GET /api/programme — Alle Programme mit Phasen
+db.query(`
+    CREATE TABLE IF NOT EXISTS phase_rolle (
+        phase_id   UUID REFERENCES phase(phase_id) ON DELETE CASCADE,
+        rolle_name VARCHAR(50) NOT NULL,
+        PRIMARY KEY (phase_id, rolle_name)
+    )
+`).catch(err => console.error('phase_rolle table init:', err));
+
+// GET /api/programme — Alle Programme mit Phasen, Kriterien und Rollen
 router.get('/', auth, async (req, res) => {
     try {
         const programme = await db.query(
             `SELECT * FROM programm WHERE aktiv = TRUE ORDER BY name`
         );
 
-        // Phasen und Kriterien für jedes Programm laden
         for (const prog of programme.rows) {
+            // Phasen + Kriterien
             const phasen = await db.query(
                 `SELECT
                     ph.phase_id, ph.label, ph.reihenfolge, ph.avg_dauer_tage,
@@ -50,6 +64,32 @@ router.get('/', auth, async (req, res) => {
                 [prog.programm_id]
             );
             prog.phasen = phasen.rows;
+
+            // Programm-Rollen
+            try {
+                const progRollenRes = await db.query(
+                    `SELECT rolle_name FROM programm_rolle WHERE programm_id = $1`,
+                    [prog.programm_id]
+                );
+                prog.rollen = progRollenRes.rows.map(r => r.rolle_name);
+            } catch { prog.rollen = []; }
+
+            // Phase-Rollen (batch für alle Phasen dieses Programms)
+            try {
+                const phaseRollenRes = await db.query(
+                    `SELECT pr.phase_id, pr.rolle_name
+                     FROM phase_rolle pr
+                     JOIN phase ph ON ph.phase_id = pr.phase_id
+                     WHERE ph.programm_id = $1`,
+                    [prog.programm_id]
+                );
+                const map = {};
+                for (const r of phaseRollenRes.rows) {
+                    if (!map[r.phase_id]) map[r.phase_id] = [];
+                    map[r.phase_id].push(r.rolle_name);
+                }
+                prog.phasen.forEach(ph => { ph.rollen = map[ph.phase_id] || []; });
+            } catch { prog.phasen.forEach(ph => { ph.rollen = []; }); }
         }
 
         res.json(programme.rows);
@@ -81,13 +121,10 @@ router.post('/', auth, async (req, res) => {
     if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
-
     const { name, farbe_hex, tarif_pro_tag, avg_dauer_tage, aufwand_h_monat } = req.body;
-
     if (!name || !tarif_pro_tag) {
         return res.status(400).json({ error: 'Name und Tarif erforderlich' });
     }
-
     try {
         const result = await db.query(
             `INSERT INTO programm (name, farbe_hex, tarif_pro_tag, avg_dauer_tage, aufwand_h_monat)
@@ -120,6 +157,30 @@ router.put('/:id', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Aktualisieren' });
+    }
+});
+
+// PUT /api/programme/:id/rollen — Rollen für Programm setzen
+router.put('/:id/rollen', auth, async (req, res) => {
+    if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+    const { rollen } = req.body;
+    if (!Array.isArray(rollen)) return res.status(400).json({ error: 'rollen muss ein Array sein' });
+    console.log('[PUT /programme/' + req.params.id + '/rollen] body:', rollen);
+    try {
+        await db.query(`DELETE FROM programm_rolle WHERE programm_id = $1`, [req.params.id]);
+        if (rollen.length > 0) {
+            const vals = rollen.map((_, i) => `($1, $${i + 2})`).join(', ');
+            await db.query(
+                `INSERT INTO programm_rolle (programm_id, rolle_name) VALUES ${vals}`,
+                [req.params.id, ...rollen]
+            );
+        }
+        res.json({ message: 'Rollen aktualisiert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern der Rollen' });
     }
 });
 
@@ -157,6 +218,30 @@ router.put('/:id/phasen/:phase_id', auth, async (req, res) => {
     }
 });
 
+// PUT /api/programme/:id/phasen/:phase_id/rollen — Rollen für Phase setzen
+router.put('/:id/phasen/:phase_id/rollen', auth, async (req, res) => {
+    if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+    const { rollen } = req.body;
+    if (!Array.isArray(rollen)) return res.status(400).json({ error: 'rollen muss ein Array sein' });
+    console.log('[PUT /phasen/' + req.params.phase_id + '/rollen] body:', rollen);
+    try {
+        await db.query(`DELETE FROM phase_rolle WHERE phase_id = $1`, [req.params.phase_id]);
+        if (rollen.length > 0) {
+            const vals = rollen.map((_, i) => `($1, $${i + 2})`).join(', ');
+            await db.query(
+                `INSERT INTO phase_rolle (phase_id, rolle_name) VALUES ${vals}`,
+                [req.params.phase_id, ...rollen]
+            );
+        }
+        res.json({ message: 'Rollen aktualisiert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern der Rollen' });
+    }
+});
+
 // DELETE /api/programme/phasen/:phase_id — Phase löschen
 router.delete('/phasen/:phase_id', auth, async (req, res) => {
     try {
@@ -171,6 +256,7 @@ router.delete('/phasen/:phase_id', auth, async (req, res) => {
 // POST /api/programme/phasen/:phase_id/kriterien — Kriterium hinzufügen
 router.post('/phasen/:phase_id/kriterien', auth, async (req, res) => {
     const { text, typ, pflicht } = req.body;
+    console.log('[POST /phasen/' + req.params.phase_id + '/kriterien] body:', req.body);
     if (!text?.trim()) return res.status(400).json({ error: 'Text erforderlich' });
     try {
         const count = await db.query(
@@ -180,12 +266,13 @@ router.post('/phasen/:phase_id/kriterien', auth, async (req, res) => {
         const result = await db.query(
             `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge)
              VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-            [req.params.phase_id, text.trim(), typ || null, pflicht || false, reihenfolge]
+            // typ || '' vermeidet NOT NULL-Fehler (DB-Migration: add-programm-rollen.sql)
+            [req.params.phase_id, text.trim(), typ || '', pflicht || false, reihenfolge]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Fehler beim Erstellen' });
+        res.status(500).json({ error: 'Fehler beim Erstellen: ' + err.message });
     }
 });
 
