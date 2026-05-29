@@ -571,20 +571,32 @@ export default function Programme() {
 
                                             {/* Zuständige Rollen */}
                                             <Section title="Zuständige Rollen">
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    {ROLLEN.map(rolle => (
-                                                        <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: editierbar ? 'pointer' : 'default', userSelect: 'none' }}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={(p.rollen || []).includes(rolle)}
-                                                                onChange={editierbar ? e => toggleProgRolle(p.programm_id, p.rollen || [], rolle, e.target.checked) : undefined}
-                                                                disabled={!editierbar}
-                                                                style={{ cursor: editierbar ? 'pointer' : 'default', accentColor: p.farbe_hex }}
-                                                            />
-                                                            <span style={{ fontSize: 13 }}>{rolle}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
+                                                {editierbar ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                                        {ROLLEN.map(rolle => (
+                                                            <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={(p.rollen || []).includes(rolle)}
+                                                                    onChange={e => toggleProgRolle(p.programm_id, p.rollen || [], rolle, e.target.checked)}
+                                                                    style={{ cursor: 'pointer', accentColor: p.farbe_hex }}
+                                                                />
+                                                                <span style={{ fontSize: 13 }}>{rolle}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                ) : (() => {
+                                                    const alleRollen = [...new Set((p.phasen || []).flatMap(ph => ph.rollen || []))];
+                                                    return alleRollen.length === 0 ? (
+                                                        <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic' }}>Keine Rollen definiert</div>
+                                                    ) : (
+                                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                            {alleRollen.map(rolle => (
+                                                                <span key={rolle} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: p.farbe_hex + '15', color: p.farbe_hex, border: `1px solid ${p.farbe_hex}30`, fontWeight: 500 }}>{rolle}</span>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </Section>
 
                                             {/* Programm-Dokumente */}
@@ -629,16 +641,12 @@ export default function Programme() {
 
                                                 {/* Kriterien */}
                                                 <Section title="Kriterien">
-                                                    {(() => {
-                                                        const alle = activePhaseObj.kriterien || [];
-                                                        const sichtbar = editModus ? alle : alle.filter(k => k.pflicht);
-                                                        if (sichtbar.length === 0) return (
-                                                            <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic', marginBottom: 8 }}>
-                                                                {alle.length === 0 ? 'Keine Kriterien definiert' : 'Keine Pflicht-Kriterien definiert'}
-                                                            </div>
-                                                        );
-                                                        return sichtbar;
-                                                    })().map?.(k => (
+                                                    {(activePhaseObj.kriterien || []).length === 0 && (
+                                                        <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic', marginBottom: 8 }}>
+                                                            Keine Kriterien definiert
+                                                        </div>
+                                                    )}
+                                                    {(activePhaseObj.kriterien || []).map(k => (
                                                         <div key={k.kriterium_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
                                                             <span style={{ flex: 1, fontSize: 12.5 }}>{k.text}</span>
                                                             <span style={{
@@ -680,20 +688,29 @@ export default function Programme() {
 
                                                 {/* Involvierte Rollen */}
                                                 <Section title="Involvierte Rollen">
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                        {ROLLEN.map(rolle => (
-                                                            <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: editierbar ? 'pointer' : 'default', userSelect: 'none' }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={(activePhaseObj.rollen || []).includes(rolle)}
-                                                                    onChange={editierbar ? e => togglePhaseRolle(p.programm_id, activePhaseObj.phase_id, activePhaseObj.rollen || [], rolle, e.target.checked) : undefined}
-                                                                    disabled={!editierbar}
-                                                                    style={{ cursor: editierbar ? 'pointer' : 'default', accentColor: p.farbe_hex }}
-                                                                />
-                                                                <span style={{ fontSize: 13 }}>{rolle}</span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
+                                                    {editierbar ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                                            {ROLLEN.map(rolle => (
+                                                                <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={(activePhaseObj.rollen || []).includes(rolle)}
+                                                                        onChange={e => togglePhaseRolle(p.programm_id, activePhaseObj.phase_id, activePhaseObj.rollen || [], rolle, e.target.checked)}
+                                                                        style={{ cursor: 'pointer', accentColor: p.farbe_hex }}
+                                                                    />
+                                                                    <span style={{ fontSize: 13 }}>{rolle}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    ) : (activePhaseObj.rollen || []).length === 0 ? (
+                                                        <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic' }}>Keine Rollen definiert</div>
+                                                    ) : (
+                                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                            {(activePhaseObj.rollen || []).map(rolle => (
+                                                                <span key={rolle} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: p.farbe_hex + '15', color: p.farbe_hex, border: `1px solid ${p.farbe_hex}30`, fontWeight: 500 }}>{rolle}</span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </Section>
 
                                                 {/* Phasen-Dokumente */}
