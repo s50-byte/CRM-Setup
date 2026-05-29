@@ -40,5 +40,6 @@ GRANT ALL PRIVILEGES ON TABLE benutzer_einstellung TO crm_user;
 GRANT ALL PRIVILEGES ON TABLE praesenz_historie TO crm_user;
 GRANT ALL PRIVILEGES ON TABLE dashboard_meldung TO crm_user;
 
--- Kommentar-Spalte zu praesenz_eintrag hinzufügen falls noch nicht vorhanden
+-- Neue Spalten zu praesenz_eintrag hinzufügen
 ALTER TABLE praesenz_eintrag ADD COLUMN IF NOT EXISTS kommentar TEXT;
+ALTER TABLE praesenz_eintrag ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();

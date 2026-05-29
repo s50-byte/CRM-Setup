@@ -11,25 +11,34 @@ function berechneTageVerbleibend(start_datum, avg_dauer_tage) {
     return Math.floor((ende - heute) / (1000 * 60 * 60 * 24));
 }
 
+const STATUS_LABELS = {
+    'anwesend': 'Anwesend', 'krank': 'Krank', 'unentschuldigt': 'Unentschuldigt',
+    'verspaetet': 'Verspätet', 'schule': 'Schule', 'ferien': 'Ferien',
+    'feiertag': 'Feiertag', 'unfall': 'Unfall',
+};
+
 export default function Dashboard() {
     const { benutzer } = useAuth();
     const navigate = useNavigate();
     const [tasks, setTasks] = useState([]);
     const [termine, setTermine] = useState([]);
     const [dossiers, setDossiers] = useState([]);
+    const [meldungen, setMeldungen] = useState([]);
     const [laden, setLaden] = useState(true);
 
     useEffect(() => {
         async function laden() {
             try {
-                const [tasksRes, termineRes, dossiersRes] = await Promise.all([
+                const [tasksRes, termineRes, dossiersRes, meldungenRes] = await Promise.all([
                     client.get('/tasks'),
                     client.get('/termine'),
                     client.get('/dossiers?meine=true'),
+                    client.get('/meldungen'),
                 ]);
                 setTasks(tasksRes.data);
                 setTermine(termineRes.data);
                 setDossiers(dossiersRes.data);
+                setMeldungen(meldungenRes.data);
             } catch (err) {
                 console.error(err);
             } finally {
@@ -38,6 +47,15 @@ export default function Dashboard() {
         }
         laden();
     }, []);
+
+    async function acknowledge(meldung_id) {
+        try {
+            await client.put(`/meldungen/${meldung_id}/acknowledge`);
+            setMeldungen(prev => prev.filter(m => m.meldung_id !== meldung_id));
+        } catch (err) {
+            console.error(err);
+        }
+    }
 
     const offeneTasks = tasks.filter(t => !t.erledigt);
     const heute = new Date().toISOString().slice(0, 10);
@@ -77,6 +95,55 @@ export default function Dashboard() {
                         <div style={{ fontSize: 21, fontWeight: 600, color: k.farbe }}>{laden ? '…' : k.wert}</div>
                     </div>
                 ))}
+            </div>
+
+            {/* Meine Meldungen */}
+            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '.75rem' }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                        Meine Meldungen
+                    </div>
+                    {meldungen.length > 0 && (
+                        <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
+                            background: '#DC2626', color: '#fff', minWidth: 16, textAlign: 'center'
+                        }}>{meldungen.length}</span>
+                    )}
+                </div>
+                {laden ? (
+                    <div style={{ color: '#6B6860', fontSize: 12 }}>Laden…</div>
+                ) : meldungen.length === 0 ? (
+                    <div style={{ color: '#15803D', fontSize: 12.5, fontWeight: 500 }}>Keine offenen Meldungen ✓</div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {meldungen.map(m => (
+                            <div key={m.meldung_id} style={{
+                                border: '1px solid rgba(0,0,0,.07)', borderRadius: 8,
+                                padding: '.625rem .875rem', background: '#FAFAFA',
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12
+                            }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 11.5, fontWeight: 600, color: '#1A1917', marginBottom: 5 }}>
+                                        {new Date(m.datum + 'T12:00:00').toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </div>
+                                    {(m.aenderungen || []).map((a, i) => (
+                                        <div key={i} style={{ fontSize: 12, color: '#1A1917', marginTop: 3 }}>
+                                            <strong>{a.name}</strong>
+                                            <span style={{ color: '#6B6860' }}> · {a.alter_status ? (STATUS_LABELS[a.alter_status] || a.alter_status) : '—'} → </span>
+                                            <span style={{ fontWeight: 600 }}>{STATUS_LABELS[a.neuer_status] || a.neuer_status}</span>
+                                            {a.kommentar && <span style={{ color: '#6B6860', fontSize: 11.5 }}> ({a.kommentar})</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                                <button onClick={() => acknowledge(m.meldung_id)} style={{
+                                    fontSize: 11.5, padding: '5px 12px', borderRadius: 5, cursor: 'pointer', flexShrink: 0,
+                                    border: '1px solid rgba(22,163,74,.25)', background: '#F0FDF4',
+                                    fontFamily: 'inherit', color: '#15803D', fontWeight: 500, whiteSpace: 'nowrap'
+                                }}>✓ Gelesen</button>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
