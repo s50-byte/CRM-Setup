@@ -9,16 +9,6 @@ const STATUS_STYLE = {
     'Abgesagt':   { bg: '#FEF2F2', color: '#B91C1C' },
 };
 
-const JKAT = {
-    'Standortgespräch':               { bg: '#E0F2FE', color: '#0369A1' },
-    'Job Coaching':                    { bg: '#F0FDF4', color: '#166534' },
-    'Beobachtung':                     { bg: '#F5F3FF', color: '#5B21B6' },
-    'Zielfortschritt':                 { bg: '#FFF7ED', color: '#9A3412' },
-    'Absenz':                          { bg: '#FEF2F2', color: '#991B1B' },
-    'Kommunikation zuweisende Stelle': { bg: '#E0F2FE', color: '#075985' },
-    'Externe Person':                  { bg: '#FDF4FF', color: '#7E22CE' },
-    'Sonstiges':                       { bg: '#F5F4F0', color: '#6B6860' },
-};
 
 const TYP_FARBEN = {
     'IV-Stelle':        '#2563EB',
@@ -64,7 +54,6 @@ export default function DossierPhase() {
     const [dossier, setDossier] = useState(null);
     const [kriterien, setKriterien] = useState([]);
     const [tasks, setTasks] = useState([]);
-    const [journal, setJournal] = useState([]);
     const [termine, setTermine] = useState([]);
     const [laden, setLaden] = useState(true);
 
@@ -74,16 +63,20 @@ export default function DossierPhase() {
             const dos = dosRes.data;
             setDossier(dos);
 
-            const [krRes, taskRes, journalRes, termRes] = await Promise.all([
+            console.log('[DossierPhase] phase_id:', phase_id);
+
+            const [krRes, taskRes, termRes] = await Promise.all([
                 client.get(`/dossiers/${id}/phase/${phase_id}/kriterien`),
                 dos.klient_id ? client.get(`/tasks/klient/${dos.klient_id}`) : Promise.resolve({ data: [] }),
-                dos.klient_id ? client.get(`/journal/${dos.klient_id}`) : Promise.resolve({ data: [] }),
                 dos.klient_id ? client.get(`/termine?klient_id=${dos.klient_id}`) : Promise.resolve({ data: [] }),
             ]);
 
+            const phaseTasks = (taskRes.data || []).filter(t => t.phase_id === phase_id);
+            console.log('[DossierPhase] tasks total:', (taskRes.data || []).length, '| this phase:', phaseTasks.length, '| sample:', (taskRes.data || []).slice(0, 3).map(t => ({ phase_id: t.phase_id, text: t.text })));
+            console.log('[DossierPhase] kriterien:', krRes.data);
+
             setKriterien(krRes.data);
-            setTasks((taskRes.data || []).filter(t => !t.phase_id || t.phase_id === phase_id));
-            setJournal(journalRes.data || []);
+            setTasks(phaseTasks);
             setTermine(termRes.data || []);
         } catch (err) {
             console.error(err);
@@ -122,6 +115,7 @@ export default function DossierPhase() {
 
     const erledigtCount = kriterien.filter(k => k.erfuellt).length;
     const offeneTasks = tasks.filter(t => !t.erledigt).length;
+
 
     return (
         <div>
@@ -276,34 +270,6 @@ export default function DossierPhase() {
                         </div>
                     </div>
 
-                    {/* Journal */}
-                    <div style={{ ...CARD, overflow: 'hidden' }}>
-                        <div style={{ padding: '.65rem 1rem', borderBottom: '1px solid rgba(0,0,0,.05)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={SECTION_HDR}>📓 Journal</span>
-                            {journal.length > 0 && (
-                                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.09)', fontFamily: 'monospace', marginLeft: 4 }}>{journal.length}</span>
-                            )}
-                        </div>
-                        <div style={{ padding: '1rem' }}>
-                            {journal.length === 0 ? (
-                                <div style={{ fontSize: 12, color: '#A09D97', fontStyle: 'italic' }}>Keine Journal-Einträge</div>
-                            ) : journal.map((j, i) => {
-                                const s = JKAT[j.kategorie] || JKAT['Sonstiges'];
-                                return (
-                                    <div key={i} style={{ border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, marginBottom: 6, overflow: 'hidden' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 11px', background: '#F5F4F0' }}>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: 11.5, fontWeight: 500 }}>{j.kategorie}</div>
-                                                <div style={{ fontSize: 10.5, color: '#6B6860', marginTop: 1 }}>{fmt(j.datum)} · {j.erfasst_von}</div>
-                                            </div>
-                                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 20, background: s.bg, color: s.color, textTransform: 'uppercase', letterSpacing: '.03em' }}>{j.kategorie}</span>
-                                        </div>
-                                        <div style={{ padding: '8px 11px', fontSize: 11.5, color: '#6B6860', lineHeight: 1.6 }}>{j.text}</div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
                 </div>
 
                 {/* RECHTE SPALTE */}
