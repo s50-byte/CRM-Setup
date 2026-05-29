@@ -92,7 +92,7 @@ router.get('/:datum', auth, async (req, res) => {
                 lv.pensum_pct, lv.zeit_von, lv.zeit_bis, lv.zeitbasis,
                 lv.tage_mo, lv.tage_di, lv.tage_mi, lv.tage_do, lv.tage_fr,
                 pe.eintrag_id, pe.status, pe.ankunftszeit, pe.bemerkung,
-                pe.kommentar, pe.updated_at,
+                pe.kommentar, COALESCE(pe.updated_at, pe.created_at) AS updated_at,
                 COALESCE(
                     JSON_AGG(
                         DISTINCT JSONB_BUILD_OBJECT(
@@ -118,7 +118,7 @@ router.get('/:datum', auth, async (req, res) => {
                       lv.pensum_pct, lv.zeit_von, lv.zeit_bis, lv.zeitbasis,
                       lv.tage_mo, lv.tage_di, lv.tage_mi, lv.tage_do, lv.tage_fr,
                       pe.eintrag_id, pe.status, pe.ankunftszeit, pe.bemerkung,
-                      pe.kommentar, pe.updated_at
+                      pe.kommentar, pe.updated_at, pe.created_at
              ORDER BY k.nachname, k.vorname`,
             [req.params.datum]
         );
