@@ -50,6 +50,7 @@ function KriteriumTypBadge({ typ, pflicht }) {
 export default function DossierPhase() {
     const { id, phase_id } = useParams();
     const navigate = useNavigate();
+    console.log('[DossierPhase] MOUNT id:', id, 'phase_id:', phase_id);
 
     const [dossier, setDossier] = useState(null);
     const [kriterien, setKriterien] = useState([]);

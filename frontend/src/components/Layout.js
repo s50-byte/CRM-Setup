@@ -211,8 +211,8 @@ export default function Layout() {
                     <Route path="/externe"   element={<Externe />} />
                     <Route path="/programme" element={<Programme />} />
                     <Route path="/profil"    element={<Profil />} />
-                    <Route path="/dossiers/:id" element={<DossierDetail />} />
                     <Route path="/dossiers/:id/phase/:phase_id" element={<DossierPhase />} />
+                    <Route path="/dossiers/:id" element={<DossierDetail />} />
                     <Route path="/klienten/:id" element={<KlientDetail />} />
                     <Route path="/externe/:id"  element={<ExterneDetail />} />
                     <Route path="/standorte"    element={<Standorte />} />
