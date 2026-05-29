@@ -245,100 +245,78 @@ export default function DossierDetail() {
                     </div>
                 </div>
 
-                {/* Row 2: Info-Grid (2 Spalten) + Buttons rechts */}
-                <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                {/* Row 2: Info-Grid (60%) + Buttons (40%) */}
+                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
                     {/* Info-Grid */}
-                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', minWidth: 0 }}>
-                        {/* Linke Spalte */}
-                        {dossier.programm_name && (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Programm</span>
-                                <span style={{ fontSize: 12.5, fontWeight: 500, color: '#1A1917' }}>{dossier.programm_name}</span>
-                            </div>
-                        )}
-                        {/* Rechte Spalte — Pensum */}
-                        {dossier.pensum_pct ? (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Pensum</span>
-                                <span style={{ fontSize: 12.5, fontWeight: 500, color: '#1A1917' }}>{dossier.pensum_pct}%</span>
-                            </div>
-                        ) : <div />}
+                    <div style={{ flex: '0 0 60%', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px', minWidth: 0 }}>
+                        {/* Zeile 1: Programm | Pensum */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 11, color: '#6B6860' }}>Programm</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{dossier.programm_name || '—'}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 11, color: '#6B6860' }}>Pensum</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{dossier.pensum_pct ? `${dossier.pensum_pct}%` : '—'}</span>
+                        </div>
 
-                        {dossier.auftraggeber && (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0, whiteSpace: 'nowrap' }}>Zuweisende Stelle</span>
-                                <span style={{ fontSize: 12.5, color: '#1A1917', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dossier.auftraggeber}</span>
-                            </div>
-                        )}
-                        {/* Rechte Spalte — Start */}
-                        {dossier.laufend_start_datum ? (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Start</span>
-                                <span style={{ fontSize: 12.5, color: '#1A1917' }}>{fmt(dossier.laufend_start_datum)}</span>
-                            </div>
-                        ) : <div />}
+                        {/* Zeile 2: Zuweisende Stelle | Start */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 11, color: '#6B6860' }}>Zuweisende Stelle</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{dossier.auftraggeber || '—'}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 11, color: '#6B6860' }}>Start</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{fmt(dossier.laufend_start_datum)}</span>
+                        </div>
 
+                        {/* Zeile 3: Zuweisende Person | Ende (geplant) */}
                         {(dossier.zuweisende_person_vorname || dossier.zuweisende_person_nachname) ? (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0, whiteSpace: 'nowrap' }}>Zuweisende Person</span>
-                                <span style={{ fontSize: 12.5, color: '#1A1917' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <span style={{ fontSize: 11, color: '#6B6860' }}>Zuweisende Person</span>
+                                <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>
                                     {dossier.zuweisende_person_vorname} {dossier.zuweisende_person_nachname}
-                                    {dossier.zuweisende_person_firma && <span style={{ color: '#6B6860' }}> · {dossier.zuweisende_person_firma}</span>}
+                                    {dossier.zuweisende_person_firma && <span style={{ fontWeight: 400, color: '#6B6860' }}> · {dossier.zuweisende_person_firma}</span>}
                                 </span>
                             </div>
                         ) : <div />}
-                        {/* Rechte Spalte — Ende */}
-                        {dossier.geplantes_enddatum ? (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0, whiteSpace: 'nowrap' }}>Ende (geplant)</span>
-                                <span style={{ fontSize: 12.5, color: '#1A1917' }}>{fmt(dossier.geplantes_enddatum)}</span>
-                            </div>
-                        ) : <div />}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 11, color: '#6B6860' }}>Ende (geplant)</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{fmt(dossier.geplantes_enddatum)}</span>
+                        </div>
 
-                        {dossier.standort_name && (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Standort</span>
-                                <span style={{ fontSize: 12.5, color: '#1A1917' }}>{dossier.standort_name}</span>
-                            </div>
-                        )}
-                        {/* Rechte Spalte — Intern/Extern */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            {dossier.abteilung && (
-                                <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                    <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Intern</span>
-                                    <span style={{ fontSize: 12.5, color: '#1A1917' }}>{dossier.abteilung}</span>
-                                </div>
-                            )}
-                            {dossier.arbeitgeber_firma && (
-                                <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                    <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Extern</span>
-                                    <span style={{ fontSize: 12.5, color: '#1A1917', fontWeight: 500 }}>{dossier.arbeitgeber_firma}</span>
-                                </div>
-                            )}
+                        {/* Zeile 4: Standort | Arbeitsort */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 11, color: '#6B6860' }}>Standort</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>{dossier.standort_name || '—'}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 11, color: '#6B6860' }}>Arbeitsort</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1917' }}>
+                                {dossier.abteilung
+                                    ? `Intern: ${dossier.abteilung}`
+                                    : dossier.arbeitgeber_firma
+                                    ? `Extern: ${dossier.arbeitgeber_firma}`
+                                    : '—'}
+                            </span>
                         </div>
                     </div>
 
-                    {/* Buttons vertikal */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, minWidth: 148 }}>
+                    {/* Buttons vertikal, oben ausgerichtet */}
+                    <div style={{ flex: '0 0 40%', display: 'flex', flexDirection: 'column', gap: 6, alignSelf: 'flex-start' }}>
                         <button onClick={() => { setJFormOpen(true); setAktTab('journal'); }} style={{
                             padding: '7px 14px', fontSize: 12.5, fontWeight: 500,
                             cursor: 'pointer', border: 'none', borderRadius: 6,
-                            background: '#2563EB', color: '#fff', fontFamily: 'inherit', textAlign: 'center'
+                            background: '#2563EB', color: '#fff', fontFamily: 'inherit'
                         }}>+ Journal-Eintrag</button>
-                        <button onClick={oeffneAgModal} style={{
-                            padding: '7px 14px', fontSize: 12.5,
-                            cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                            background: '#fff', fontFamily: 'inherit', color: '#1A1917', textAlign: 'center'
-                        }}>Arbeitgeber zuweisen</button>
                         <button onClick={() => setFelderModal(true)} style={{
                             padding: '7px 14px', fontSize: 12.5,
                             cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                            background: '#fff', fontFamily: 'inherit', color: '#1A1917', textAlign: 'center'
-                        }}>Felder bearbeiten</button>
+                            background: '#fff', fontFamily: 'inherit', color: '#1A1917'
+                        }}>Arbeitsort ändern</button>
                         <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
                             padding: '7px 14px', fontSize: 12.5,
                             cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                            background: '#fff', fontFamily: 'inherit', color: '#6B6860', textAlign: 'center'
+                            background: '#fff', fontFamily: 'inherit', color: '#6B6860'
                         }}>Stammdaten →</button>
                     </div>
                 </div>

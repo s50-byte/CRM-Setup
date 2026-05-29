@@ -464,13 +464,13 @@ router.put('/:id/arbeitgeber', auth, async (req, res) => {
     }
 });
 
-// PUT /api/dossiers/:id/felder — Zuweisende Person + Abteilung
+// PUT /api/dossiers/:id/felder — Zuweisende Person + Abteilung + Arbeitgeber
 router.put('/:id/felder', auth, async (req, res) => {
-    const { zuweisende_person_id, abteilung } = req.body;
+    const { zuweisende_person_id, abteilung, arbeitgeber_id } = req.body;
     try {
         await db.query(
-            `UPDATE dossier SET zuweisende_person_id = $1, abteilung = $2 WHERE dossier_id = $3`,
-            [zuweisende_person_id || null, abteilung || null, req.params.id]
+            `UPDATE dossier SET zuweisende_person_id = $1, abteilung = $2, arbeitgeber_id = $3 WHERE dossier_id = $4`,
+            [zuweisende_person_id || null, abteilung || null, arbeitgeber_id || null, req.params.id]
         );
         res.json({ message: 'Felder aktualisiert' });
     } catch (err) {
