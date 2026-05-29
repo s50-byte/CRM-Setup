@@ -63,12 +63,7 @@ export default function Praesenz() {
     const [verlaufGeladen, setVerlaufGeladen] = useState(false);
     const [verlaufLaden, setVerlaufLaden] = useState(false);
 
-    // Gespeicherte Abteilung laden
-    useEffect(() => {
-        client.get('/benutzer/einstellung/praesenz_abteilung')
-            .then(r => setAbteilung(r.data.wert || ''))
-            .catch(console.error);
-    }, []);
+    // Abteilung-Einstellung beim Start NICHT laden — Standard ist immer "Alle"
 
     // Präsenz + Ferien laden wenn Datum wechselt
     useEffect(() => {
@@ -180,7 +175,8 @@ export default function Praesenz() {
         win.print();
     }
 
-    const gefiltert = eintraege.filter(e => !abteilung || e.abteilung === abteilung);
+    // Klient anzeigen wenn: kein Filter aktiv ODER Dossier hat keine Abteilung ODER Abteilung passt
+    const gefiltert = eintraege.filter(e => !abteilung || !e.abteilung || e.abteilung === abteilung);
     const anwesend  = gefiltert.filter(e => e.status === 'anwesend').length;
     const abwesend  = gefiltert.filter(e => e.status && e.status !== 'anwesend' && e.status !== 'verspaetet').length;
     const verspaetet = gefiltert.filter(e => e.status === 'verspaetet').length;

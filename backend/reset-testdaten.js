@@ -12,6 +12,7 @@ const pool = new Pool({
 const VORNAMEN  = ['Anna','Peter','Maria','Thomas','Lisa','Hans','Sandra','Michael','Claudia','Daniel','Ursula','Stefan','Monika','Andreas','Petra','Roland','Brigitte','Markus','Nicole','Beat'];
 const NACHNAMEN = ['Müller','Schmid','Keller','Weber','Zimmermann','Meier','Huber','Steiner','Brunner','Widmer','Berger','Fischer','Baumann','Schneider','Koch','Bürki','Wenger','Gerber','Lüthi','Graf'];
 const KANAELE   = ['Telefon', 'E-Mail', 'Direkt'];
+const ABTEILUNGEN = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert'];
 const LABELS    = ['LE', 'TN', 'TN', 'MA', 'TN'];  // TN häufiger
 
 // Pipeline-Status rotiert durch alle 5 Werte
@@ -311,14 +312,15 @@ async function main() {
                     lvAnz++;
 
                     // Dossier
+                    const abteilung = pick(ABTEILUNGEN, counter);
                     const dossierRes = await db.query(
                         `INSERT INTO dossier
                             (klient_id, auftraggeber, kanal, akt_programm_id, akt_phase_id,
-                             pipeline_status, standort_id)
-                         VALUES ($1,$2,$3,$4,$5,$6::pipeline_status,$7)
+                             pipeline_status, standort_id, abteilung)
+                         VALUES ($1,$2,$3,$4,$5,$6::pipeline_status,$7,$8)
                          RETURNING dossier_id`,
                         [klient_id, auftraggeber, kanal,
-                         prog.programm_id, phase.phase_id, pipeline, standort.standort_id]
+                         prog.programm_id, phase.phase_id, pipeline, standort.standort_id, abteilung]
                     );
                     const dossier_id = dossierRes.rows[0].dossier_id;
                     dossierAnz++;
