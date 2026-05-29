@@ -266,8 +266,7 @@ router.post('/phasen/:phase_id/kriterien', auth, async (req, res) => {
         const result = await db.query(
             `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge)
              VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-            // typ || '' vermeidet NOT NULL-Fehler (DB-Migration: add-programm-rollen.sql)
-            [req.params.phase_id, text.trim(), typ || '', pflicht || false, reihenfolge]
+            [req.params.phase_id, text.trim(), typ || null, pflicht || false, reihenfolge]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {

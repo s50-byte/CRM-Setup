@@ -111,6 +111,8 @@ function ProgrammFormFelder({ form, onChange }) {
 export default function Programme() {
     const { benutzer } = useAuth();
     const istLeitungsteam = ['teamleitung', 'management'].includes(benutzer?.system_rolle);
+    const [editModus, setEditModus] = useState(false);
+    const editierbar = istLeitungsteam && editModus;
 
     const [programme, setProgramme] = useState([]);
     const [laden, setLaden] = useState(true);
@@ -362,13 +364,23 @@ export default function Programme() {
                     <div style={{ fontSize: 19, fontWeight: 600 }}>Knowledge Pool</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Phasen, Kriterien, Dokumente und Tarife pro Programm</div>
                 </div>
-                {istLeitungsteam && (
-                    <button onClick={() => setNeuesProgrammOffen(true)} style={{
-                        padding: '7px 14px', fontSize: 13, fontWeight: 500,
-                        cursor: 'pointer', border: 'none', borderRadius: 6,
-                        background: '#2563EB', color: '#fff', fontFamily: 'inherit'
-                    }}>+ Neues Programm</button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {istLeitungsteam && (
+                        <div onClick={() => setEditModus(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', userSelect: 'none' }}>
+                            <span style={{ fontSize: 11.5, fontWeight: 500, color: editModus ? '#2563EB' : '#6B6860' }}>Bearbeiten</span>
+                            <div style={{ width: 36, height: 20, borderRadius: 10, background: editModus ? '#2563EB' : '#D1D5DB', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                                <div style={{ position: 'absolute', top: 3, left: editModus ? 19 : 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.2)', transition: 'left .2s' }} />
+                            </div>
+                        </div>
+                    )}
+                    {editierbar && (
+                        <button onClick={() => setNeuesProgrammOffen(true)} style={{
+                            padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                            cursor: 'pointer', border: 'none', borderRadius: 6,
+                            background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                        }}>+ Neues Programm</button>
+                    )}
+                </div>
             </div>
 
             {programme.length === 0 && (
@@ -449,7 +461,7 @@ export default function Programme() {
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                         fontSize: 9, fontWeight: 700, fontFamily: 'monospace', flexShrink: 0
                                                     }}>{i + 1}</div>
-                                                    {isRenaming && istLeitungsteam ? (
+                                                    {isRenaming && editierbar ? (
                                                         <input
                                                             autoFocus
                                                             value={renamePhase.label}
@@ -466,8 +478,8 @@ export default function Programme() {
                                                     ) : (
                                                         <span
                                                             style={{ flex: 1, fontSize: 12.5, fontWeight: isActive ? 500 : 400 }}
-                                                            title={istLeitungsteam ? 'Doppelklick zum Umbenennen' : undefined}
-                                                            onDoubleClick={istLeitungsteam ? e => {
+                                                            title={editierbar ? 'Doppelklick zum Umbenennen' : undefined}
+                                                            onDoubleClick={editierbar ? e => {
                                                                 e.stopPropagation();
                                                                 setRenamePhase({ phase_id: ph.phase_id, label: ph.label });
                                                             } : undefined}
@@ -479,7 +491,7 @@ export default function Programme() {
                                     </div>
 
                                     {/* + Phase hinzufügen */}
-                                    {istLeitungsteam && (
+                                    {editierbar && (
                                         neuePhaseForm[p.programm_id]?.open ? (
                                             <div style={{ padding: '8px 12px 12px', display: 'flex', gap: 5 }}>
                                                 <input
@@ -520,7 +532,7 @@ export default function Programme() {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                                                 <div style={{ width: 14, height: 14, borderRadius: 4, background: p.farbe_hex, flexShrink: 0 }} />
                                                 <div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>{p.name}</div>
-                                                {istLeitungsteam && (
+                                                {editierbar && (
                                                     <button style={BTN_ADD} onClick={() => setEditProgramm({ ...p })}>
                                                         Bearbeiten
                                                     </button>
@@ -561,13 +573,13 @@ export default function Programme() {
                                             <Section title="Zuständige Rollen">
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                                                     {ROLLEN.map(rolle => (
-                                                        <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: istLeitungsteam ? 'pointer' : 'default', userSelect: 'none' }}>
+                                                        <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: editierbar ? 'pointer' : 'default', userSelect: 'none' }}>
                                                             <input
                                                                 type="checkbox"
                                                                 checked={(p.rollen || []).includes(rolle)}
-                                                                onChange={istLeitungsteam ? e => toggleProgRolle(p.programm_id, p.rollen || [], rolle, e.target.checked) : undefined}
-                                                                disabled={!istLeitungsteam}
-                                                                style={{ cursor: istLeitungsteam ? 'pointer' : 'default', accentColor: p.farbe_hex }}
+                                                                onChange={editierbar ? e => toggleProgRolle(p.programm_id, p.rollen || [], rolle, e.target.checked) : undefined}
+                                                                disabled={!editierbar}
+                                                                style={{ cursor: editierbar ? 'pointer' : 'default', accentColor: p.farbe_hex }}
                                                             />
                                                             <span style={{ fontSize: 13 }}>{rolle}</span>
                                                         </label>
@@ -578,7 +590,7 @@ export default function Programme() {
                                             {/* Programm-Dokumente */}
                                             <Section
                                                 title="Programm-Dokumente"
-                                                headerRight={istLeitungsteam && (
+                                                headerRight={editierbar && (
                                                     <button style={BTN_ADD} onClick={() => {
                                                         setDokModal({ programm_id: p.programm_id, phase_id: null });
                                                         setDokForm({ dateiname: '', typ: 'Sonstiges' });
@@ -587,7 +599,7 @@ export default function Programme() {
                                             >
                                                 <DokListe
                                                     docs={progDoks[p.programm_id]}
-                                                    onDelete={istLeitungsteam ? id => dokumentLoeschen(id, p.programm_id, null) : null}
+                                                    onDelete={editierbar ? id => dokumentLoeschen(id, p.programm_id, null) : null}
                                                 />
                                             </Section>
                                         </>
@@ -600,7 +612,7 @@ export default function Programme() {
                                                 {/* Phase-Kopfzeile */}
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                                                     <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{activePhaseObj.label}</div>
-                                                    {istLeitungsteam && (
+                                                    {editierbar && (
                                                         <>
                                                             <button style={BTN_ADD} onClick={() => setRenamePhase({ phase_id: activePhaseObj.phase_id, label: activePhaseObj.label })}>
                                                                 Umbenennen
@@ -629,12 +641,12 @@ export default function Programme() {
                                                                 color: k.pflicht ? '#B91C1C' : '#A09D97',
                                                                 border: `1px solid ${k.pflicht ? 'rgba(220,38,38,.15)' : 'rgba(0,0,0,.09)'}`,
                                                             }}>{k.pflicht ? 'Pflicht' : 'Optional'}</span>
-                                                            {istLeitungsteam && (
+                                                            {editierbar && (
                                                                 <button style={BTN_DEL_SM} onClick={() => kriteriumLoeschen(k.kriterium_id)}>×</button>
                                                             )}
                                                         </div>
                                                     ))}
-                                                    {istLeitungsteam && (
+                                                    {editierbar && (
                                                         <div style={{ display: 'flex', gap: 7, marginTop: 10, alignItems: 'center' }}>
                                                             <input
                                                                 value={neuerKForm[activePhaseObj.phase_id]?.text || ''}
@@ -664,13 +676,13 @@ export default function Programme() {
                                                 <Section title="Involvierte Rollen">
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                                                         {ROLLEN.map(rolle => (
-                                                            <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: istLeitungsteam ? 'pointer' : 'default', userSelect: 'none' }}>
+                                                            <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: editierbar ? 'pointer' : 'default', userSelect: 'none' }}>
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={(activePhaseObj.rollen || []).includes(rolle)}
-                                                                    onChange={istLeitungsteam ? e => togglePhaseRolle(p.programm_id, activePhaseObj.phase_id, activePhaseObj.rollen || [], rolle, e.target.checked) : undefined}
-                                                                    disabled={!istLeitungsteam}
-                                                                    style={{ cursor: istLeitungsteam ? 'pointer' : 'default', accentColor: p.farbe_hex }}
+                                                                    onChange={editierbar ? e => togglePhaseRolle(p.programm_id, activePhaseObj.phase_id, activePhaseObj.rollen || [], rolle, e.target.checked) : undefined}
+                                                                    disabled={!editierbar}
+                                                                    style={{ cursor: editierbar ? 'pointer' : 'default', accentColor: p.farbe_hex }}
                                                                 />
                                                                 <span style={{ fontSize: 13 }}>{rolle}</span>
                                                             </label>
@@ -681,7 +693,7 @@ export default function Programme() {
                                                 {/* Phasen-Dokumente */}
                                                 <Section
                                                     title="Phasen-Dokumente"
-                                                    headerRight={istLeitungsteam && (
+                                                    headerRight={editierbar && (
                                                         <button style={BTN_ADD} onClick={() => {
                                                             setDokModal({ programm_id: p.programm_id, phase_id: activePhaseObj.phase_id });
                                                             setDokForm({ dateiname: '', typ: 'Sonstiges' });
@@ -690,7 +702,7 @@ export default function Programme() {
                                                 >
                                                     <DokListe
                                                         docs={phaseDoks[activePhaseObj.phase_id]}
-                                                        onDelete={istLeitungsteam ? id => dokumentLoeschen(id, p.programm_id, activePhaseObj.phase_id) : null}
+                                                        onDelete={editierbar ? id => dokumentLoeschen(id, p.programm_id, activePhaseObj.phase_id) : null}
                                                     />
                                                 </Section>
                                             </>
