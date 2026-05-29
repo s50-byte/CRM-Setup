@@ -409,9 +409,6 @@ export default function Programme() {
                         >
                             <div style={{ width: 12, height: 12, borderRadius: 3, background: p.farbe_hex, flexShrink: 0 }} />
                             <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{p.name}</div>
-                            <span style={{ ...BADGE, background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(37,99,235,.15)' }}>
-                                {phasen.length} Phasen
-                            </span>
                             <span style={{ fontSize: 13, color: '#A09D97', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>▾</span>
                         </div>
 
@@ -632,10 +629,16 @@ export default function Programme() {
 
                                                 {/* Kriterien */}
                                                 <Section title="Kriterien">
-                                                    {(activePhaseObj.kriterien || []).length === 0 && (
-                                                        <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic', marginBottom: 8 }}>Keine Kriterien definiert</div>
-                                                    )}
-                                                    {(activePhaseObj.kriterien || []).map(k => (
+                                                    {(() => {
+                                                        const alle = activePhaseObj.kriterien || [];
+                                                        const sichtbar = editModus ? alle : alle.filter(k => k.pflicht);
+                                                        if (sichtbar.length === 0) return (
+                                                            <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic', marginBottom: 8 }}>
+                                                                {alle.length === 0 ? 'Keine Kriterien definiert' : 'Keine Pflicht-Kriterien definiert'}
+                                                            </div>
+                                                        );
+                                                        return sichtbar;
+                                                    })().map?.(k => (
                                                         <div key={k.kriterium_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
                                                             <span style={{ flex: 1, fontSize: 12.5 }}>{k.text}</span>
                                                             <span style={{
