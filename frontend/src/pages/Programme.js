@@ -366,7 +366,7 @@ export default function Programme() {
             {/* Page Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
                 <div>
-                    <div style={{ fontSize: 19, fontWeight: 600 }}>Knowledge Pool</div>
+                    <div style={{ fontSize: 19, fontWeight: 600 }}>Programmübersicht</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Phasen, Kriterien, Dokumente und Tarife pro Programm</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
