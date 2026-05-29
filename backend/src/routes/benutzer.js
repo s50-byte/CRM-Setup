@@ -146,8 +146,13 @@ router.get('/mein-profil', auth, async (req, res) => {
              WHERE bs.user_id = $1`,
             [req.user.user_id]
         );
+        const abteilungenEinst = await db.query(
+            `SELECT wert FROM benutzer_einstellung WHERE user_id = $1 AND schluessel = 'abteilungen'`,
+            [req.user.user_id]
+        );
+        const abteilungen = abteilungenEinst.rows[0]?.wert ? JSON.parse(abteilungenEinst.rows[0].wert) : [];
 
-        res.json({ ...user.rows[0], rollen: rollen.rows, programme: programme.rows, standorte: standorte.rows });
+        res.json({ ...user.rows[0], rollen: rollen.rows, programme: programme.rows, standorte: standorte.rows, abteilungen });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden des Profils' });

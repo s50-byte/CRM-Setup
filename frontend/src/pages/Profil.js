@@ -34,6 +34,7 @@ function Toggle({ label, checked, onChange }) {
 }
 
 const ROLLEN_LISTE = ['Klientenführung', 'Job Coach', 'Fachperson'];
+const ABTEILUNGEN_LISTE = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert'];
 
 export default function Profil() {
     const { benutzer } = useAuth();
@@ -45,11 +46,13 @@ export default function Profil() {
     const [rollen, setRollen] = useState(new Set());
     const [programme, setProgramme] = useState(new Set());
     const [standorte, setStandorte] = useState(new Set());
+    const [abteilungen, setAbteilungen] = useState(new Set());
     const [alleProgramme, setAlleProgramme] = useState([]);
     const [alleStandorte, setAlleStandorte] = useState([]);
     const [rollenMsg, setRollenMsg] = useState('');
     const [programmeMsg, setProgrammeMsg] = useState('');
     const [standorteMsg, setStandorteMsg] = useState('');
+    const [abteilungenMsg, setAbteilungenMsg] = useState('');
 
     const initials = benutzer?.avatar_initials ||
         benutzer?.full_name?.split(' ').map(n => n[0]).join('') || '?';
@@ -59,6 +62,7 @@ export default function Profil() {
             setRollen(new Set(r.data.rollen.map(ro => ro.rolle_name)));
             setProgramme(new Set(r.data.programme.map(p => p.programm_id)));
             setStandorte(new Set((r.data.standorte || []).map(s => s.standort_id)));
+            setAbteilungen(new Set(r.data.abteilungen || []));
         }).catch(console.error);
         client.get('/programme').then(r => setAlleProgramme(r.data)).catch(console.error);
         client.get('/standorte').then(r => setAlleStandorte(r.data)).catch(console.error);
@@ -72,6 +76,9 @@ export default function Profil() {
 
     const toggleStandort = (id) =>
         setStandorte(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+    const toggleAbteilung = (name) =>
+        setAbteilungen(prev => { const s = new Set(prev); s.has(name) ? s.delete(name) : s.add(name); return s; });
 
     const speichernRollen = async () => {
         try {
@@ -94,6 +101,14 @@ export default function Profil() {
             await client.put('/benutzer/standorte', { standorte: [...standorte] });
             setStandorteMsg('Gespeichert ✓');
             setTimeout(() => setStandorteMsg(''), 2500);
+        } catch (err) { console.error(err); }
+    };
+
+    const speichernAbteilungen = async () => {
+        try {
+            await client.put('/benutzer/einstellung/abteilungen', { wert: JSON.stringify([...abteilungen]) });
+            setAbteilungenMsg('Gespeichert ✓');
+            setTimeout(() => setAbteilungenMsg(''), 2500);
         } catch (err) { console.error(err); }
     };
 
@@ -224,6 +239,21 @@ export default function Profil() {
                             border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit'
                         }}>Speichern</button>
                         {standorteMsg && <span style={{ fontSize: 12.5, color: '#16A34A' }}>{standorteMsg}</span>}
+                    </div>
+                </div>
+
+                {/* Meine Abteilungen */}
+                <div style={CARD}>
+                    <div style={SECTION_LABEL}>Meine Abteilungen</div>
+                    {ABTEILUNGEN_LISTE.map(name => (
+                        <Toggle key={name} label={name} checked={abteilungen.has(name)} onChange={() => toggleAbteilung(name)} />
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: '.875rem' }}>
+                        <button onClick={speichernAbteilungen} style={{
+                            padding: '7px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                            border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                        }}>Speichern</button>
+                        {abteilungenMsg && <span style={{ fontSize: 12.5, color: '#16A34A' }}>{abteilungenMsg}</span>}
                     </div>
                 </div>
             </div>

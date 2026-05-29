@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 
 const ABTEILUNGEN = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert'];
@@ -12,6 +13,7 @@ const STATUS_OPTS = [
     { value: 'ferien',         label: 'Ferien',          bg: '#F5F3FF', color: '#5B21B6' },
     { value: 'feiertag',       label: 'Feiertag',        bg: '#F5F4F0', color: '#6B6860' },
     { value: 'unfall',         label: 'Unfall',          bg: '#FEF2F2', color: '#B91C1C' },
+    { value: 'absenz',         label: 'Absenz',          bg: '#FFF7ED', color: '#C2410C' },
 ];
 
 const LABEL_FARBEN = {
@@ -48,6 +50,7 @@ function tabBtn(aktiv) {
 }
 
 export default function Praesenz() {
+    const navigate = useNavigate();
     const heute = new Date().toISOString().slice(0, 10);
     const [datum, setDatum] = useState(heute);
     const [eintraege, setEintraege] = useState([]);
@@ -252,6 +255,8 @@ export default function Praesenz() {
                         const hatFerien = ferienKlienten.has(e.klient_id);
                         const labelFarbe = e.klient_label ? (LABEL_FARBEN[e.klient_label] || { bg: '#F5F4F0', color: '#6B6860' }) : null;
                         const zeitstempel = fmtZeit(e.updated_at);
+                        const selectVal = e.status || (hatFerien ? 'ferien' : 'anwesend');
+                        const selectOpt = statusOpt(selectVal);
                         return (
                             <div key={e.klient_id} style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: hatFerien ? '#F0FDF4' : '#fff' }}>
                                 {/* Linke Spalte: Name + Badges */}
@@ -269,7 +274,12 @@ export default function Praesenz() {
                                         {(e.nachname?.[0] || '') + (e.vorname?.[0] || '')}
                                     </div>
                                     <div style={{ minWidth: 0 }}>
-                                        <div style={{ fontSize: 12.5, fontWeight: 600 }}>{e.nachname} {e.vorname}</div>
+                                        <div
+                                            onClick={() => e.dossier_id && navigate('/dossiers/' + e.dossier_id)}
+                                            style={{ fontSize: 12.5, fontWeight: 600, cursor: e.dossier_id ? 'pointer' : 'default', color: e.dossier_id ? '#2563EB' : '#1A1917' }}
+                                        >
+                                            {e.nachname} {e.vorname}
+                                        </div>
                                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
                                             {e.programm_name && (
                                                 <span style={{
@@ -290,24 +300,25 @@ export default function Praesenz() {
                                     </div>
                                 </div>
 
-                                {/* Rechte Spalte: Status-Buttons + Kommentar */}
+                                {/* Rechte Spalte: Status-Dropdown + Kommentar */}
                                 <div style={{
                                     borderBottom: '1px solid rgba(0,0,0,.05)',
                                     padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 5
                                 }}>
-                                    {/* Status-Buttons + Ferien-Indikator */}
-                                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-                                        {STATUS_OPTS.map(o => (
-                                            <button key={o.value} onClick={() => setStatus(e.klient_id, o.value)} style={{
-                                                fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 12,
-                                                cursor: 'pointer', fontFamily: 'inherit',
-                                                background: e.status === o.value ? o.bg : '#F5F4F0',
-                                                color: e.status === o.value ? o.color : '#6B6860',
-                                                border: e.status === o.value ? `1px solid ${o.color}33` : '1px solid rgba(0,0,0,.09)'
-                                            }}>
-                                                {e.status === o.value && o.value === 'anwesend' ? '✓ ' : ''}{o.label}
-                                            </button>
-                                        ))}
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <select
+                                            value={selectVal}
+                                            onChange={ev => setStatus(e.klient_id, ev.target.value)}
+                                            style={{
+                                                fontSize: 12, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                                                border: `1px solid ${e.status ? selectOpt.color + '44' : 'rgba(0,0,0,.09)'}`,
+                                                background: e.status ? selectOpt.bg : '#F5F4F0',
+                                                color: e.status ? selectOpt.color : '#6B6860',
+                                                fontFamily: 'inherit', fontWeight: 500, outline: 'none'
+                                            }}
+                                        >
+                                            {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                        </select>
                                         {hatFerien && (
                                             <span style={{
                                                 fontSize: 10.5, padding: '2px 8px', borderRadius: 10, fontWeight: 500,
