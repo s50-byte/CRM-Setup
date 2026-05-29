@@ -77,13 +77,18 @@ function DokListe({ docs, onDelete }) {
     );
 }
 
+function formatCHF(val) {
+    if (!val && val !== 0) return '—';
+    return Number(val).toLocaleString('de-CH');
+}
+
 function ProgrammFormFelder({ form, onChange }) {
     return (
         <>
             {[
                 { label: 'Name', key: 'name', type: 'text' },
-                { label: 'Tarif pro Tag (CHF)', key: 'tarif_pro_tag', type: 'number' },
-                { label: 'Ø Dauer (Tage)', key: 'avg_dauer_tage', type: 'number' },
+                { label: 'Monatspreis (CHF)', key: 'monatspreis', type: 'number' },
+                { label: 'Ø Dauer (Monate)', key: 'avg_dauer_monate', type: 'number' },
                 { label: 'Aufwand (h/Monat)', key: 'aufwand_h_monat', type: 'number' },
             ].map(f => (
                 <div key={f.key} style={{ marginBottom: 14 }}>
@@ -127,7 +132,7 @@ export default function Programme() {
     const [dokForm, setDokForm] = useState({ dateiname: '', typ: 'Sonstiges' });
     const [fehler, setFehler] = useState('');
     const [neuesProgrammOffen, setNeuesProgrammOffen] = useState(false);
-    const [npForm, setNpForm] = useState({ name: '', farbe_hex: '#2563EB', tarif_pro_tag: '', avg_dauer_tage: 60, aufwand_h_monat: 10 });
+    const [npForm, setNpForm] = useState({ name: '', farbe_hex: '#2563EB', monatspreis: '', avg_dauer_monate: 3, aufwand_h_monat: 10 });
     const [editProgramm, setEditProgramm] = useState(null);
     const [busy, setBusy] = useState(false);
 
@@ -328,13 +333,13 @@ export default function Programme() {
     }
 
     async function programmErstellen() {
-        if (!npForm.name || !npForm.tarif_pro_tag) return;
+        if (!npForm.name || !npForm.monatspreis) return;
         console.log('[programmErstellen] POST /programme:', npForm);
         setBusy(true);
         try {
             await client.post('/programme', npForm);
             setNeuesProgrammOffen(false);
-            setNpForm({ name: '', farbe_hex: '#2563EB', tarif_pro_tag: '', avg_dauer_tage: 60, aufwand_h_monat: 10 });
+            setNpForm({ name: '', farbe_hex: '#2563EB', monatspreis: '', avg_dauer_monate: 3, aufwand_h_monat: 10 });
             await ladeProgramme();
         } catch (err) {
             console.error('[programmErstellen] error:', err.response?.data || err);
@@ -342,7 +347,7 @@ export default function Programme() {
     }
 
     async function programmSpeichern() {
-        if (!editProgramm?.name || !editProgramm?.tarif_pro_tag) return;
+        if (!editProgramm?.name || !editProgramm?.monatspreis) return;
         console.log('[programmSpeichern] PUT /programme/' + editProgramm.programm_id + ':', editProgramm);
         setBusy(true);
         try {
@@ -404,8 +409,6 @@ export default function Programme() {
                         >
                             <div style={{ width: 12, height: 12, borderRadius: 3, background: p.farbe_hex, flexShrink: 0 }} />
                             <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{p.name}</div>
-                            <span style={BADGE}>CHF {p.tarif_pro_tag}/Tag</span>
-                            <span style={BADGE}>Ø {p.avg_dauer_tage}d</span>
                             <span style={{ ...BADGE, background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(37,99,235,.15)' }}>
                                 {phasen.length} Phasen
                             </span>
@@ -539,8 +542,8 @@ export default function Programme() {
                                                 )}
                                             </div>
                                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
-                                                <span style={{ ...BADGE, fontSize: 12 }}>CHF {p.tarif_pro_tag}/Tag</span>
-                                                <span style={{ ...BADGE, fontSize: 12 }}>Ø {p.avg_dauer_tage} Tage</span>
+                                                <span style={{ ...BADGE, fontSize: 12 }}>CHF {formatCHF(p.monatspreis)} / Monat</span>
+                                                {p.avg_dauer_monate && <span style={{ ...BADGE, fontSize: 12 }}>Ø {p.avg_dauer_monate} Monate</span>}
                                                 <span style={{ ...BADGE, fontSize: 12 }}>{p.aufwand_h_monat} h/Mt.</span>
                                             </div>
 
@@ -773,7 +776,7 @@ export default function Programme() {
                     />
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                         <button onClick={() => setEditProgramm(null)} style={{ padding: '7px 14px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}>Abbrechen</button>
-                        <button onClick={programmSpeichern} disabled={busy || !editProgramm.name || !editProgramm.tarif_pro_tag} style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', opacity: (!editProgramm.name || !editProgramm.tarif_pro_tag) ? .5 : 1 }}>Speichern</button>
+                        <button onClick={programmSpeichern} disabled={busy || !editProgramm.name || !editProgramm.monatspreis} style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', opacity: (!editProgramm.name || !editProgramm.monatspreis) ? .5 : 1 }}>Speichern</button>
                     </div>
                 </Modal>
             )}
@@ -786,7 +789,7 @@ export default function Programme() {
                 />
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                     <button onClick={() => setNeuesProgrammOffen(false)} style={{ padding: '7px 14px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}>Abbrechen</button>
-                    <button onClick={programmErstellen} disabled={busy || !npForm.name || !npForm.tarif_pro_tag} style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', opacity: (!npForm.name || !npForm.tarif_pro_tag) ? .5 : 1 }}>Erstellen</button>
+                    <button onClick={programmErstellen} disabled={busy || !npForm.name || !npForm.monatspreis} style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', opacity: (!npForm.name || !npForm.monatspreis) ? .5 : 1 }}>Erstellen</button>
                 </div>
             </Modal>
         </div>

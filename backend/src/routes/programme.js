@@ -121,17 +121,17 @@ router.post('/', auth, async (req, res) => {
     if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
-    const { name, farbe_hex, tarif_pro_tag, avg_dauer_tage, aufwand_h_monat } = req.body;
-    if (!name || !tarif_pro_tag) {
-        return res.status(400).json({ error: 'Name und Tarif erforderlich' });
+    const { name, farbe_hex, monatspreis, avg_dauer_monate, aufwand_h_monat } = req.body;
+    if (!name || !monatspreis) {
+        return res.status(400).json({ error: 'Name und Monatspreis erforderlich' });
     }
     try {
         const result = await db.query(
-            `INSERT INTO programm (name, farbe_hex, tarif_pro_tag, avg_dauer_tage, aufwand_h_monat)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO programm (name, farbe_hex, monatspreis, avg_dauer_monate, tarif_pro_tag, avg_dauer_tage, aufwand_h_monat)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING *`,
-            [name, farbe_hex || '#2563EB', tarif_pro_tag,
-             avg_dauer_tage || 30, aufwand_h_monat || 10]
+            [name, farbe_hex || '#2563EB', monatspreis, avg_dauer_monate || null,
+             monatspreis, (avg_dauer_monate || 1) * 30, aufwand_h_monat || 10]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -145,13 +145,15 @@ router.put('/:id', auth, async (req, res) => {
     if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
-    const { name, farbe_hex, tarif_pro_tag, avg_dauer_tage, aufwand_h_monat } = req.body;
-    if (!name || !tarif_pro_tag) return res.status(400).json({ error: 'Name und Tarif erforderlich' });
+    const { name, farbe_hex, monatspreis, avg_dauer_monate, aufwand_h_monat } = req.body;
+    if (!name || !monatspreis) return res.status(400).json({ error: 'Name und Monatspreis erforderlich' });
     try {
         await db.query(
-            `UPDATE programm SET name=$1, farbe_hex=$2, tarif_pro_tag=$3, avg_dauer_tage=$4, aufwand_h_monat=$5
-             WHERE programm_id=$6`,
-            [name, farbe_hex || '#2563EB', tarif_pro_tag, avg_dauer_tage || 30, aufwand_h_monat || 10, req.params.id]
+            `UPDATE programm SET name=$1, farbe_hex=$2, monatspreis=$3, avg_dauer_monate=$4,
+             tarif_pro_tag=$5, avg_dauer_tage=$6, aufwand_h_monat=$7
+             WHERE programm_id=$8`,
+            [name, farbe_hex || '#2563EB', monatspreis, avg_dauer_monate || null,
+             monatspreis, (avg_dauer_monate || 1) * 30, aufwand_h_monat || 10, req.params.id]
         );
         res.json({ message: 'Programm aktualisiert' });
     } catch (err) {
