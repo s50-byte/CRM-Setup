@@ -182,16 +182,16 @@ router.post('/', auth, async (req, res) => {
 
             if (kaderResult.rows.length > 0) {
                 const klient = kaderResult.rows[0];
-                const aenderung = {
+                const art = alterStatus === null      ? 'ersterfassung'
+                          : alterStatus !== status    ? 'status'
+                          :                            'kommentar';
+                const aenderungMitTimestamp = {
                     klient_id,
                     name: `${klient.vorname} ${klient.nachname}`,
+                    art,
                     alter_status: alterStatus,
                     neuer_status: status,
                     kommentar: kommentar || null,
-                };
-
-                const aenderungMitTimestamp = {
-                    ...aenderung,
                     timestamp: new Date().toISOString(),
                 };
 

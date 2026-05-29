@@ -36,9 +36,9 @@ router.get('/alle', auth, async (req, res) => {
     let p = 2;
 
     if (datum) {
-        // Stand-Ansicht: Meldungen die ich heute erstellt habe, für alle Empfänger
+        // Stand-Ansicht: alle Meldungen die ich für dieses Präsenz-Datum erstellt habe
         bedingungen.push(`m.erstellt_von = $1`);
-        bedingungen.push(`DATE(m.created_at) = $${p++}::date`);
+        bedingungen.push(`m.datum = $${p++}`);
         params.push(datum);
     } else {
         // Eigene Meldungen als Empfänger

@@ -129,14 +129,19 @@ export default function Dashboard() {
                                             · {new Date(m.created_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })} Uhr
                                         </span>
                                     </div>
-                                    {(m.aenderungen || []).map((a, i) => (
-                                        <div key={i} style={{ fontSize: 12, color: '#1A1917', marginTop: 3 }}>
-                                            <strong>{a.name}</strong>
-                                            <span style={{ color: '#6B6860' }}> · {a.alter_status ? (STATUS_LABELS[a.alter_status] || a.alter_status) : '—'} → </span>
-                                            <span style={{ fontWeight: 600 }}>{STATUS_LABELS[a.neuer_status] || a.neuer_status}</span>
-                                            {a.kommentar && <span style={{ color: '#6B6860', fontSize: 11.5 }}> ({a.kommentar})</span>}
-                                        </div>
-                                    ))}
+                                    {(m.aenderungen || []).map((a, i) => {
+                                        const sl = s => STATUS_LABELS[s] || s || '—';
+                                        const art = a.art || (a.alter_status === null ? 'ersterfassung' : a.alter_status === a.neuer_status ? 'kommentar' : 'status');
+                                        return (
+                                            <div key={i} style={{ fontSize: 12, color: '#6B6860', marginTop: 3 }}>
+                                                <strong style={{ color: '#1A1917' }}>{a.name}</strong>
+                                                {art === 'ersterfassung' && <span> · <strong>{sl(a.neuer_status)}</strong> erfasst</span>}
+                                                {art === 'status'        && <span> · {sl(a.alter_status)} → <strong>{sl(a.neuer_status)}</strong></span>}
+                                                {art === 'kommentar'     && <span> · Status unverändert ({sl(a.neuer_status)})</span>}
+                                                {a.kommentar && <span style={{ fontSize: 11.5 }}> | {a.kommentar}</span>}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                                 <button onClick={() => acknowledge(m.meldung_id)} style={{
                                     fontSize: 11.5, padding: '5px 12px', borderRadius: 5, cursor: 'pointer', flexShrink: 0,

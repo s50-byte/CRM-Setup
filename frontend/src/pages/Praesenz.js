@@ -457,8 +457,8 @@ export default function Praesenz() {
                                 <div style={{ fontSize: 11, fontWeight: 700, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>{gruppe.name}</div>
                                 {gruppe.meldungen.map((m, mi) => (
                                     (m.aenderungen || []).map((a, ai) => {
-                                        const nurKommentar = a.alter_status === a.neuer_status;
-                                        const statusLabel = s => STATUS_OPTS.find(o => o.value === s)?.label || s || '—';
+                                        const sl = s => STATUS_OPTS.find(o => o.value === s)?.label || '—';
+                                        const art = a.art || (a.alter_status === null ? 'ersterfassung' : a.alter_status === a.neuer_status ? 'kommentar' : 'status');
                                         return (
                                             <div key={`${mi}-${ai}`} style={{
                                                 display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
@@ -467,12 +467,11 @@ export default function Praesenz() {
                                             }}>
                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                     <span style={{ fontWeight: 600, fontSize: 12.5 }}>{a.name}</span>
-                                                    <span style={{ fontSize: 12, color: '#1A1917' }}>
-                                                        {nurKommentar
-                                                            ? <span style={{ color: '#6B6860' }}> · Status unverändert ({statusLabel(a.neuer_status)})</span>
-                                                            : <span> · <span style={{ color: '#6B6860' }}>{statusLabel(a.alter_status)}</span> → <strong>{statusLabel(a.neuer_status)}</strong></span>
-                                                        }
-                                                        {a.kommentar && <span style={{ color: '#6B6860' }}> | {a.kommentar}</span>}
+                                                    <span style={{ fontSize: 12, color: '#6B6860' }}>
+                                                        {art === 'ersterfassung' && <span> · <strong style={{ color: '#1A1917' }}>{sl(a.neuer_status)}</strong> erfasst</span>}
+                                                        {art === 'status'        && <span> · {sl(a.alter_status)} → <strong style={{ color: '#1A1917' }}>{sl(a.neuer_status)}</strong></span>}
+                                                        {art === 'kommentar'     && <span> · Status unverändert ({sl(a.neuer_status)})</span>}
+                                                        {a.kommentar && <span> | {a.kommentar}</span>}
                                                     </span>
                                                 </div>
                                                 <span style={{ fontSize: 11, flexShrink: 0, padding: '2px 7px', borderRadius: 8, fontWeight: 500,
