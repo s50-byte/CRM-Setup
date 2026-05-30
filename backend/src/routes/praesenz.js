@@ -25,25 +25,37 @@ router.get('/ferien', auth, async (req, res) => {
 
 // GET /api/praesenz/historie — Präsenz-Einträge mit Filtern (für Export)
 // (MUSS vor /:datum stehen)
+// Startet von klient, damit auch Klienten ohne Eintrag angezeigt werden.
 router.get('/historie', auth, async (req, res) => {
     const { datum_von, datum_bis, klient_id, status, abteilung } = req.query;
 
-    const bedingungen = [];
     const params = [];
     let p = 1;
 
-    if (datum_von) { bedingungen.push(`pe.datum >= $${p++}`); params.push(datum_von); }
-    if (datum_bis) { bedingungen.push(`pe.datum <= $${p++}`); params.push(datum_bis); }
-    if (klient_id) { bedingungen.push(`pe.klient_id = $${p++}`); params.push(klient_id); }
-    if (status)    { bedingungen.push(`pe.status = $${p++}`); params.push(status); }
-    if (abteilung) { bedingungen.push(`d.abteilung = $${p++}`); params.push(abteilung); }
+    // Datum-Filter und regulärer Status-Filter gehen in die praesenz_eintrag-Subquery,
+    // damit Klienten ohne passende Einträge als NULL-Zeile erscheinen.
+    const peBedingungen = [];
+    if (datum_von) { peBedingungen.push(`pe2.datum >= $${p++}`); params.push(datum_von); }
+    if (datum_bis) { peBedingungen.push(`pe2.datum <= $${p++}`); params.push(datum_bis); }
+    if (status && status !== 'nicht_erfasst') { peBedingungen.push(`pe2.status = $${p++}`); params.push(status); }
+    const peWhere = peBedingungen.length ? 'WHERE ' + peBedingungen.join(' AND ') : '';
 
-    const where = bedingungen.length > 0 ? 'WHERE ' + bedingungen.join(' AND ') : '';
+    // Äussere WHERE-Bedingungen (immer aktive Klienten, kein Erstkontakt)
+    const outerBedingungen = ["k.aktiv = TRUE", "d.pipeline_status != 'Erstkontakt'"];
+    if (klient_id) { outerBedingungen.push(`k.klient_id = $${p++}`); params.push(klient_id); }
+    if (abteilung) { outerBedingungen.push(`d.abteilung = $${p++}`); params.push(abteilung); }
+    // Kein Eintrag im Zeitraum → "Nicht erfasst"
+    if (status === 'nicht_erfasst') {
+        outerBedingungen.push('pe.eintrag_id IS NULL');
+    } else if (status) {
+        // Regulärer Status: nur Klienten die mindestens einen passenden Eintrag haben
+        outerBedingungen.push('pe.eintrag_id IS NOT NULL');
+    }
 
     try {
         const result = await db.query(
             `SELECT
-                pe.eintrag_id, pe.klient_id, pe.datum, pe.status,
+                pe.eintrag_id, k.klient_id, pe.datum, pe.status,
                 pe.ankunftszeit, pe.bemerkung, pe.kommentar,
                 k.nachname, k.vorname,
                 pr.name AS programm_name,
@@ -60,15 +72,18 @@ router.get('/historie', auth, async (req, res) => {
                     ) FILTER (WHERE ph.historie_id IS NOT NULL),
                     '[]'
                 ) AS historie
-             FROM praesenz_eintrag pe
-             JOIN klient k ON k.klient_id = pe.klient_id
-             LEFT JOIN dossier d ON d.klient_id = k.klient_id
+             FROM klient k
+             JOIN dossier d ON d.klient_id = k.klient_id
              LEFT JOIN programm pr ON pr.programm_id = d.akt_programm_id
+             LEFT JOIN (SELECT * FROM praesenz_eintrag pe2 ${peWhere}) pe
+                ON pe.klient_id = k.klient_id
              LEFT JOIN praesenz_historie ph ON ph.eintrag_id = pe.eintrag_id
              LEFT JOIN benutzer u ON u.user_id = ph.erfasst_von
-             ${where}
-             GROUP BY pe.eintrag_id, k.klient_id, pr.name, d.abteilung
-             ORDER BY pe.datum DESC, k.nachname, k.vorname`,
+             WHERE ${outerBedingungen.join(' AND ')}
+             GROUP BY pe.eintrag_id, k.klient_id, k.nachname, k.vorname,
+                      pr.name, d.abteilung,
+                      pe.datum, pe.status, pe.ankunftszeit, pe.bemerkung, pe.kommentar
+             ORDER BY pe.datum DESC NULLS LAST, k.nachname, k.vorname`,
             params
         );
         res.json(result.rows);

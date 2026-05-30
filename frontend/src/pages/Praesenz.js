@@ -171,9 +171,9 @@ export default function Praesenz() {
     function drucken() {
         const rows = verlaufData.map(e =>
             `<tr>
-                <td>${fmtDatum(e.datum)}</td>
+                <td>${e.datum ? fmtDatum(e.datum) : '—'}</td>
                 <td>${e.nachname} ${e.vorname}</td>
-                <td>${statusOpt(e.status).label}</td>
+                <td>${e.status ? statusOpt(e.status).label : 'Nicht erfasst'}</td>
                 <td>${e.abteilung || '—'}</td>
                 <td>${e.programm_name || '—'}</td>
                 <td>${e.kommentar || '—'}</td>
@@ -377,6 +377,7 @@ export default function Praesenz() {
                         <select value={vFilter.status} onChange={e => setVFilter(p => ({ ...p, status: e.target.value }))} style={INPUT_S}>
                             <option value="">Alle Status</option>
                             {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            <option value="nicht_erfasst">Nicht erfasst</option>
                         </select>
                         <select value={vFilter.abteilung} onChange={e => setVFilter(p => ({ ...p, abteilung: e.target.value }))} style={INPUT_S}>
                             <option value="">Alle Abteilungen</option>
@@ -422,11 +423,14 @@ export default function Praesenz() {
                                     {verlaufData.map((e, i) => {
                                         const s = statusOpt(e.status);
                                         return (
-                                            <tr key={e.eintrag_id} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                                                <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{fmtDatum(e.datum)}</td>
+                                            <tr key={e.eintrag_id || e.klient_id + '_' + i} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                                                <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{e.datum ? fmtDatum(e.datum) : '—'}</td>
                                                 <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', fontWeight: 500 }}>{e.nachname} {e.vorname}</td>
                                                 <td style={{ padding: '7px 12px' }}>
-                                                    <span style={{ padding: '2px 7px', borderRadius: 10, fontSize: 11, background: s.bg, color: s.color, fontWeight: 500 }}>{s.label}</span>
+                                                    {e.status
+                                                        ? <span style={{ padding: '2px 7px', borderRadius: 10, fontSize: 11, background: s.bg, color: s.color, fontWeight: 500 }}>{s.label}</span>
+                                                        : <span style={{ padding: '2px 7px', borderRadius: 10, fontSize: 11, background: '#F5F4F0', color: '#A09D97', fontWeight: 500 }}>Nicht erfasst</span>
+                                                    }
                                                 </td>
                                                 <td style={{ padding: '7px 12px', color: '#6B6860' }}>{e.abteilung || '—'}</td>
                                                 <td style={{ padding: '7px 12px', color: '#6B6860', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.programm_name || '—'}</td>
