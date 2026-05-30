@@ -128,6 +128,13 @@ export default function Praesenz() {
         });
     }, []);
 
+    // Erste eigene Abteilung als Standard setzen
+    useEffect(() => {
+        if (meineAbteilungen.length > 0 && abteilung === '') {
+            setAbteilung(meineAbteilungen[0]);
+        }
+    }, [meineAbteilungen]);
+
     // Präsenz + Ferien laden wenn Datum wechselt
     useEffect(() => {
         setLaden(true);
@@ -259,7 +266,9 @@ export default function Praesenz() {
     }
 
     console.log('[Filter] meineAbteilungen:', meineAbteilungen, '| gewaehltAbteilung:', JSON.stringify(abteilung), '| klient[0].abteilung:', JSON.stringify(eintraege[0]?.abteilung));
-    const gefiltert = eintraege.filter(e => !abteilung || e.abteilung === abteilung);
+    const gefiltert = eintraege.length === 0 ? [] : eintraege.filter(k =>
+        !abteilung || abteilung === 'Alle' || k.abteilung === abteilung
+    );
 
     const verlaufKlienten = [...new Map(verlaufData.map(e => [e.klient_id, e])).values()]
         .sort((a, b) => (a.nachname || '').localeCompare(b.nachname || ''));
