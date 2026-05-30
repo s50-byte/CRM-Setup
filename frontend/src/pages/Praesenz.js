@@ -61,6 +61,9 @@ export default function Praesenz() {
     const [aktTab, setAktTab] = useState('tag');
 
     // Stand-Popup
+    const [meineAbteilungen, setMeineAbteilungen] = useState([]);
+
+    // Stand-Popup
     const [standPopup, setStandPopup] = useState(false);
     const [standMeldungen, setStandMeldungen] = useState([]);
     const [standLaden, setStandLaden] = useState(false);
@@ -71,7 +74,18 @@ export default function Praesenz() {
     const [verlaufGeladen, setVerlaufGeladen] = useState(false);
     const [verlaufLaden, setVerlaufLaden] = useState(false);
 
-    // Abteilung-Einstellung beim Start NICHT laden — Standard ist immer "Alle"
+    // Abteilungen aus Benutzer-Einstellung laden
+    useEffect(() => {
+        client.get('/benutzer/einstellung/abteilungen').then(r => {
+            try {
+                const list = r.data.wert ? JSON.parse(r.data.wert) : [];
+                if (list.length > 0) setAbteilung('');
+                setMeineAbteilungen(list);
+            } catch {
+                setMeineAbteilungen([]);
+            }
+        }).catch(console.error);
+    }, []);
 
     // Präsenz + Ferien laden wenn Datum wechselt
     useEffect(() => {
@@ -183,8 +197,8 @@ export default function Praesenz() {
         win.print();
     }
 
-    // Klient anzeigen wenn: kein Filter aktiv ODER Dossier hat keine Abteilung ODER Abteilung passt
-    const gefiltert = eintraege.filter(e => !abteilung || !e.abteilung || e.abteilung === abteilung);
+    console.log('meineAbteilungen:', meineAbteilungen, 'erster Klient abteilung:', eintraege[0]?.abteilung);
+    const gefiltert = eintraege.filter(e => !abteilung || e.abteilung === abteilung);
     const anwesend  = gefiltert.filter(e => e.status === 'anwesend').length;
     const abwesend  = gefiltert.filter(e => e.status && e.status !== 'anwesend' && e.status !== 'verspaetet').length;
     const verspaetet = gefiltert.filter(e => e.status === 'verspaetet').length;
@@ -203,7 +217,7 @@ export default function Praesenz() {
                 <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <select value={abteilung} onChange={e => handleAbteilungChange(e.target.value)} style={INPUT_S}>
                         <option value="">Alle Abteilungen</option>
-                        {ABTEILUNGEN.map(a => <option key={a}>{a}</option>)}
+                        {(meineAbteilungen.length > 0 ? meineAbteilungen : ABTEILUNGEN).map(a => <option key={a}>{a}</option>)}
                     </select>
                     <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={INPUT_S} />
                     <button onClick={zeigeMeldungenStand} style={{
@@ -253,7 +267,6 @@ export default function Praesenz() {
                         <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Keine Klienten</div>
                     ) : gefiltert.map(e => {
                         const hatFerien = ferienKlienten.has(e.klient_id);
-                        const labelFarbe = e.klient_label ? (LABEL_FARBEN[e.klient_label] || { bg: '#F5F4F0', color: '#6B6860' }) : null;
                         const zeitstempel = fmtZeit(e.updated_at);
                         const selectVal = e.status || (hatFerien ? 'ferien' : 'anwesend');
                         const selectOpt = statusOpt(selectVal);
@@ -280,78 +293,66 @@ export default function Praesenz() {
                                         >
                                             {e.nachname} {e.vorname}
                                         </div>
-                                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
-                                            {e.programm_name && (
-                                                <span style={{
-                                                    fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 500,
-                                                    background: e.farbe_hex ? e.farbe_hex + '22' : '#EEF3FE',
-                                                    color: e.farbe_hex || '#1D4ED8',
-                                                    border: `1px solid ${e.farbe_hex ? e.farbe_hex + '44' : 'rgba(29,78,216,.15)'}`,
-                                                    maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                                                }}>{e.programm_name}</span>
-                                            )}
-                                            {e.klient_label && labelFarbe && (
-                                                <span style={{
-                                                    fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 600,
-                                                    background: labelFarbe.bg, color: labelFarbe.color,
-                                                }}>{e.klient_label}</span>
-                                            )}
-                                        </div>
+                                        {e.programm_name && (
+                                            <span style={{
+                                                display: 'inline-block', marginTop: 3,
+                                                fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 500,
+                                                background: e.farbe_hex ? e.farbe_hex + '22' : '#EEF3FE',
+                                                color: e.farbe_hex || '#1D4ED8',
+                                                border: `1px solid ${e.farbe_hex ? e.farbe_hex + '44' : 'rgba(29,78,216,.15)'}`,
+                                                maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                            }}>{e.programm_name}</span>
+                                        )}
                                     </div>
                                 </div>
 
-                                {/* Rechte Spalte: Status-Dropdown + Kommentar */}
+                                {/* Rechte Spalte: Status-Dropdown + Kommentar inline */}
                                 <div style={{
                                     borderBottom: '1px solid rgba(0,0,0,.05)',
-                                    padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 5
+                                    padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8
                                 }}>
-                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                        <select
-                                            value={selectVal}
-                                            onChange={ev => setStatus(e.klient_id, ev.target.value)}
-                                            style={{
-                                                fontSize: 12, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
-                                                border: `1px solid ${e.status ? selectOpt.color + '44' : 'rgba(0,0,0,.09)'}`,
-                                                background: e.status ? selectOpt.bg : '#F5F4F0',
-                                                color: e.status ? selectOpt.color : '#6B6860',
-                                                fontFamily: 'inherit', fontWeight: 500, outline: 'none'
-                                            }}
-                                        >
-                                            {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                        </select>
-                                        {hatFerien && (
-                                            <span style={{
-                                                fontSize: 10.5, padding: '2px 8px', borderRadius: 10, fontWeight: 500,
-                                                background: '#DCFCE7', color: '#15803D',
-                                                border: '1px solid rgba(22,163,74,.2)'
-                                            }}>Ferien geplant</span>
-                                        )}
-                                    </div>
-
-                                    {/* Kommentar + Zeitstempel */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        <input
-                                            type="text"
-                                            value={kommentare[e.klient_id] ?? ''}
-                                            onChange={ev => setKommentare(prev => ({ ...prev, [e.klient_id]: ev.target.value }))}
-                                            onBlur={() => saveKommentar(e.klient_id)}
-                                            placeholder={e.status ? 'Kommentar…' : 'Status zuerst setzen'}
-                                            disabled={!e.status}
-                                            style={{
-                                                fontSize: 11, padding: '2px 7px', borderRadius: 4, width: 200,
-                                                border: '1px solid rgba(0,0,0,.09)', background: e.status ? '#F5F4F0' : '#FAFAFA',
-                                                fontFamily: 'inherit', color: '#1A1917', outline: 'none'
-                                            }}
-                                        />
-                                        {zeitstempel && (
-                                            <span style={{ fontSize: 10, color: '#A09D97' }}>zuletzt {zeitstempel}</span>
-                                        )}
-                                        {(e.zugewiesen || []).length > 0 && (
-                                            <span style={{ fontSize: 10.5, color: '#A09D97', marginLeft: 'auto' }}>
-                                                {e.zugewiesen.map(u => u.full_name).join(', ')}
-                                            </span>
-                                        )}
-                                    </div>
+                                    <select
+                                        value={selectVal}
+                                        onChange={ev => setStatus(e.klient_id, ev.target.value)}
+                                        style={{
+                                            fontSize: 12, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                                            border: `1px solid ${e.status ? selectOpt.color + '44' : 'rgba(0,0,0,.09)'}`,
+                                            background: e.status ? selectOpt.bg : '#F5F4F0',
+                                            color: e.status ? selectOpt.color : '#6B6860',
+                                            fontFamily: 'inherit', fontWeight: 500, outline: 'none', flexShrink: 0
+                                        }}
+                                    >
+                                        {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    </select>
+                                    {hatFerien && (
+                                        <span style={{
+                                            fontSize: 10.5, padding: '2px 7px', borderRadius: 10, fontWeight: 500,
+                                            background: '#DCFCE7', color: '#15803D',
+                                            border: '1px solid rgba(22,163,74,.2)', flexShrink: 0
+                                        }}>Ferien</span>
+                                    )}
+                                    <input
+                                        type="text"
+                                        value={kommentare[e.klient_id] ?? ''}
+                                        onChange={ev => setKommentare(prev => ({ ...prev, [e.klient_id]: ev.target.value }))}
+                                        onBlur={() => saveKommentar(e.klient_id)}
+                                        placeholder={e.status ? 'Kommentar…' : ''}
+                                        disabled={!e.status}
+                                        style={{
+                                            fontSize: 11, padding: '3px 7px', borderRadius: 4,
+                                            flex: 1, maxWidth: 300,
+                                            border: '1px solid rgba(0,0,0,.09)', background: e.status ? '#F5F4F0' : 'transparent',
+                                            fontFamily: 'inherit', color: '#1A1917', outline: 'none'
+                                        }}
+                                    />
+                                    {zeitstempel && (
+                                        <span style={{ fontSize: 10, color: '#A09D97', flexShrink: 0 }}>zuletzt {zeitstempel}</span>
+                                    )}
+                                    {(e.zugewiesen || []).length > 0 && (
+                                        <span style={{ fontSize: 10.5, color: '#A09D97', marginLeft: 'auto', flexShrink: 0 }}>
+                                            {e.zugewiesen.map(u => u.full_name).join(', ')}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         );
