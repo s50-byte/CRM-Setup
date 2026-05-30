@@ -28,7 +28,7 @@ function statusOpt(s) {
 
 function fmtDatum(d) {
     if (!d) return '—';
-    return new Date(d + 'T12:00:00').toLocaleDateString('de-CH');
+    return new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('de-CH');
 }
 
 function fmtZeit(ts) {
@@ -70,6 +70,7 @@ export default function Praesenz() {
 
     // Verlauf
     const [vFilter, setVFilter] = useState({ datum_von: '', datum_bis: heute, status: '', abteilung: '' });
+    const [vKlientId, setVKlientId] = useState('');
     const [verlaufData, setVerlaufData] = useState([]);
     const [verlaufGeladen, setVerlaufGeladen] = useState(false);
     const [verlaufLaden, setVerlaufLaden] = useState(false);
@@ -152,6 +153,7 @@ export default function Praesenz() {
 
     async function ladeVerlauf() {
         setVerlaufLaden(true);
+        setVKlientId('');
         try {
             const params = new URLSearchParams();
             if (vFilter.datum_von) params.set('datum_von', vFilter.datum_von);
@@ -161,6 +163,7 @@ export default function Praesenz() {
             const r = await client.get(`/praesenz/historie?${params}`);
             setVerlaufData(r.data);
             setVerlaufGeladen(true);
+            if (r.data.length > 0) console.log('Verlauf erster Eintrag:', r.data[0]);
         } catch (err) {
             console.error(err);
         } finally {
@@ -173,7 +176,7 @@ export default function Praesenz() {
             `<tr>
                 <td>${e.datum ? fmtDatum(e.datum) : '—'}</td>
                 <td>${e.nachname} ${e.vorname}</td>
-                <td>${e.status ? statusOpt(e.status).label : 'Nicht erfasst'}</td>
+                <td>${e.status ? statusOpt(e.status).label : 'Anwesend'}</td>
                 <td>${e.abteilung || '—'}</td>
                 <td>${e.programm_name || '—'}</td>
                 <td>${e.kommentar || '—'}</td>
@@ -199,6 +202,12 @@ export default function Praesenz() {
 
     console.log('meineAbteilungen:', meineAbteilungen, 'erster Klient abteilung:', eintraege[0]?.abteilung);
     const gefiltert = eintraege.filter(e => !abteilung || e.abteilung === abteilung);
+
+    const verlaufKlienten = [...new Map(verlaufData.map(e => [e.klient_id, e])).values()]
+        .sort((a, b) => (a.nachname || '').localeCompare(b.nachname || ''));
+    const verlaufAngezeigt = vKlientId
+        ? verlaufData.filter(e => String(e.klient_id) === vKlientId)
+        : verlaufData;
     const anwesend  = gefiltert.filter(e => e.status === 'anwesend').length;
     const abwesend  = gefiltert.filter(e => e.status && e.status !== 'anwesend' && e.status !== 'verspaetet').length;
     const verspaetet = gefiltert.filter(e => e.status === 'verspaetet').length;
@@ -383,6 +392,14 @@ export default function Praesenz() {
                             <option value="">Alle Abteilungen</option>
                             {ABTEILUNGEN.map(a => <option key={a}>{a}</option>)}
                         </select>
+                        {verlaufGeladen && verlaufKlienten.length > 0 && (
+                            <select value={vKlientId} onChange={e => setVKlientId(e.target.value)} style={INPUT_S}>
+                                <option value="">Alle Klienten</option>
+                                {verlaufKlienten.map(k => (
+                                    <option key={k.klient_id} value={String(k.klient_id)}>{k.nachname} {k.vorname}</option>
+                                ))}
+                            </select>
+                        )}
                         <button onClick={ladeVerlauf} style={{
                             padding: '5px 14px', fontSize: 12.5, fontWeight: 500, border: 'none',
                             borderRadius: 6, background: '#2563EB', color: '#fff', cursor: 'pointer', fontFamily: 'inherit'
@@ -395,7 +412,7 @@ export default function Praesenz() {
                         )}
                         {verlaufGeladen && (
                             <span style={{ fontSize: 11.5, color: '#A09D97', marginLeft: 'auto' }}>
-                                {verlaufData.length} Einträge
+                                {verlaufAngezeigt.length}{vKlientId ? ` / ${verlaufData.length}` : ''} Einträge
                             </span>
                         )}
                     </div>
@@ -407,7 +424,7 @@ export default function Praesenz() {
                         </div>
                     ) : verlaufLaden ? (
                         <div style={{ ...CARD, padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Laden…</div>
-                    ) : verlaufData.length === 0 ? (
+                    ) : verlaufAngezeigt.length === 0 ? (
                         <div style={{ ...CARD, padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Keine Einträge</div>
                     ) : (
                         <div style={{ ...CARD, overflow: 'auto' }}>
@@ -420,7 +437,7 @@ export default function Praesenz() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {verlaufData.map((e, i) => {
+                                    {verlaufAngezeigt.map((e, i) => {
                                         const s = statusOpt(e.status);
                                         return (
                                             <tr key={e.eintrag_id || e.klient_id + '_' + i} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
@@ -429,7 +446,7 @@ export default function Praesenz() {
                                                 <td style={{ padding: '7px 12px' }}>
                                                     {e.status
                                                         ? <span style={{ padding: '2px 7px', borderRadius: 10, fontSize: 11, background: s.bg, color: s.color, fontWeight: 500 }}>{s.label}</span>
-                                                        : <span style={{ padding: '2px 7px', borderRadius: 10, fontSize: 11, background: '#F5F4F0', color: '#A09D97', fontWeight: 500 }}>Nicht erfasst</span>
+                                                        : <span style={{ padding: '2px 7px', borderRadius: 10, fontSize: 11, background: '#ECFDF5', color: '#15803D', fontWeight: 500 }}>Anwesend</span>
                                                     }
                                                 </td>
                                                 <td style={{ padding: '7px 12px', color: '#6B6860' }}>{e.abteilung || '—'}</td>
