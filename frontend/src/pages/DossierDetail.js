@@ -256,6 +256,11 @@ export default function DossierDetail() {
                                 cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
                                 background: '#fff', fontFamily: 'inherit', color: '#1A1917'
                             }}>Arbeitsort ändern</button>
+                            <button onClick={() => navigate('/praesenz?klient_id=' + dossier.klient_id + '&ansicht=verlauf&tage=7')} style={{
+                                padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
+                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
+                                background: '#fff', fontFamily: 'inherit', color: '#1A1917'
+                            }}>Präsenzverlauf</button>
                             <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
                                 padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
                                 cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,

@@ -100,13 +100,10 @@ export default function Dossiers() {
         { label: 'Name',      field: 'nachname' },
         { label: 'Programm',  field: 'programm_name' },
         { label: 'Phase',     field: 'pipeline_status' },
-        { label: 'Label',     field: 'klient_label' },
-        { label: 'Verlauf',   field: null },
         { label: 'Laufzeit',  field: null },
-        { label: 'Standort',  field: 'standort_kuerzel' },
         { label: 'Betreuung', field: null },
-        { label: 'Tasks',     field: 'offene_tasks' },
-        { label: 'Ziele',     field: null },
+        { label: '',          field: null },
+        { label: '',          field: null },
     ];
 
     const hasFilter = suche || filterTyp || filterPhase || filterStandort;
@@ -157,7 +154,7 @@ export default function Dossiers() {
             </div>
 
             <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                <table style={{ width: '100%', minWidth: 1200, borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <table style={{ width: '100%', minWidth: 800, borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                         <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
                             {COLS.map((c, i) => (
@@ -172,13 +169,12 @@ export default function Dossiers() {
                     </thead>
                     <tbody>
                         {laden ? (
-                            <tr><td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
+                            <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
                         ) : gefiltert.length === 0 ? (
-                            <tr><td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
+                            <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
                         ) : gefiltert.map((d, i) => {
                             const farbe = FARBEN[d.programm_name] || '#888';
                             const ps = PHASE_STYLE[d.pipeline_status] || { bg: '#F5F4F0', color: '#6B6860' };
-                            const verlauf = d.programm_verlauf || [];
                             const tage = berechneTageVerbleibend(d.laufend_start_datum, d.avg_dauer_tage);
                             const warnBg = tage !== null && tage < 14 ? '#FEF2F2' : tage !== null && tage < 28 ? '#FFFBEB' : '';
                             return (
@@ -187,18 +183,13 @@ export default function Dossiers() {
                                     onMouseOut={e => e.currentTarget.style.background = warnBg}>
                                     <td onClick={() => navigate(`/dossiers/${d.dossier_id}`)} style={{ padding: '8px 12px', fontWeight: 500, color: '#2563EB', cursor: 'pointer', whiteSpace: 'nowrap' }}>{d.nachname} {d.vorname}</td>
                                     <td style={{ padding: '8px 12px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                            {d.programm_name ? (
-                                                <span style={{
-                                                    fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                                    background: farbe + '22', color: farbe,
-                                                    border: `1px solid ${farbe}33`, fontWeight: 500
-                                                }}>{d.programm_name}</span>
-                                            ) : '—'}
-                                            {tage !== null && tage < 28 && (
-                                                <span title={`${tage} Tage verbleibend`} style={{ fontSize: 12, cursor: 'default', color: tage < 14 ? '#B91C1C' : '#B45309' }}>⚠</span>
-                                            )}
-                                        </div>
+                                        {d.programm_name ? (
+                                            <span style={{
+                                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                                                background: farbe + '22', color: farbe,
+                                                border: `1px solid ${farbe}33`, fontWeight: 500
+                                            }}>{d.programm_name}</span>
+                                        ) : '—'}
                                     </td>
                                     <td style={{ padding: '8px 12px' }}>
                                         <span style={{
@@ -206,26 +197,6 @@ export default function Dossiers() {
                                             background: ps.bg, color: ps.color,
                                             border: `1px solid ${ps.color}33`, fontFamily: 'monospace'
                                         }}>{d.phase_label || d.pipeline_status}</span>
-                                    </td>
-                                    <td style={{ padding: '8px 12px' }}>
-                                        {d.klient_label ? (
-                                            <span style={{
-                                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                                background: (LABEL_FARBEN[d.klient_label] || '#6B6860') + '22',
-                                                color: LABEL_FARBEN[d.klient_label] || '#6B6860',
-                                                border: `1px solid ${LABEL_FARBEN[d.klient_label] || '#6B6860'}33`,
-                                                fontFamily: 'monospace'
-                                            }}>{d.klient_label}</span>
-                                        ) : '—'}
-                                    </td>
-                                    <td style={{ padding: '8px 12px' }}>
-                                        {verlauf.length > 1 ? (
-                                            <span style={{
-                                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                                background: '#EEF3FE', color: '#1D4ED8',
-                                                border: '1px solid rgba(37,99,235,.15)', fontFamily: 'monospace'
-                                            }}>{verlauf.length} Programme</span>
-                                        ) : '1 Programm'}
                                     </td>
                                     <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5, whiteSpace: 'nowrap' }}>
                                         {(() => {
@@ -238,37 +209,21 @@ export default function Dossiers() {
                                             return <span style={color ? { color, fontWeight: 600 } : {}}>{start} – {ende}</span>;
                                         })()}
                                     </td>
-                                    <td style={{ padding: '8px 12px' }}>
-                                        {d.standort_name ? (
-                                            <span style={{
-                                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                                background: '#EEF3FE', color: '#1D4ED8',
-                                                border: '1px solid rgba(37,99,235,.15)', fontFamily: 'monospace'
-                                            }}>{d.standort_kuerzel}</span>
-                                        ) : '—'}
-                                    </td>
                                     <td style={{ padding: '8px 12px', fontSize: 11.5 }}>
                                         {(d.zugewiesen || []).map(u => u.full_name).join(', ') || '—'}
                                     </td>
-                                    <td style={{ padding: '8px 12px' }}>
-                                        {d.offene_tasks > 0 ? (
-                                            <span style={{
-                                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                                background: '#FFFBEB', color: '#B45309',
-                                                border: '1px solid rgba(217,119,6,.15)', fontFamily: 'monospace'
-                                            }}>{d.offene_tasks}</span>
-                                        ) : (
-                                            <span style={{
-                                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                                background: '#ECFDF5', color: '#15803D',
-                                                border: '1px solid rgba(22,163,74,.15)', fontFamily: 'monospace'
-                                            }}>0</span>
+                                    <td style={{ padding: '8px 12px', width: 28, textAlign: 'center' }}>
+                                        {tage !== null && tage < 28 && (
+                                            <span title={`${tage} Tage verbleibend`} style={{ fontSize: 14, cursor: 'default', color: tage < 14 ? '#B91C1C' : '#B45309' }}>⚠</span>
                                         )}
                                     </td>
-                                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>
-                                        {(d.ziele_total > 0)
-                                            ? <span style={{ color: d.ziele_erreicht === d.ziele_total ? '#15803D' : '#1A1917' }}>{d.ziele_erreicht}/{d.ziele_total}</span>
-                                            : <span style={{ color: '#A09D97' }}>—</span>}
+                                    <td style={{ padding: '8px 12px' }}>
+                                        <button onClick={() => navigate(`/dossiers/${d.dossier_id}`)} style={{
+                                            padding: '3px 10px', fontSize: 11.5, cursor: 'pointer',
+                                            border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
+                                            background: '#F5F4F0', fontFamily: 'inherit', color: '#1A1917',
+                                            whiteSpace: 'nowrap'
+                                        }}>Öffnen</button>
                                     </td>
                                 </tr>
                             );

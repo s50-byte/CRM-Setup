@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import client from '../api/client';
 
 const ABTEILUNGEN = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert'];
@@ -51,6 +51,7 @@ function tabBtn(aktiv) {
 
 export default function Praesenz() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const heute = new Date().toISOString().slice(0, 10);
     const [datum, setDatum] = useState(heute);
     const [eintraege, setEintraege] = useState([]);
@@ -69,7 +70,7 @@ export default function Praesenz() {
     const [standLaden, setStandLaden] = useState(false);
 
     // Verlauf
-    const [vFilter, setVFilter] = useState({ datum_von: '', datum_bis: heute, status: '', abteilung: '' });
+    const [vFilter, setVFilter] = useState({ datum_von: '', datum_bis: heute, status: '', abteilung: '', klient_id: '' });
     const [vKlientId, setVKlientId] = useState('');
     const [verlaufData, setVerlaufData] = useState([]);
     const [verlaufGeladen, setVerlaufGeladen] = useState(false);
@@ -151,15 +152,17 @@ export default function Praesenz() {
         }
     }
 
-    async function ladeVerlauf() {
+    async function ladeVerlauf(filterOverride) {
+        const f = filterOverride || vFilter;
         setVerlaufLaden(true);
-        setVKlientId('');
+        if (!filterOverride) setVKlientId('');
         try {
             const params = new URLSearchParams();
-            if (vFilter.datum_von) params.set('datum_von', vFilter.datum_von);
-            if (vFilter.datum_bis) params.set('datum_bis', vFilter.datum_bis);
-            if (vFilter.status) params.set('status', vFilter.status);
-            if (vFilter.abteilung) params.set('abteilung', vFilter.abteilung);
+            if (f.datum_von) params.set('datum_von', f.datum_von);
+            if (f.datum_bis) params.set('datum_bis', f.datum_bis);
+            if (f.status) params.set('status', f.status);
+            if (f.abteilung) params.set('abteilung', f.abteilung);
+            if (f.klient_id) params.set('klient_id', f.klient_id);
             const r = await client.get(`/praesenz/historie?${params}`);
             setVerlaufData(r.data);
             setVerlaufGeladen(true);
@@ -170,6 +173,23 @@ export default function Praesenz() {
             setVerlaufLaden(false);
         }
     }
+
+    // URL-Params: klient_id + ansicht=verlauf + tage=N → direkt Verlauf laden
+    useEffect(() => {
+        const ansicht = searchParams.get('ansicht');
+        const klientId = searchParams.get('klient_id');
+        const tage = parseInt(searchParams.get('tage') || '0', 10);
+        if (ansicht !== 'verlauf') return;
+        setAktTab('verlauf');
+        const von = tage > 0 ? (() => {
+            const d = new Date(); d.setDate(d.getDate() - tage);
+            return d.toISOString().slice(0, 10);
+        })() : '';
+        const neuesFilter = { datum_von: von, datum_bis: heute, status: '', abteilung: '', klient_id: klientId || '' };
+        setVFilter(neuesFilter);
+        ladeVerlauf(neuesFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     function drucken() {
         const rows = verlaufData.map(e =>
