@@ -105,7 +105,8 @@ export default function Praesenz() {
     const [standLaden, setStandLaden] = useState(false);
 
     // Verlauf
-    const [vFilter, setVFilter] = useState({ datum_von: '', datum_bis: heute, status: '', abteilung: '', klient_id: '' });
+    const [vDatum, setVDatum] = useState(heute);
+    const [vFilter, setVFilter] = useState({ datum_von: '', datum_bis: heute, status: '', abteilung: '' });
     const [vKlientId, setVKlientId] = useState('');
     const [verlaufData, setVerlaufData] = useState([]);
     const [verlaufGeladen, setVerlaufGeladen] = useState(false);
@@ -198,24 +199,52 @@ export default function Praesenz() {
         }
     }
 
-    async function ladeVerlauf(filterOverride) {
-        const f = filterOverride || vFilter;
+    async function ladeVerlauf(opts = {}) {
         setVerlaufLaden(true);
-        if (!filterOverride) setVKlientId('');
         try {
+            const kid = 'klient_id' in opts ? opts.klient_id : vKlientId;
             const params = new URLSearchParams();
-            if (f.datum_von) params.set('datum_von', f.datum_von);
-            if (f.datum_bis) params.set('datum_bis', f.datum_bis);
-            if (f.abteilung) params.set('abteilung', f.abteilung);
-            if (f.klient_id) params.set('klient_id', f.klient_id);
+            if (kid) {
+                const von = opts.datum_von ?? vFilter.datum_von;
+                const bis = opts.datum_bis ?? vFilter.datum_bis;
+                if (von) params.set('datum_von', von);
+                if (bis) params.set('datum_bis', bis);
+                params.set('klient_id', String(kid));
+            } else {
+                const d = opts.datum ?? vDatum;
+                params.set('datum_von', d);
+                params.set('datum_bis', d);
+                const ab = opts.abteilung ?? vFilter.abteilung;
+                if (ab) params.set('abteilung', ab);
+            }
             const r = await client.get(`/praesenz/historie?${params}`);
             setVerlaufData(r.data);
             setVerlaufGeladen(true);
-            if (r.data.length > 0) console.log('Verlauf erster Eintrag:', r.data[0]);
         } catch (err) {
             console.error(err);
         } finally {
             setVerlaufLaden(false);
+        }
+    }
+
+    function navDatum(delta) {
+        const d = new Date(vDatum + 'T12:00:00');
+        d.setDate(d.getDate() + delta);
+        const neu = d.toISOString().slice(0, 10);
+        setVDatum(neu);
+        ladeVerlauf({ datum: neu });
+    }
+
+    function handleKlientChange(kid) {
+        setVKlientId(kid);
+        if (kid) {
+            const von7 = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
+            const newVon = vFilter.datum_von || von7;
+            const newBis = vFilter.datum_bis || heute;
+            setVFilter(p => ({ ...p, datum_von: newVon, datum_bis: newBis }));
+            ladeVerlauf({ klient_id: kid, datum_von: newVon, datum_bis: newBis });
+        } else {
+            ladeVerlauf({ datum: vDatum, klient_id: '' });
         }
     }
 
@@ -226,13 +255,17 @@ export default function Praesenz() {
         const tage = parseInt(searchParams.get('tage') || '0', 10);
         if (ansicht !== 'verlauf') return;
         setAktTab('verlauf');
-        const von = tage > 0 ? (() => {
-            const d = new Date(); d.setDate(d.getDate() - tage);
-            return d.toISOString().slice(0, 10);
-        })() : '';
-        const neuesFilter = { datum_von: von, datum_bis: heute, status: '', abteilung: '', klient_id: klientId || '' };
-        setVFilter(neuesFilter);
-        ladeVerlauf(neuesFilter);
+        if (klientId) {
+            const von = tage > 0 ? (() => {
+                const d = new Date(); d.setDate(d.getDate() - tage);
+                return d.toISOString().slice(0, 10);
+            })() : '';
+            setVKlientId(klientId);
+            setVFilter(p => ({ ...p, datum_von: von, datum_bis: heute }));
+            ladeVerlauf({ klient_id: klientId, datum_von: von, datum_bis: heute });
+        } else {
+            ladeVerlauf({ datum: heute });
+        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -272,14 +305,14 @@ export default function Praesenz() {
 
     const verlaufKlienten = [...new Map(verlaufData.map(e => [e.klient_id, e])).values()]
         .sort((a, b) => (a.nachname || '').localeCompare(b.nachname || ''));
-    const verlaufExpanded = expandVerlaufTageweise(verlaufData, vFilter.datum_von, vFilter.datum_bis);
-    const verlaufAngezeigt = verlaufExpanded
-        .filter(e => !vKlientId || String(e.klient_id) === vKlientId)
-        .filter(e => {
-            if (!vFilter.status) return true;
-            if (vFilter.status === 'nicht_erfasst') return !e.status;
-            return e.status === vFilter.status;
-        });
+    const expandVon = vKlientId ? vFilter.datum_von : vDatum;
+    const expandBis = vKlientId ? vFilter.datum_bis : vDatum;
+    const verlaufExpanded = expandVerlaufTageweise(verlaufData, expandVon, expandBis);
+    const verlaufAngezeigt = verlaufExpanded.filter(e => {
+        if (!vFilter.status) return true;
+        if (vFilter.status === 'nicht_erfasst') return !e.status;
+        return e.status === vFilter.status;
+    });
     const anwesend  = gefiltert.filter(e => e.status === 'anwesend').length;
     const abwesend  = gefiltert.filter(e => e.status && e.status !== 'anwesend' && e.status !== 'verspaetet').length;
     const verspaetet = gefiltert.filter(e => e.status === 'verspaetet').length;
@@ -447,35 +480,63 @@ export default function Praesenz() {
                     {/* Filter-Leiste */}
                     <div style={{ ...CARD, padding: '.75rem 1rem', marginBottom: '1rem', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.05em' }}>Filter</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <label style={{ fontSize: 11.5, color: '#6B6860' }}>Von</label>
-                            <input type="date" value={vFilter.datum_von} onChange={e => setVFilter(p => ({ ...p, datum_von: e.target.value }))} style={INPUT_S} />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <label style={{ fontSize: 11.5, color: '#6B6860' }}>Bis</label>
-                            <input type="date" value={vFilter.datum_bis} onChange={e => setVFilter(p => ({ ...p, datum_bis: e.target.value }))} style={INPUT_S} />
-                        </div>
-                        <select value={vFilter.status} onChange={e => setVFilter(p => ({ ...p, status: e.target.value }))} style={INPUT_S}>
-                            <option value="">Alle Status</option>
-                            {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            <option value="nicht_erfasst">Nicht erfasst</option>
-                        </select>
-                        <select value={vFilter.abteilung} onChange={e => setVFilter(p => ({ ...p, abteilung: e.target.value }))} style={INPUT_S}>
-                            <option value="">Alle Abteilungen</option>
-                            {ABTEILUNGEN.map(a => <option key={a}>{a}</option>)}
-                        </select>
-                        {verlaufGeladen && verlaufKlienten.length > 0 && (
-                            <select value={vKlientId} onChange={e => setVKlientId(e.target.value)} style={INPUT_S}>
-                                <option value="">Alle Klienten</option>
-                                {verlaufKlienten.map(k => (
-                                    <option key={k.klient_id} value={String(k.klient_id)}>{k.nachname} {k.vorname}</option>
-                                ))}
-                            </select>
+                        {vKlientId ? (
+                            <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                    <label style={{ fontSize: 11.5, color: '#6B6860' }}>Von</label>
+                                    <input type="date" value={vFilter.datum_von} onChange={e => setVFilter(p => ({ ...p, datum_von: e.target.value }))} style={INPUT_S} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                    <label style={{ fontSize: 11.5, color: '#6B6860' }}>Bis</label>
+                                    <input type="date" value={vFilter.datum_bis} onChange={e => setVFilter(p => ({ ...p, datum_bis: e.target.value }))} style={INPUT_S} />
+                                </div>
+                                <select value={vFilter.status} onChange={e => setVFilter(p => ({ ...p, status: e.target.value }))} style={INPUT_S}>
+                                    <option value="">Alle Status</option>
+                                    {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    <option value="nicht_erfasst">Nicht erfasst</option>
+                                </select>
+                                {(() => {
+                                    const k = verlaufKlienten.find(k => String(k.klient_id) === vKlientId);
+                                    return k ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: '#EEF3FE', border: '1px solid rgba(37,99,235,.2)', fontSize: 12, color: '#1D4ED8', fontWeight: 500 }}>
+                                            {k.nachname} {k.vorname}
+                                            <button onClick={() => handleKlientChange('')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#1D4ED8', padding: 0, fontSize: 14, lineHeight: 1, marginLeft: 2 }}>×</button>
+                                        </div>
+                                    ) : null;
+                                })()}
+                                <button onClick={() => ladeVerlauf()} style={{
+                                    padding: '5px 14px', fontSize: 12.5, fontWeight: 500, border: 'none',
+                                    borderRadius: 6, background: '#2563EB', color: '#fff', cursor: 'pointer', fontFamily: 'inherit'
+                                }}>{verlaufLaden ? 'Laden…' : 'Laden'}</button>
+                            </>
+                        ) : (
+                            <>
+                                <select value={vFilter.abteilung} onChange={e => setVFilter(p => ({ ...p, abteilung: e.target.value }))} style={INPUT_S}>
+                                    <option value="">Alle Abteilungen</option>
+                                    {ABTEILUNGEN.map(a => <option key={a}>{a}</option>)}
+                                </select>
+                                <select value={vFilter.status} onChange={e => setVFilter(p => ({ ...p, status: e.target.value }))} style={INPUT_S}>
+                                    <option value="">Alle Status</option>
+                                    {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    <option value="nicht_erfasst">Nicht erfasst</option>
+                                </select>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <button onClick={() => navDatum(-1)} style={{ ...INPUT_S, padding: '4px 10px', fontWeight: 600, fontSize: 14, lineHeight: 1 }}>←</button>
+                                    <span style={{ fontSize: 12.5, fontWeight: 500, minWidth: 90, textAlign: 'center', padding: '0 4px' }}>
+                                        {new Date(vDatum + 'T12:00:00').toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                    </span>
+                                    <button onClick={() => navDatum(1)} style={{ ...INPUT_S, padding: '4px 10px', fontWeight: 600, fontSize: 14, lineHeight: 1 }}>→</button>
+                                </div>
+                                {verlaufGeladen && verlaufKlienten.length > 0 && (
+                                    <select value={vKlientId} onChange={e => handleKlientChange(e.target.value)} style={INPUT_S}>
+                                        <option value="">Alle Klienten</option>
+                                        {verlaufKlienten.map(k => (
+                                            <option key={k.klient_id} value={String(k.klient_id)}>{k.nachname} {k.vorname}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </>
                         )}
-                        <button onClick={ladeVerlauf} style={{
-                            padding: '5px 14px', fontSize: 12.5, fontWeight: 500, border: 'none',
-                            borderRadius: 6, background: '#2563EB', color: '#fff', cursor: 'pointer', fontFamily: 'inherit'
-                        }}>{verlaufLaden ? 'Laden…' : 'Laden'}</button>
                         {verlaufGeladen && verlaufData.length > 0 && (
                             <button onClick={drucken} style={{
                                 padding: '5px 12px', fontSize: 12.5, border: '1px solid rgba(0,0,0,.09)',
@@ -484,7 +545,7 @@ export default function Praesenz() {
                         )}
                         {verlaufGeladen && (
                             <span style={{ fontSize: 11.5, color: '#A09D97', marginLeft: 'auto' }}>
-                                {verlaufAngezeigt.length}{vKlientId ? ` / ${verlaufData.length}` : ''} Einträge
+                                {verlaufAngezeigt.length} Einträge
                             </span>
                         )}
                     </div>
