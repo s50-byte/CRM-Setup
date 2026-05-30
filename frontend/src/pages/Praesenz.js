@@ -114,14 +114,18 @@ export default function Praesenz() {
     // Abteilungen aus Benutzer-Einstellung laden
     useEffect(() => {
         client.get('/benutzer/einstellung/abteilungen').then(r => {
+            console.log('[Abteilungen] API Antwort:', r.data);
             try {
                 const list = r.data.wert ? JSON.parse(r.data.wert) : [];
-                if (list.length > 0) setAbteilung('');
+                console.log('[Abteilungen] Geparste Liste:', list);
                 setMeineAbteilungen(list);
-            } catch {
+            } catch (e) {
+                console.error('[Abteilungen] JSON.parse Fehler:', e, '| Rohwert:', r.data.wert);
                 setMeineAbteilungen([]);
             }
-        }).catch(console.error);
+        }).catch(err => {
+            console.error('[Abteilungen] API Fehler:', err.response?.status, err.response?.data);
+        });
     }, []);
 
     // Präsenz + Ferien laden wenn Datum wechselt
@@ -254,7 +258,7 @@ export default function Praesenz() {
         win.print();
     }
 
-    console.log('meineAbteilungen:', meineAbteilungen, 'erster Klient abteilung:', eintraege[0]?.abteilung);
+    console.log('[Filter] meineAbteilungen:', meineAbteilungen, '| gewaehltAbteilung:', JSON.stringify(abteilung), '| klient[0].abteilung:', JSON.stringify(eintraege[0]?.abteilung));
     const gefiltert = eintraege.filter(e => !abteilung || e.abteilung === abteilung);
 
     const verlaufKlienten = [...new Map(verlaufData.map(e => [e.klient_id, e])).values()]
