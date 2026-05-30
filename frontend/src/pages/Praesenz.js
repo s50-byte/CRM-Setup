@@ -36,6 +36,41 @@ function fmtZeit(ts) {
     return new Date(ts).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
 }
 
+function expandVerlaufTageweise(data, von, bis) {
+    if (!von || !bis) return data;
+    const vonDate = new Date(von + 'T12:00:00');
+    const bisDate = new Date(bis + 'T12:00:00');
+    if (isNaN(vonDate) || isNaN(bisDate) || vonDate > bisDate) return data;
+
+    const klientenMap = new Map();
+    const entryMap = new Map();
+    data.forEach(e => {
+        if (!klientenMap.has(e.klient_id)) {
+            klientenMap.set(e.klient_id, {
+                klient_id: e.klient_id, nachname: e.nachname, vorname: e.vorname,
+                programm_name: e.programm_name, abteilung: e.abteilung,
+            });
+        }
+        if (e.datum) {
+            entryMap.set(`${e.klient_id}_${String(e.datum).slice(0, 10)}`, e);
+        }
+    });
+
+    const klienten = [...klientenMap.values()].sort((a, b) =>
+        (a.nachname || '').localeCompare(b.nachname || ''));
+    const result = [];
+    for (let d = new Date(bisDate); d >= vonDate; d.setDate(d.getDate() - 1)) {
+        const datumStr = d.toISOString().slice(0, 10);
+        for (const k of klienten) {
+            result.push(
+                entryMap.get(`${k.klient_id}_${datumStr}`) ||
+                { ...k, datum: datumStr, status: null, eintrag_id: null, kommentar: null, historie: [] }
+            );
+        }
+    }
+    return result;
+}
+
 const CARD = { background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)' };
 const INPUT_S = { fontSize: 12, padding: '5px 9px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', cursor: 'pointer' };
 const TH_STYLE = { padding: '9px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em' };
@@ -160,7 +195,6 @@ export default function Praesenz() {
             const params = new URLSearchParams();
             if (f.datum_von) params.set('datum_von', f.datum_von);
             if (f.datum_bis) params.set('datum_bis', f.datum_bis);
-            if (f.status) params.set('status', f.status);
             if (f.abteilung) params.set('abteilung', f.abteilung);
             if (f.klient_id) params.set('klient_id', f.klient_id);
             const r = await client.get(`/praesenz/historie?${params}`);
@@ -192,7 +226,7 @@ export default function Praesenz() {
     }, []);
 
     function drucken() {
-        const rows = verlaufData.map(e =>
+        const rows = verlaufAngezeigt.map(e =>
             `<tr>
                 <td>${e.datum ? fmtDatum(e.datum) : '—'}</td>
                 <td>${e.nachname} ${e.vorname}</td>
@@ -225,9 +259,14 @@ export default function Praesenz() {
 
     const verlaufKlienten = [...new Map(verlaufData.map(e => [e.klient_id, e])).values()]
         .sort((a, b) => (a.nachname || '').localeCompare(b.nachname || ''));
-    const verlaufAngezeigt = vKlientId
-        ? verlaufData.filter(e => String(e.klient_id) === vKlientId)
-        : verlaufData;
+    const verlaufExpanded = expandVerlaufTageweise(verlaufData, vFilter.datum_von, vFilter.datum_bis);
+    const verlaufAngezeigt = verlaufExpanded
+        .filter(e => !vKlientId || String(e.klient_id) === vKlientId)
+        .filter(e => {
+            if (!vFilter.status) return true;
+            if (vFilter.status === 'nicht_erfasst') return !e.status;
+            return e.status === vFilter.status;
+        });
     const anwesend  = gefiltert.filter(e => e.status === 'anwesend').length;
     const abwesend  = gefiltert.filter(e => e.status && e.status !== 'anwesend' && e.status !== 'verspaetet').length;
     const verspaetet = gefiltert.filter(e => e.status === 'verspaetet').length;
