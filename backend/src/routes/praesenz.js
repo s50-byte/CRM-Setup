@@ -117,9 +117,9 @@ router.get('/:datum', auth, async (req, res) => {
                     ) FILTER (WHERE u.user_id IS NOT NULL),
                     '[]'
                 ) AS zugewiesen,
-                (SELECT COUNT(*) > 0 FROM ferienplanung fp2
-                 WHERE fp2.klient_id = k.klient_id
-                 AND $1::date BETWEEN fp2.von AND fp2.bis) AS hat_ferien
+                fp_lat.von AS ferien_von,
+                fp_lat.bis AS ferien_bis,
+                fp_lat.von IS NOT NULL AS hat_ferien
              FROM klient k
              JOIN dossier d ON d.klient_id = k.klient_id
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
@@ -128,6 +128,12 @@ router.get('/:datum', auth, async (req, res) => {
                 AND pe.datum = $1
              LEFT JOIN klient_user ku ON ku.klient_id = k.klient_id AND ku.aktiv = TRUE
              LEFT JOIN benutzer u ON u.user_id = ku.user_id
+             LEFT JOIN LATERAL (
+                SELECT von, bis FROM ferienplanung fp2
+                WHERE fp2.klient_id = k.klient_id
+                AND $1::date BETWEEN fp2.von AND fp2.bis
+                LIMIT 1
+             ) fp_lat ON TRUE
              WHERE k.aktiv = TRUE
                AND d.pipeline_status != 'Erstkontakt'
              GROUP BY k.klient_id, k.nachname, k.vorname,
@@ -136,7 +142,8 @@ router.get('/:datum', auth, async (req, res) => {
                       lv.pensum_pct, lv.zeit_von, lv.zeit_bis, lv.zeitbasis,
                       lv.tage_mo, lv.tage_di, lv.tage_mi, lv.tage_do, lv.tage_fr,
                       pe.eintrag_id, pe.status, pe.ankunftszeit, pe.bemerkung,
-                      pe.kommentar, pe.updated_at, pe.created_at
+                      pe.kommentar, pe.updated_at, pe.created_at,
+                      fp_lat.von, fp_lat.bis
              ORDER BY k.nachname, k.vorname`,
             [req.params.datum]
         );

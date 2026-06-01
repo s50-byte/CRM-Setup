@@ -90,10 +90,9 @@ export default function Praesenz() {
     const [datum, setDatum] = useState(heute);
     const [eintraege, setEintraege] = useState([]);
     const [laden, setLaden] = useState(true);
-    const [selAbteilungen, setSelAbteilungen] = useState(new Set());
-    const [selStandorte, setSelStandorte] = useState(new Set());
+    const [selAbteilung, setSelAbteilung] = useState('');
+    const [selStandort, setSelStandort] = useState('');
     const [alleStandorte, setAlleStandorte] = useState([]);
-    const [filterOffen, setFilterOffen] = useState(null);
     const [kommentare, setKommentare] = useState({});
     const [aktTab, setAktTab] = useState('tag');
 
@@ -119,8 +118,8 @@ export default function Praesenz() {
             setAlleStandorte(stRes.data);
             try {
                 const f = filterRes.data.wert ? JSON.parse(filterRes.data.wert) : {};
-                if (f.abteilungen?.length) setSelAbteilungen(new Set(f.abteilungen));
-                if (f.standorte?.length) setSelStandorte(new Set(f.standorte.map(String)));
+                if (f.abteilung) setSelAbteilung(f.abteilung);
+                if (f.standort) setSelStandort(f.standort);
             } catch(e) {}
         }).catch(console.error);
     }, []);
@@ -140,23 +139,8 @@ export default function Praesenz() {
 
     function speichereFilter(abt, st) {
         client.put('/benutzer/einstellung/praesenz_filter', {
-            wert: JSON.stringify({ abteilungen: [...abt], standorte: [...st].map(Number) })
+            wert: JSON.stringify({ abteilung: abt, standort: st })
         }).catch(console.error);
-    }
-
-    function toggleAbteilung(a) {
-        const neu = new Set(selAbteilungen);
-        neu.has(a) ? neu.delete(a) : neu.add(a);
-        setSelAbteilungen(neu);
-        speichereFilter(neu, selStandorte);
-    }
-
-    function toggleStandort(id) {
-        const neu = new Set(selStandorte);
-        const sid = String(id);
-        neu.has(sid) ? neu.delete(sid) : neu.add(sid);
-        setSelStandorte(neu);
-        speichereFilter(selAbteilungen, neu);
     }
 
     async function setStatus(klient_id, status) {
@@ -301,9 +285,11 @@ export default function Praesenz() {
     }
 
     const gefiltert = eintraege.filter(k =>
-        (selAbteilungen.size === 0 || selAbteilungen.has(k.abteilung)) &&
-        (selStandorte.size === 0 || selStandorte.has(String(k.standort_id)))
+        (!selAbteilung || k.abteilung === selAbteilung) &&
+        (!selStandort || String(k.standort_id) === selStandort)
     );
+    const gefiltertNormal = gefiltert.filter(k => !k.hat_ferien);
+    const gefiltertFerien  = gefiltert.filter(k => k.hat_ferien);
 
     const verlaufKlienten = [...new Map(verlaufData.map(e => [e.klient_id, e])).values()]
         .sort((a, b) => (a.nachname || '').localeCompare(b.nachname || ''));
@@ -315,10 +301,10 @@ export default function Praesenz() {
         if (vFilter.status === 'nicht_erfasst') return !e.status;
         return e.status === vFilter.status;
     });
-    const anwesend  = gefiltert.filter(e => e.status === 'anwesend').length;
-    const abwesend  = gefiltert.filter(e => e.status && e.status !== 'anwesend' && e.status !== 'verspaetet').length;
-    const verspaetet = gefiltert.filter(e => e.status === 'verspaetet').length;
-    const offen     = gefiltert.filter(e => !e.status).length;
+    const anwesend  = gefiltertNormal.filter(e => e.status === 'anwesend').length;
+    const abwesend  = gefiltertNormal.filter(e => e.status && e.status !== 'anwesend' && e.status !== 'verspaetet').length;
+    const verspaetet = gefiltertNormal.filter(e => e.status === 'verspaetet').length;
+    const offen     = gefiltertNormal.filter(e => !e.status).length;
 
     return (
         <div>
@@ -331,51 +317,15 @@ export default function Praesenz() {
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    {/* Abteilung-Filter */}
-                    <div style={{ position: 'relative' }}>
-                        <button onClick={() => setFilterOffen(filterOffen === 'abt' ? null : 'abt')} style={{ ...INPUT_S, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            {selAbteilungen.size === 0 ? 'Alle Abteilungen' : `${selAbteilungen.size} Abt.`}
-                            <span style={{ fontSize: 8 }}>▼</span>
-                        </button>
-                        {filterOffen === 'abt' && (<>
-                            <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setFilterOffen(null)} />
-                            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 10, background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 8, padding: '.75rem', boxShadow: '0 4px 16px rgba(0,0,0,.12)', minWidth: 200 }}>
-                                <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, cursor: 'pointer', marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(0,0,0,.06)' }}>
-                                    <input type="checkbox" checked={selAbteilungen.size === 0} onChange={() => { setSelAbteilungen(new Set()); speichereFilter(new Set(), selStandorte); }} />
-                                    Alle
-                                </label>
-                                {ABTEILUNGEN.map(a => (
-                                    <label key={a} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, cursor: 'pointer', marginBottom: 3 }}>
-                                        <input type="checkbox" checked={selAbteilungen.has(a)} onChange={() => toggleAbteilung(a)} />
-                                        {a}
-                                    </label>
-                                ))}
-                            </div>
-                        </>)}
-                    </div>
-                    {/* Standort-Filter */}
+                    <select value={selAbteilung} onChange={e => { setSelAbteilung(e.target.value); speichereFilter(e.target.value, selStandort); }} style={INPUT_S}>
+                        <option value="">Alle Abteilungen</option>
+                        {ABTEILUNGEN.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
                     {alleStandorte.length > 0 && (
-                        <div style={{ position: 'relative' }}>
-                            <button onClick={() => setFilterOffen(filterOffen === 'st' ? null : 'st')} style={{ ...INPUT_S, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                {selStandorte.size === 0 ? 'Alle Standorte' : `${selStandorte.size} Standort${selStandorte.size > 1 ? 'e' : ''}`}
-                                <span style={{ fontSize: 8 }}>▼</span>
-                            </button>
-                            {filterOffen === 'st' && (<>
-                                <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setFilterOffen(null)} />
-                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 10, background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 8, padding: '.75rem', boxShadow: '0 4px 16px rgba(0,0,0,.12)', minWidth: 200 }}>
-                                    <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, cursor: 'pointer', marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(0,0,0,.06)' }}>
-                                        <input type="checkbox" checked={selStandorte.size === 0} onChange={() => { setSelStandorte(new Set()); speichereFilter(selAbteilungen, new Set()); }} />
-                                        Alle
-                                    </label>
-                                    {alleStandorte.map(s => (
-                                        <label key={s.standort_id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, cursor: 'pointer', marginBottom: 3 }}>
-                                            <input type="checkbox" checked={selStandorte.has(String(s.standort_id))} onChange={() => toggleStandort(s.standort_id)} />
-                                            {s.name}
-                                        </label>
-                                    ))}
-                                </div>
-                            </>)}
-                        </div>
+                        <select value={selStandort} onChange={e => { setSelStandort(e.target.value); speichereFilter(selAbteilung, e.target.value); }} style={INPUT_S}>
+                            <option value="">Alle Standorte</option>
+                            {alleStandorte.map(s => <option key={s.standort_id} value={String(s.standort_id)}>{s.name}</option>)}
+                        </select>
                     )}
                     <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={INPUT_S} />
                     <button onClick={zeigeMeldungenStand} style={{
@@ -412,109 +362,84 @@ export default function Praesenz() {
 
             {/* === Tab: Heutiger Tag === */}
             {aktTab === 'tag' && (
-                <div style={{ ...CARD, overflow: 'hidden' }}>
-                    {/* Tabellenkopf */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
-                        <div style={{ ...TH_STYLE, borderRight: '1px solid rgba(0,0,0,.09)' }}>Klient/in</div>
-                        <div style={TH_STYLE}>Status · Kommentar</div>
-                    </div>
-
-                    {laden ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Laden…</div>
-                    ) : gefiltert.length === 0 ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Keine Klienten</div>
-                    ) : gefiltert.map(e => {
-                        const hatFerien = !!e.hat_ferien;
-                        const zeitstempel = fmtZeit(e.updated_at);
-                        const selectVal = e.status || (hatFerien ? 'ferien' : 'anwesend');
-                        const selectOpt = statusOpt(selectVal);
-                        return (
-                            <div key={e.klient_id} style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: hatFerien ? '#F0FDF4' : '#fff' }}>
-                                {/* Linke Spalte: Name + Badges */}
-                                <div style={{
-                                    borderRight: '1px solid rgba(0,0,0,.09)',
-                                    borderBottom: '1px solid rgba(0,0,0,.05)',
-                                    padding: '8px 12px', display: 'flex', alignItems: 'flex-start', gap: 8
-                                }}>
-                                    <div style={{
-                                        width: 26, height: 26, borderRadius: 6,
-                                        background: '#EEF3FE', color: '#1D4ED8',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: 9, fontWeight: 600, flexShrink: 0, marginTop: 1
-                                    }}>
-                                        {(e.nachname?.[0] || '') + (e.vorname?.[0] || '')}
-                                    </div>
-                                    <div style={{ minWidth: 0 }}>
-                                        <div
-                                            onClick={() => e.dossier_id && navigate('/dossiers/' + e.dossier_id)}
-                                            style={{ fontSize: 12.5, fontWeight: 600, cursor: e.dossier_id ? 'pointer' : 'default', color: e.dossier_id ? '#2563EB' : '#1A1917' }}
-                                        >
-                                            {e.nachname} {e.vorname}
+                <div>
+                    {/* Tabelle 1: Anwesend / Kontrolle */}
+                    <div style={{ ...CARD, overflow: 'hidden', marginBottom: gefiltertFerien.length > 0 ? '1rem' : 0 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
+                            <div style={{ ...TH_STYLE, borderRight: '1px solid rgba(0,0,0,.09)' }}>Anwesend / Kontrolle</div>
+                            <div style={TH_STYLE}>Status · Kommentar</div>
+                        </div>
+                        {laden ? (
+                            <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Laden…</div>
+                        ) : gefiltertNormal.length === 0 ? (
+                            <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Keine Klienten</div>
+                        ) : gefiltertNormal.map(e => {
+                            const zeitstempel = fmtZeit(e.updated_at);
+                            const selectVal = e.status || 'anwesend';
+                            const selectOpt = statusOpt(selectVal);
+                            return (
+                                <div key={e.klient_id} style={{ display: 'grid', gridTemplateColumns: '220px 1fr' }}>
+                                    <div style={{ borderRight: '1px solid rgba(0,0,0,.09)', borderBottom: '1px solid rgba(0,0,0,.05)', padding: '8px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                        <div style={{ width: 26, height: 26, borderRadius: 6, background: '#EEF3FE', color: '#1D4ED8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, flexShrink: 0, marginTop: 1 }}>
+                                            {(e.nachname?.[0] || '') + (e.vorname?.[0] || '')}
                                         </div>
-                                        {e.programm_name && (
-                                            <span style={{
-                                                display: 'inline-block', marginTop: 3,
-                                                fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 500,
-                                                background: e.farbe_hex ? e.farbe_hex + '22' : '#EEF3FE',
-                                                color: e.farbe_hex || '#1D4ED8',
-                                                border: `1px solid ${e.farbe_hex ? e.farbe_hex + '44' : 'rgba(29,78,216,.15)'}`,
-                                                maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                                            }}>{e.programm_name}</span>
+                                        <div style={{ minWidth: 0 }}>
+                                            <div onClick={() => e.dossier_id && navigate('/dossiers/' + e.dossier_id)} style={{ fontSize: 12.5, fontWeight: 600, cursor: e.dossier_id ? 'pointer' : 'default', color: e.dossier_id ? '#2563EB' : '#1A1917' }}>
+                                                {e.nachname} {e.vorname}
+                                            </div>
+                                            {e.programm_name && (
+                                                <span style={{ display: 'inline-block', marginTop: 3, fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 500, background: e.farbe_hex ? e.farbe_hex + '22' : '#EEF3FE', color: e.farbe_hex || '#1D4ED8', border: `1px solid ${e.farbe_hex ? e.farbe_hex + '44' : 'rgba(29,78,216,.15)'}`, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.programm_name}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div style={{ borderBottom: '1px solid rgba(0,0,0,.05)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <select value={selectVal} onChange={ev => setStatus(e.klient_id, ev.target.value)} style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${e.status ? selectOpt.color + '44' : 'rgba(0,0,0,.09)'}`, background: e.status ? selectOpt.bg : '#F5F4F0', color: e.status ? selectOpt.color : '#6B6860', fontFamily: 'inherit', fontWeight: 500, outline: 'none', flexShrink: 0 }}>
+                                            {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                        </select>
+                                        <input type="text" value={kommentare[e.klient_id] ?? ''} onChange={ev => setKommentare(prev => ({ ...prev, [e.klient_id]: ev.target.value }))} onBlur={() => saveKommentar(e.klient_id)} placeholder={e.status ? 'Kommentar…' : ''} disabled={!e.status} style={{ fontSize: 11, padding: '3px 7px', borderRadius: 4, flex: 1, maxWidth: 300, border: '1px solid rgba(0,0,0,.09)', background: e.status ? '#F5F4F0' : 'transparent', fontFamily: 'inherit', color: '#1A1917', outline: 'none' }} />
+                                        {zeitstempel && <span style={{ fontSize: 10, color: '#A09D97', flexShrink: 0 }}>zuletzt {zeitstempel}</span>}
+                                        {(e.zugewiesen || []).length > 0 && (
+                                            <span style={{ fontSize: 10.5, color: '#A09D97', marginLeft: 'auto', flexShrink: 0 }}>
+                                                {e.zugewiesen.map(u => u.full_name).join(', ')}
+                                            </span>
                                         )}
                                     </div>
                                 </div>
+                            );
+                        })}
+                    </div>
 
-                                {/* Rechte Spalte: Status-Dropdown + Kommentar inline */}
-                                <div style={{
-                                    borderBottom: '1px solid rgba(0,0,0,.05)',
-                                    padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8
-                                }}>
-                                    <select
-                                        value={selectVal}
-                                        onChange={ev => setStatus(e.klient_id, ev.target.value)}
-                                        style={{
-                                            fontSize: 12, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
-                                            border: `1px solid ${e.status ? selectOpt.color + '44' : 'rgba(0,0,0,.09)'}`,
-                                            background: e.status ? selectOpt.bg : '#F5F4F0',
-                                            color: e.status ? selectOpt.color : '#6B6860',
-                                            fontFamily: 'inherit', fontWeight: 500, outline: 'none', flexShrink: 0
-                                        }}
-                                    >
-                                        {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
-                                    {hatFerien && (
-                                        <span style={{
-                                            fontSize: 10.5, padding: '2px 7px', borderRadius: 10, fontWeight: 500,
-                                            background: '#DCFCE7', color: '#15803D',
-                                            border: '1px solid rgba(22,163,74,.2)', flexShrink: 0
-                                        }}>Ferien</span>
-                                    )}
-                                    <input
-                                        type="text"
-                                        value={kommentare[e.klient_id] ?? ''}
-                                        onChange={ev => setKommentare(prev => ({ ...prev, [e.klient_id]: ev.target.value }))}
-                                        onBlur={() => saveKommentar(e.klient_id)}
-                                        placeholder={e.status ? 'Kommentar…' : ''}
-                                        disabled={!e.status}
-                                        style={{
-                                            fontSize: 11, padding: '3px 7px', borderRadius: 4,
-                                            flex: 1, maxWidth: 300,
-                                            border: '1px solid rgba(0,0,0,.09)', background: e.status ? '#F5F4F0' : 'transparent',
-                                            fontFamily: 'inherit', color: '#1A1917', outline: 'none'
-                                        }}
-                                    />
-                                    {zeitstempel && (
-                                        <span style={{ fontSize: 10, color: '#A09D97', flexShrink: 0 }}>zuletzt {zeitstempel}</span>
-                                    )}
-                                    {(e.zugewiesen || []).length > 0 && (
-                                        <span style={{ fontSize: 10.5, color: '#A09D97', marginLeft: 'auto', flexShrink: 0 }}>
-                                            {e.zugewiesen.map(u => u.full_name).join(', ')}
-                                        </span>
-                                    )}
-                                </div>
+                    {/* Tabelle 2: Geplant abwesend */}
+                    {!laden && gefiltertFerien.length > 0 && (
+                        <div style={{ ...CARD, overflow: 'hidden' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: '#DCFCE7', borderBottom: '1px solid rgba(22,163,74,.2)' }}>
+                                <div style={{ ...TH_STYLE, color: '#15803D', borderRight: '1px solid rgba(22,163,74,.2)' }}>Geplant abwesend ({gefiltertFerien.length})</div>
+                                <div style={{ ...TH_STYLE, color: '#15803D' }}>Programm · Ferien-Zeitraum</div>
                             </div>
-                        );
-                    })}
+                            {gefiltertFerien.map(e => (
+                                <div key={e.klient_id} style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: '#F0FDF4' }}>
+                                    <div style={{ borderRight: '1px solid rgba(22,163,74,.15)', borderBottom: '1px solid rgba(22,163,74,.1)', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <div style={{ width: 26, height: 26, borderRadius: 6, background: '#DCFCE7', color: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, flexShrink: 0 }}>
+                                            {(e.nachname?.[0] || '') + (e.vorname?.[0] || '')}
+                                        </div>
+                                        <div onClick={() => e.dossier_id && navigate('/dossiers/' + e.dossier_id)} style={{ fontSize: 12.5, fontWeight: 600, cursor: e.dossier_id ? 'pointer' : 'default', color: e.dossier_id ? '#2563EB' : '#1A1917' }}>
+                                            {e.nachname} {e.vorname}
+                                        </div>
+                                    </div>
+                                    <div style={{ borderBottom: '1px solid rgba(22,163,74,.1)', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        {e.programm_name && (
+                                            <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 500, background: e.farbe_hex ? e.farbe_hex + '22' : '#EEF3FE', color: e.farbe_hex || '#1D4ED8', border: `1px solid ${e.farbe_hex ? e.farbe_hex + '44' : 'rgba(29,78,216,.15)'}`, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>{e.programm_name}</span>
+                                        )}
+                                        {e.ferien_von && (
+                                            <span style={{ fontSize: 12, color: '#15803D', fontWeight: 500 }}>
+                                                {fmtDatum(e.ferien_von)} – {fmtDatum(e.ferien_bis)}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
