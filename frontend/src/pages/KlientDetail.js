@@ -399,9 +399,9 @@ export default function KlientDetail() {
                                 </thead>
                                 <tbody>
                                     {ferien.map((f, i) => {
-                                        const von = new Date(f.von + 'T12:00:00');
-                                        const bis = new Date(f.bis + 'T12:00:00');
-                                        const tage = Math.round((bis - von) / 86400000) + 1;
+                                        const von = new Date(f.von);
+                                        const bis = new Date(f.bis);
+                                        const tage = Math.round((bis - von) / (1000*60*60*24)) + 1;
                                         return (
                                             <tr key={f.ferien_id} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
                                                 <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{von.toLocaleDateString('de-CH')}</td>

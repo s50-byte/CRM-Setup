@@ -116,7 +116,8 @@ router.get('/:datum', auth, async (req, res) => {
                         )
                     ) FILTER (WHERE u.user_id IS NOT NULL),
                     '[]'
-                ) AS zugewiesen
+                ) AS zugewiesen,
+                MAX(fp.ferien_id) IS NOT NULL AS hat_ferien
              FROM klient k
              JOIN dossier d ON d.klient_id = k.klient_id
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
@@ -125,6 +126,8 @@ router.get('/:datum', auth, async (req, res) => {
                 AND pe.datum = $1
              LEFT JOIN klient_user ku ON ku.klient_id = k.klient_id AND ku.aktiv = TRUE
              LEFT JOIN benutzer u ON u.user_id = ku.user_id
+             LEFT JOIN ferienplanung fp ON fp.klient_id = k.klient_id
+                AND $1::date BETWEEN fp.von AND fp.bis
              WHERE k.aktiv = TRUE
                AND d.pipeline_status != 'Erstkontakt'
              GROUP BY k.klient_id, k.nachname, k.vorname,

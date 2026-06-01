@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import client from '../api/client';
-import FerienModal from '../components/FerienModal';
-
 const ABTEILUNGEN = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert'];
 
 const STATUS_OPTS = [
@@ -93,7 +91,6 @@ export default function Praesenz() {
     const [eintraege, setEintraege] = useState([]);
     const [laden, setLaden] = useState(true);
     const [abteilung, setAbteilung] = useState('');
-    const [ferienKlienten, setFerienKlienten] = useState(new Set());
     const [kommentare, setKommentare] = useState({});
     const [aktTab, setAktTab] = useState('tag');
 
@@ -104,10 +101,6 @@ export default function Praesenz() {
     const [standPopup, setStandPopup] = useState(false);
     const [standMeldungen, setStandMeldungen] = useState([]);
     const [standLaden, setStandLaden] = useState(false);
-
-    // Ferien-Modal
-    const [ferienModal, setFerienModal] = useState(false);
-    const [ferienKlientId, setFerienKlientId] = useState(null);
 
     // Verlauf
     const [vDatum, setVDatum] = useState(heute);
@@ -141,20 +134,17 @@ export default function Praesenz() {
         }
     }, [meineAbteilungen]);
 
-    // Präsenz + Ferien laden wenn Datum wechselt
+    // Präsenz laden wenn Datum wechselt
     useEffect(() => {
         setLaden(true);
-        Promise.all([
-            client.get(`/praesenz/${datum}`),
-            client.get(`/praesenz/ferien?datum=${datum}`),
-        ]).then(([pRes, fRes]) => {
-            setEintraege(pRes.data);
-            setFerienKlienten(new Set(fRes.data));
-            const km = {};
-            pRes.data.forEach(e => { km[e.klient_id] = e.kommentar || ''; });
-            setKommentare(km);
-        }).catch(console.error)
-          .finally(() => setLaden(false));
+        client.get(`/praesenz/${datum}`)
+            .then(r => {
+                setEintraege(r.data);
+                const km = {};
+                r.data.forEach(e => { km[e.klient_id] = e.kommentar || ''; });
+                setKommentare(km);
+            }).catch(console.error)
+              .finally(() => setLaden(false));
     }, [datum]);
 
     function handleAbteilungChange(val) {
@@ -385,7 +375,7 @@ export default function Praesenz() {
                     ) : gefiltert.length === 0 ? (
                         <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Keine Klienten</div>
                     ) : gefiltert.map(e => {
-                        const hatFerien = ferienKlienten.has(e.klient_id);
+                        const hatFerien = !!e.hat_ferien;
                         const zeitstempel = fmtZeit(e.updated_at);
                         const selectVal = e.status || (hatFerien ? 'ferien' : 'anwesend');
                         const selectOpt = statusOpt(selectVal);
@@ -472,16 +462,6 @@ export default function Praesenz() {
                                             {e.zugewiesen.map(u => u.full_name).join(', ')}
                                         </span>
                                     )}
-                                    <button
-                                        onClick={() => { setFerienKlientId(e.klient_id); setFerienModal(true); }}
-                                        title="Ferien erfassen"
-                                        style={{
-                                            marginLeft: 'auto', flexShrink: 0, border: '1px solid rgba(0,0,0,.09)',
-                                            borderRadius: 5, background: '#F5F4F0', cursor: 'pointer',
-                                            fontSize: 11, padding: '2px 7px', color: '#6B6860', fontFamily: 'inherit',
-                                        }}>
-                                        Ferien
-                                    </button>
                                 </div>
                             </div>
                         );
@@ -609,18 +589,6 @@ export default function Praesenz() {
                     )}
                 </div>
             )}
-            <FerienModal
-                open={ferienModal}
-                onClose={() => setFerienModal(false)}
-                klientId={ferienKlientId}
-                onSaved={() => {
-                    setFerienModal(false);
-                    client.get(`/praesenz/ferien?datum=${datum}`)
-                        .then(r => setFerienKlienten(new Set(r.data)))
-                        .catch(console.error);
-                }}
-            />
-
             {/* Stand-Popup */}
             {standPopup && (() => {
             const gruppen = {};
