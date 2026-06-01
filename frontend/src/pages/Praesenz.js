@@ -90,12 +90,12 @@ export default function Praesenz() {
     const [datum, setDatum] = useState(heute);
     const [eintraege, setEintraege] = useState([]);
     const [laden, setLaden] = useState(true);
-    const [abteilung, setAbteilung] = useState('');
+    const [selAbteilungen, setSelAbteilungen] = useState(new Set());
+    const [selStandorte, setSelStandorte] = useState(new Set());
+    const [alleStandorte, setAlleStandorte] = useState([]);
+    const [filterOffen, setFilterOffen] = useState(null);
     const [kommentare, setKommentare] = useState({});
     const [aktTab, setAktTab] = useState('tag');
-
-    // Stand-Popup
-    const [meineAbteilungen, setMeineAbteilungen] = useState([]);
 
     // Stand-Popup
     const [standPopup, setStandPopup] = useState(false);
@@ -110,29 +110,20 @@ export default function Praesenz() {
     const [verlaufGeladen, setVerlaufGeladen] = useState(false);
     const [verlaufLaden, setVerlaufLaden] = useState(false);
 
-    // Abteilungen aus Benutzer-Einstellung laden
+    // Standorte + gespeicherte Filter laden
     useEffect(() => {
-        client.get('/benutzer/einstellung/abteilungen').then(r => {
-            console.log('[Abteilungen] API Antwort:', r.data);
+        Promise.all([
+            client.get('/standorte'),
+            client.get('/benutzer/einstellung/praesenz_filter'),
+        ]).then(([stRes, filterRes]) => {
+            setAlleStandorte(stRes.data);
             try {
-                const list = r.data.wert ? JSON.parse(r.data.wert) : [];
-                console.log('[Abteilungen] Geparste Liste:', list);
-                setMeineAbteilungen(list);
-            } catch (e) {
-                console.error('[Abteilungen] JSON.parse Fehler:', e, '| Rohwert:', r.data.wert);
-                setMeineAbteilungen([]);
-            }
-        }).catch(err => {
-            console.error('[Abteilungen] API Fehler:', err.response?.status, err.response?.data);
-        });
+                const f = filterRes.data.wert ? JSON.parse(filterRes.data.wert) : {};
+                if (f.abteilungen?.length) setSelAbteilungen(new Set(f.abteilungen));
+                if (f.standorte?.length) setSelStandorte(new Set(f.standorte.map(String)));
+            } catch(e) {}
+        }).catch(console.error);
     }, []);
-
-    // Erste eigene Abteilung als Standard setzen
-    useEffect(() => {
-        if (meineAbteilungen.length > 0 && abteilung === '') {
-            setAbteilung(meineAbteilungen[0]);
-        }
-    }, [meineAbteilungen]);
 
     // Präsenz laden wenn Datum wechselt
     useEffect(() => {
@@ -147,9 +138,25 @@ export default function Praesenz() {
               .finally(() => setLaden(false));
     }, [datum]);
 
-    function handleAbteilungChange(val) {
-        setAbteilung(val);
-        client.put('/benutzer/einstellung/praesenz_abteilung', { wert: val || null }).catch(console.error);
+    function speichereFilter(abt, st) {
+        client.put('/benutzer/einstellung/praesenz_filter', {
+            wert: JSON.stringify({ abteilungen: [...abt], standorte: [...st].map(Number) })
+        }).catch(console.error);
+    }
+
+    function toggleAbteilung(a) {
+        const neu = new Set(selAbteilungen);
+        neu.has(a) ? neu.delete(a) : neu.add(a);
+        setSelAbteilungen(neu);
+        speichereFilter(neu, selStandorte);
+    }
+
+    function toggleStandort(id) {
+        const neu = new Set(selStandorte);
+        const sid = String(id);
+        neu.has(sid) ? neu.delete(sid) : neu.add(sid);
+        setSelStandorte(neu);
+        speichereFilter(selAbteilungen, neu);
     }
 
     async function setStatus(klient_id, status) {
@@ -293,9 +300,9 @@ export default function Praesenz() {
         win.print();
     }
 
-    console.log('[Filter] meineAbteilungen:', meineAbteilungen, '| gewaehltAbteilung:', JSON.stringify(abteilung), '| klient[0].abteilung:', JSON.stringify(eintraege[0]?.abteilung));
-    const gefiltert = eintraege.length === 0 ? [] : eintraege.filter(k =>
-        !abteilung || abteilung === 'Alle' || k.abteilung === abteilung
+    const gefiltert = eintraege.filter(k =>
+        (selAbteilungen.size === 0 || selAbteilungen.has(k.abteilung)) &&
+        (selStandorte.size === 0 || selStandorte.has(String(k.standort_id)))
     );
 
     const verlaufKlienten = [...new Map(verlaufData.map(e => [e.klient_id, e])).values()]
@@ -324,10 +331,52 @@ export default function Praesenz() {
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <select value={abteilung} onChange={e => handleAbteilungChange(e.target.value)} style={INPUT_S}>
-                        <option value="">Alle Abteilungen</option>
-                        {(meineAbteilungen.length > 0 ? meineAbteilungen : ABTEILUNGEN).map(a => <option key={a}>{a}</option>)}
-                    </select>
+                    {/* Abteilung-Filter */}
+                    <div style={{ position: 'relative' }}>
+                        <button onClick={() => setFilterOffen(filterOffen === 'abt' ? null : 'abt')} style={{ ...INPUT_S, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {selAbteilungen.size === 0 ? 'Alle Abteilungen' : `${selAbteilungen.size} Abt.`}
+                            <span style={{ fontSize: 8 }}>▼</span>
+                        </button>
+                        {filterOffen === 'abt' && (<>
+                            <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setFilterOffen(null)} />
+                            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 10, background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 8, padding: '.75rem', boxShadow: '0 4px 16px rgba(0,0,0,.12)', minWidth: 200 }}>
+                                <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, cursor: 'pointer', marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+                                    <input type="checkbox" checked={selAbteilungen.size === 0} onChange={() => { setSelAbteilungen(new Set()); speichereFilter(new Set(), selStandorte); }} />
+                                    Alle
+                                </label>
+                                {ABTEILUNGEN.map(a => (
+                                    <label key={a} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, cursor: 'pointer', marginBottom: 3 }}>
+                                        <input type="checkbox" checked={selAbteilungen.has(a)} onChange={() => toggleAbteilung(a)} />
+                                        {a}
+                                    </label>
+                                ))}
+                            </div>
+                        </>)}
+                    </div>
+                    {/* Standort-Filter */}
+                    {alleStandorte.length > 0 && (
+                        <div style={{ position: 'relative' }}>
+                            <button onClick={() => setFilterOffen(filterOffen === 'st' ? null : 'st')} style={{ ...INPUT_S, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                {selStandorte.size === 0 ? 'Alle Standorte' : `${selStandorte.size} Standort${selStandorte.size > 1 ? 'e' : ''}`}
+                                <span style={{ fontSize: 8 }}>▼</span>
+                            </button>
+                            {filterOffen === 'st' && (<>
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setFilterOffen(null)} />
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 10, background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 8, padding: '.75rem', boxShadow: '0 4px 16px rgba(0,0,0,.12)', minWidth: 200 }}>
+                                    <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, cursor: 'pointer', marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+                                        <input type="checkbox" checked={selStandorte.size === 0} onChange={() => { setSelStandorte(new Set()); speichereFilter(selAbteilungen, new Set()); }} />
+                                        Alle
+                                    </label>
+                                    {alleStandorte.map(s => (
+                                        <label key={s.standort_id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, cursor: 'pointer', marginBottom: 3 }}>
+                                            <input type="checkbox" checked={selStandorte.has(String(s.standort_id))} onChange={() => toggleStandort(s.standort_id)} />
+                                            {s.name}
+                                        </label>
+                                    ))}
+                                </div>
+                            </>)}
+                        </div>
+                    )}
                     <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={INPUT_S} />
                     <button onClick={zeigeMeldungenStand} style={{
                         padding: '7px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
