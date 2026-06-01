@@ -6,6 +6,7 @@ import ZuweisungModal from '../components/ZuweisungModal';
 import Modal from '../components/Modal';
 import ExterneZuweisungModal from '../components/ExterneZuweisungModal';
 import DossierFelderModal from '../components/DossierFelderModal';
+import FerienModal from '../components/FerienModal';
 
 const LABEL_FARBEN = {
     'LE': { bg: '#ECFDF5', color: '#15803D' },
@@ -80,6 +81,7 @@ export default function DossierDetail() {
     const [externeModal, setExterneModal] = useState(false);
     const [agModal, setAgModal] = useState(false);
     const [felderModal, setFelderModal] = useState(false);
+    const [ferienModal, setFerienModal] = useState(false);
     const [agListe, setAgListe] = useState([]);
     const [agAuswahl, setAgAuswahl] = useState('');
 
@@ -261,6 +263,11 @@ export default function DossierDetail() {
                                 cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
                                 background: '#fff', fontFamily: 'inherit', color: '#1A1917'
                             }}>Präsenzverlauf</button>
+                            <button onClick={() => setFerienModal(true)} style={{
+                                padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
+                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
+                                background: '#fff', fontFamily: 'inherit', color: '#1A1917'
+                            }}>Ferien erfassen</button>
                             <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
                                 padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
                                 cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
@@ -635,6 +642,13 @@ export default function DossierDetail() {
                 dossierId={id}
                 dossier={dossier}
                 onSaved={() => { setFelderModal(false); reloadDossier(); }}
+            />
+
+            <FerienModal
+                open={ferienModal}
+                onClose={() => setFerienModal(false)}
+                klientId={dossier.klient_id}
+                onSaved={() => setFerienModal(false)}
             />
 
             <Modal open={agModal} onClose={() => setAgModal(false)} title="Arbeitgeber / Partnerfirma zuweisen" width={480}>

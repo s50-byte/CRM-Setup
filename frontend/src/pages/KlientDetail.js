@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
+import FerienModal from '../components/FerienModal';
 
 const FARBEN = {
     'Erstmalige berufliche Abklärung': '#EA580C',
@@ -65,6 +66,10 @@ export default function KlientDetail() {
     const [lvForm, setLvForm] = useState({});
     const [lvSpeichern, setLvSpeichern] = useState(false);
     const [lvGespeichert, setLvGespeichert] = useState(false);
+
+    const [ferien, setFerien] = useState([]);
+    const [ferienLaden, setFerienLaden] = useState(false);
+    const [ferienModal, setFerienModal] = useState(false);
 
     function initLvForm(data) {
         setLvForm({
@@ -139,6 +144,21 @@ export default function KlientDetail() {
         }
     };
 
+    function ladeFerien() {
+        setFerienLaden(true);
+        client.get(`/praesenz/ferien/${id}`)
+            .then(r => setFerien(r.data))
+            .catch(console.error)
+            .finally(() => setFerienLaden(false));
+    }
+
+    async function loescheFerien(ferien_id) {
+        try {
+            await client.delete(`/praesenz/ferien/${ferien_id}`);
+            setFerien(prev => prev.filter(f => f.ferien_id !== ferien_id));
+        } catch (err) { console.error(err); }
+    }
+
     if (laden) return <div style={{ padding: '2rem', color: '#6B6860', fontSize: 13 }}>Laden…</div>;
     if (!klient) return <div style={{ padding: '2rem', color: '#B91C1C', fontSize: 13 }}>Klient nicht gefunden</div>;
 
@@ -188,8 +208,12 @@ export default function KlientDetail() {
                         { key: 'stamm', label: 'Stammdaten' },
                         { key: 'kontakt', label: 'Kontakt & Notfall' },
                         { key: 'lv', label: 'Leistungsvereinbarung' },
+                        { key: 'ferien', label: 'Ferien' },
                     ].map(tab => (
-                        <button key={tab.key} onClick={() => setAktTab(tab.key)} style={{
+                        <button key={tab.key} onClick={() => {
+                            setAktTab(tab.key);
+                            if (tab.key === 'ferien' && ferien.length === 0) ladeFerien();
+                        }} style={{
                             padding: '.5rem 1rem', fontSize: 12, fontWeight: aktTab === tab.key ? 600 : 400,
                             cursor: 'pointer', border: 'none', background: 'transparent',
                             color: aktTab === tab.key ? '#2563EB' : '#6B6860',
@@ -347,6 +371,71 @@ export default function KlientDetail() {
                             background: lvSpeichern ? '#93C5FD' : '#2563EB', color: '#fff', fontFamily: 'inherit'
                         }}>Speichern</button>
                     </div>
+                </div>
+            )}
+
+            {/* Ferien */}
+            {aktTab === 'ferien' && (
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.75rem' }}>
+                        <button onClick={() => setFerienModal(true)} style={{
+                            padding: '7px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                            border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                        }}>+ Ferien erfassen</button>
+                    </div>
+                    <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)', overflow: 'hidden' }}>
+                        {ferienLaden ? (
+                            <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Laden…</div>
+                        ) : ferien.length === 0 ? (
+                            <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 12 }}>Keine Ferieneinträge</div>
+                        ) : (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                                <thead>
+                                    <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
+                                        {['Von', 'Bis', 'Dauer', 'Bemerkung', 'Abgesprochen mit', 'Status', ''].map(h => (
+                                            <th key={h} style={{ padding: '8px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', textAlign: 'left' }}>{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {ferien.map((f, i) => {
+                                        const von = new Date(f.von + 'T12:00:00');
+                                        const bis = new Date(f.bis + 'T12:00:00');
+                                        const tage = Math.round((bis - von) / 86400000) + 1;
+                                        return (
+                                            <tr key={f.ferien_id} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                                                <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{von.toLocaleDateString('de-CH')}</td>
+                                                <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{bis.toLocaleDateString('de-CH')}</td>
+                                                <td style={{ padding: '8px 12px', color: '#6B6860' }}>{tage} Tag{tage !== 1 ? 'e' : ''}</td>
+                                                <td style={{ padding: '8px 12px', color: '#6B6860', maxWidth: 200 }}>{f.bemerkung || '—'}</td>
+                                                <td style={{ padding: '8px 12px', color: '#6B6860' }}>{f.abgesprochen_mit_name || '—'}</td>
+                                                <td style={{ padding: '8px 12px' }}>
+                                                    <span style={{
+                                                        fontSize: 11, padding: '2px 7px', borderRadius: 10, fontWeight: 500,
+                                                        background: f.genehmigt ? '#DCFCE7' : '#FEF3C7',
+                                                        color: f.genehmigt ? '#15803D' : '#B45309',
+                                                    }}>{f.genehmigt ? 'Genehmigt' : 'Ausstehend'}</span>
+                                                </td>
+                                                <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                                                    <button onClick={() => loescheFerien(f.ferien_id)} style={{
+                                                        fontSize: 11, padding: '2px 8px', cursor: 'pointer',
+                                                        border: '1px solid rgba(220,38,38,.2)', borderRadius: 5,
+                                                        background: '#FEF2F2', color: '#B91C1C', fontFamily: 'inherit'
+                                                    }}>Löschen</button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                    <FerienModal
+                        open={ferienModal}
+                        onClose={() => setFerienModal(false)}
+                        klientId={klient.klient_id}
+                        onSaved={() => { setFerienModal(false); ladeFerien(); }}
+                    />
                 </div>
             )}
         </div>

@@ -295,4 +295,15 @@ router.post('/ferien', auth, async (req, res) => {
     }
 });
 
+// DELETE /api/praesenz/ferien/:ferien_id — Ferien löschen
+router.delete('/ferien/:ferien_id', auth, async (req, res) => {
+    try {
+        await db.query('DELETE FROM ferienplanung WHERE ferien_id = $1', [req.params.ferien_id]);
+        res.status(204).end();
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Löschen der Ferien' });
+    }
+});
+
 module.exports = router;
