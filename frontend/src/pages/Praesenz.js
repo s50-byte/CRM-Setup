@@ -288,8 +288,11 @@ export default function Praesenz() {
         (!selAbteilung || k.abteilung === selAbteilung) &&
         (!selStandort || String(k.standort_id) === selStandort)
     );
-    const gefiltertNormal = gefiltert.filter(k => !k.hat_ferien);
-    const gefiltertFerien  = gefiltert.filter(k => k.hat_ferien);
+    console.log('[hat_ferien] klient[0]:', eintraege[0]);
+    console.log('[hat_ferien] Klienten mit hat_ferien:', eintraege.filter(k => k.hat_ferien === true || k.hat_ferien === 'true'));
+    const hatFerienBool = k => k.hat_ferien === true || k.hat_ferien === 'true';
+    const gefiltertNormal = gefiltert.filter(k => !hatFerienBool(k));
+    const gefiltertFerien  = gefiltert.filter(k => hatFerienBool(k));
 
     const verlaufKlienten = [...new Map(verlaufData.map(e => [e.klient_id, e])).values()]
         .sort((a, b) => (a.nachname || '').localeCompare(b.nachname || ''));
