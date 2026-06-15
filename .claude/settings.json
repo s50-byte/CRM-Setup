@@ -22,7 +22,9 @@
       "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"simon@iv-crm.ch\",\"password\":\"Admin2025!\"}')",
       "Bash(curl -v -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"simon@iv-crm.ch\",\"password\":\"Admin2025!\"}')",
       "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"barbara.vogt@kft-prototyp.ch\",\"passwort\":\"Test2025!\"}')",
-      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); print\\('count:', len\\(data\\)\\); print\\(json.dumps\\(data[0], indent=2, ensure_ascii=False\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); print\\('count:', len\\(data\\)\\); print\\(json.dumps\\(data[0], indent=2, ensure_ascii=False\\)\\)\")",
+      "Bash(grep -n \"speichernAusbildung\\\\|ausbildung_beruf\\\\|client.put\\(\\\\`/dossiers\" /home/simon/iv-crm/frontend/src/pages/DossierDetail.js)",
+      "Bash(npx eslint *)"
     ]
   }
 }
