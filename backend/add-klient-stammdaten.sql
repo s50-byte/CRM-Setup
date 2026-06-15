@@ -1,0 +1,5 @@
+ALTER TABLE klient ADD COLUMN IF NOT EXISTS anrede VARCHAR(20);
+ALTER TABLE dossier ADD COLUMN IF NOT EXISTS ausbildung_beruf VARCHAR(50);
+ALTER TABLE dossier ADD COLUMN IF NOT EXISTS ausbildung_abschluss VARCHAR(10);
+ALTER TABLE dossier ADD COLUMN IF NOT EXISTS ausbildung_fachrichtung VARCHAR(50);
+ALTER TABLE dossier ADD COLUMN IF NOT EXISTS ausbildung_lehrjahr VARCHAR(10);
