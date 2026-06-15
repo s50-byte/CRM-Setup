@@ -5,7 +5,7 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-const ERLAUBTE_ROLLEN = ['kader', 'leitungsteam'];
+const ERLAUBTE_ROLLEN = ['kader', 'leitungsteam', 'management', 'teamleitung'];
 
 function isoDate(d) {
     return d.toISOString().slice(0, 10);

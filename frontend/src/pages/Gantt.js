@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
-const ERLAUBTE_ROLLEN = ['kader', 'leitungsteam'];
+const ERLAUBTE_ROLLEN = ['kader', 'leitungsteam', 'management', 'teamleitung'];
 
 const ROLLEN_OPTS = ['Alle', 'Klientenführung', 'Job Coach', 'Fachperson'];
 

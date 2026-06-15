@@ -32,7 +32,6 @@ const NAV = [
     { path: '/dossiers',  label: 'Klientendossiers',   icon: '📁' },
     { path: '/termine',   label: 'Termine',            icon: '📅' },
     { path: '/praesenz',  label: 'Präsenzkontrolle',   icon: '✓' },
-    { path: '/gantt',     label: 'Auslastungsplanung', icon: '📅' },
     { section: 'Stammdaten' },
     { path: '/klienten',  label: 'Klienten',           icon: '👥' },
     { path: '/externe',   label: 'Externe Personen',   icon: '🏢' },
@@ -46,6 +45,7 @@ const MANAGEMENT_NAV = [
     { section: 'Management' },
     { path: '/management',             label: 'Dashboard',  icon: '📊' },
     { path: '/management/auslastung',  label: 'Auslastung', icon: '👥' },
+    { path: '/gantt',                  label: 'Auslastungsplanung', icon: '📅' },
     { path: '/management/finanzen',    label: 'Finanzen',   icon: '💰' },
     { path: '/management/benutzer',    label: 'Benutzer',   icon: '⚙' },
 ];
