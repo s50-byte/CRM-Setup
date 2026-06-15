@@ -466,6 +466,7 @@ router.put('/:id/arbeitgeber', auth, async (req, res) => {
 
 // PUT /api/dossiers/:id/felder — Zuweisende Person + Abteilung + Arbeitgeber + Ausbildung
 router.put('/:id/felder', auth, async (req, res) => {
+    console.log('PUT /dossiers/:id/felder – req.body:', req.body);
     const erlaubteFelder = [
         'zuweisende_person_id', 'abteilung', 'arbeitgeber_id',
         'ausbildung_beruf', 'ausbildung_abschluss', 'ausbildung_fachrichtung', 'ausbildung_lehrjahr',

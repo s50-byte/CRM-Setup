@@ -246,12 +246,15 @@ export default function DossierDetail() {
     async function speichernAusbildung() {
         setAusbildungSpeichern(true);
         try {
-            await client.put(`/dossiers/${id}/felder`, {
+            const body = {
                 ausbildung_beruf: ausbildung.beruf || null,
                 ausbildung_abschluss: ausbildung.abschluss || null,
                 ausbildung_fachrichtung: ausbildung.fachrichtung || null,
                 ausbildung_lehrjahr: ausbildung.lehrjahr || null,
-            });
+            };
+            console.log('speichernAusbildung – ausbildung State:', ausbildung);
+            console.log('speichernAusbildung – Request Body:', body);
+            await client.put(`/dossiers/${id}/felder`, body);
             reloadDossier();
             setAusbildungGespeichert(true);
             setTimeout(() => setAusbildungGespeichert(false), 2500);
