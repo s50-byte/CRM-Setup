@@ -47,6 +47,9 @@ router.get('/', auth, async (req, res) => {
                 (SELECT pv2.start_datum FROM programm_verlauf pv2
                  WHERE pv2.dossier_id = d.dossier_id AND pv2.status = 'Laufend'
                  LIMIT 1) AS laufend_start_datum,
+                (SELECT pv2.geplantes_enddatum FROM programm_verlauf pv2
+                 WHERE pv2.dossier_id = d.dossier_id AND pv2.status = 'Laufend'
+                 LIMIT 1) AS geplantes_enddatum,
                 -- Programmverlauf
                 COALESCE(
                     JSON_AGG(
@@ -480,10 +483,20 @@ router.put('/:id/felder', auth, async (req, res) => {
             params.push(req.body[feld] || null);
         }
     }
-    if (sets.length === 0) return res.json({ message: 'Keine Änderungen' });
-    params.push(req.params.id);
+    if (sets.length === 0 && !('geplantes_enddatum' in req.body)) {
+        return res.json({ message: 'Keine Änderungen' });
+    }
     try {
-        await db.query(`UPDATE dossier SET ${sets.join(', ')} WHERE dossier_id = $${p}`, params);
+        if (sets.length > 0) {
+            params.push(req.params.id);
+            await db.query(`UPDATE dossier SET ${sets.join(', ')} WHERE dossier_id = $${p}`, params);
+        }
+        if ('geplantes_enddatum' in req.body) {
+            await db.query(
+                `UPDATE programm_verlauf SET geplantes_enddatum = $1 WHERE dossier_id = $2 AND status = 'Laufend'`,
+                [req.body.geplantes_enddatum || null, req.params.id]
+            );
+        }
         res.json({ message: 'Felder aktualisiert' });
     } catch (err) {
         console.error(err);
@@ -509,6 +522,55 @@ router.get('/:id/phase/:phase_id/kriterien', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden der Kriterien' });
+    }
+});
+
+// GET /api/dossiers/:id/phase/:phase_id/zeitraum — Start/Enddatum der Phase
+router.get('/:id/phase/:phase_id/zeitraum', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT start_datum, end_datum FROM dossier_phase WHERE dossier_id = $1 AND phase_id = $2`,
+            [req.params.id, req.params.phase_id]
+        );
+        res.json(result.rows[0] || { start_datum: null, end_datum: null });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden des Phasen-Zeitraums' });
+    }
+});
+
+// PUT /api/dossiers/:id/phase/:phase_id/zeitraum — Start/Enddatum der Phase speichern
+router.put('/:id/phase/:phase_id/zeitraum', auth, async (req, res) => {
+    const { start_datum, end_datum } = req.body;
+    try {
+        const dossier = await db.query(`SELECT klient_id FROM dossier WHERE dossier_id = $1`, [req.params.id]);
+        if (dossier.rows.length === 0) return res.status(404).json({ error: 'Dossier nicht gefunden' });
+
+        const phase = await db.query(`SELECT label FROM phase WHERE phase_id = $1`, [req.params.phase_id]);
+
+        const result = await db.query(
+            `INSERT INTO dossier_phase (dossier_id, phase_id, start_datum, end_datum)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (dossier_id, phase_id) DO UPDATE SET
+                start_datum = $3, end_datum = $4, updated_at = NOW()
+             RETURNING start_datum, end_datum`,
+            [req.params.id, req.params.phase_id, start_datum || null, end_datum || null]
+        );
+
+        const fmtD = d => d ? new Date(d).toLocaleDateString('de-CH') : '?';
+        await db.query(
+            `INSERT INTO zeitachse_eintrag (klient_id, user_id, typ, titel, auto_generated)
+             VALUES ($1, $2, 'System', $3, TRUE)`,
+            [
+                dossier.rows[0].klient_id, req.user.user_id,
+                `Phase ${phase.rows[0]?.label || ''}: Zeitraum ${fmtD(start_datum)} – ${fmtD(end_datum)} erfasst`,
+            ]
+        );
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern des Phasen-Zeitraums' });
     }
 });
 

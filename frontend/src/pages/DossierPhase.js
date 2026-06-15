@@ -54,6 +54,11 @@ const BTN_PLUS = {
     fontWeight: 500, flexShrink: 0,
 };
 
+const DATE_INPUT_STYLE = {
+    fontSize: 12.5, padding: '5px 8px', border: '1px solid rgba(0,0,0,.13)',
+    borderRadius: 5, background: '#fff', fontFamily: 'inherit', outline: 'none',
+};
+
 function fmt(dateStr) {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('de-CH');
@@ -85,17 +90,23 @@ export default function DossierPhase() {
     const [dokumentModal, setDokumentModal] = useState(false);
     const [standortModal, setStandortModal] = useState(false);
 
+    // Phasen-Zeitraum
+    const [zeitraum, setZeitraum] = useState({ von: '', bis: '' });
+    const [zeitraumSpeichern, setZeitraumSpeichern] = useState(false);
+    const [zeitraumGespeichert, setZeitraumGespeichert] = useState(false);
+
     const ladeDaten = useCallback(async () => {
         try {
             const dosRes = await client.get(`/dossiers/${id}`);
             const dos = dosRes.data;
             setDossier(dos);
 
-            const [krRes, taskRes, termRes, dokRes] = await Promise.all([
+            const [krRes, taskRes, termRes, dokRes, zrRes] = await Promise.all([
                 client.get(`/dossiers/${id}/phase/${phase_id}/kriterien`),
                 dos.klient_id ? client.get(`/tasks/klient/${dos.klient_id}`) : Promise.resolve({ data: [] }),
                 dos.klient_id ? client.get(`/termine?klient_id=${dos.klient_id}`) : Promise.resolve({ data: [] }),
                 dos.klient_id ? client.get(`/dokumente?klient_id=${dos.klient_id}&phase_id=${phase_id}`) : Promise.resolve({ data: [] }),
+                client.get(`/dossiers/${id}/phase/${phase_id}/zeitraum`),
             ]);
 
             const phaseTasks = (taskRes.data || []).filter(t => t.phase_id === phase_id);
@@ -103,6 +114,10 @@ export default function DossierPhase() {
             setTasks(phaseTasks);
             setTermine(termRes.data || []);
             setDokumente(dokRes.data || []);
+            setZeitraum({
+                von: zrRes.data?.start_datum ? zrRes.data.start_datum.slice(0, 10) : '',
+                bis: zrRes.data?.end_datum ? zrRes.data.end_datum.slice(0, 10) : '',
+            });
         } catch (err) {
             console.error(err);
         } finally {
@@ -111,6 +126,22 @@ export default function DossierPhase() {
     }, [id, phase_id]);
 
     useEffect(() => { ladeDaten(); }, [ladeDaten]);
+
+    async function speichernZeitraum() {
+        setZeitraumSpeichern(true);
+        try {
+            await client.put(`/dossiers/${id}/phase/${phase_id}/zeitraum`, {
+                start_datum: zeitraum.von || null,
+                end_datum: zeitraum.bis || null,
+            });
+            setZeitraumGespeichert(true);
+            setTimeout(() => setZeitraumGespeichert(false), 2500);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setZeitraumSpeichern(false);
+        }
+    }
 
     async function toggleKriterium(kriterium_id) {
         try {
@@ -176,8 +207,25 @@ export default function DossierPhase() {
                     <span style={{ fontWeight: 600, color: '#1A1917' }}>{aktPhase?.label || '—'}</span>
                 </div>
 
-                <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.4px', marginBottom: '1rem' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.4px', marginBottom: '.75rem' }}>
                     {aktPhase?.label || 'Phase'}
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <label style={{ fontSize: 10.5, color: '#A09D97' }}>Phase von</label>
+                        <input type="date" value={zeitraum.von} onChange={e => setZeitraum(z => ({ ...z, von: e.target.value }))} style={DATE_INPUT_STYLE} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <label style={{ fontSize: 10.5, color: '#A09D97' }}>Phase bis</label>
+                        <input type="date" value={zeitraum.bis} onChange={e => setZeitraum(z => ({ ...z, bis: e.target.value }))} style={DATE_INPUT_STYLE} />
+                    </div>
+                    <button onClick={speichernZeitraum} disabled={zeitraumSpeichern} style={{
+                        padding: '6px 14px', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap',
+                        cursor: zeitraumSpeichern ? 'default' : 'pointer', border: 'none', borderRadius: 5,
+                        background: zeitraumSpeichern ? '#93C5FD' : '#2563EB', color: '#fff', fontFamily: 'inherit'
+                    }}>{zeitraumSpeichern ? 'Speichern…' : 'Speichern'}</button>
+                    {zeitraumGespeichert && <span style={{ fontSize: 12.5, color: '#16A34A' }}>Gespeichert ✓</span>}
                 </div>
 
                 {phasen.length > 0 && (

@@ -117,6 +117,9 @@ export default function DossierDetail() {
     const [ausbildungSpeichern, setAusbildungSpeichern] = useState(false);
     const [ausbildungGespeichert, setAusbildungGespeichert] = useState(false);
 
+    // Programmende (geplant)
+    const [endeBearbeiten, setEndeBearbeiten] = useState(false);
+
     useEffect(() => {
         async function load() {
             try {
@@ -243,6 +246,16 @@ export default function DossierDetail() {
         setAusbildung(a => ({ ...a, abschluss, lehrjahr }));
     }
 
+    async function speichernEnddatum(wert) {
+        setEndeBearbeiten(false);
+        const aktuell = dossier.geplantes_enddatum ? dossier.geplantes_enddatum.slice(0, 10) : '';
+        if ((wert || '') === aktuell) return;
+        try {
+            await client.put(`/dossiers/${id}/felder`, { geplantes_enddatum: wert || null });
+            reloadDossier();
+        } catch (err) { console.error(err); }
+    }
+
     async function speichernAusbildung() {
         setAusbildungSpeichern(true);
         try {
@@ -365,13 +378,33 @@ export default function DossierDetail() {
                             (dossier.zuweisende_person_nachname
                                 ? { label: 'Zuweisende Person', value: `${dossier.zuweisende_person_vorname || ''} ${dossier.zuweisende_person_nachname}`.trim() + (dossier.zuweisende_person_firma ? ` · ${dossier.zuweisende_person_firma}` : '') }
                                 : null),
-                            { label: 'Ende (geplant)',     value: dossier.geplantes_enddatum ? fmt(dossier.geplantes_enddatum) : null },
+                            { label: 'Ende (geplant)',     value: dossier.geplantes_enddatum ? fmt(dossier.geplantes_enddatum) : null, key: 'enddatum' },
                             { label: 'Standort',           value: dossier.standort_name },
                             { label: 'Arbeitsort',         value: dossier.abteilung ? `Intern: ${dossier.abteilung}` : dossier.arbeitgeber_firma ? `Extern: ${dossier.arbeitgeber_firma}` : null },
                         ].filter(Boolean).map((f, i) => (
                             <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                 <span style={{ fontSize: 10.5, color: '#A09D97', whiteSpace: 'nowrap' }}>{f.label}</span>
-                                <span style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap' }}>{f.value || '—'}</span>
+                                {f.key === 'enddatum' ? (
+                                    endeBearbeiten ? (
+                                        <input
+                                            type="date"
+                                            autoFocus
+                                            defaultValue={dossier.geplantes_enddatum ? dossier.geplantes_enddatum.slice(0, 10) : ''}
+                                            onBlur={e => speichernEnddatum(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') e.target.blur();
+                                                if (e.key === 'Escape') setEndeBearbeiten(false);
+                                            }}
+                                            style={{ fontSize: 12, padding: '1px 4px', border: '1px solid rgba(0,0,0,.13)', borderRadius: 4, fontFamily: 'inherit', color: '#1A1917' }}
+                                        />
+                                    ) : (
+                                        <span onClick={() => setEndeBearbeiten(true)} style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dashed #C7C4BC' }}>
+                                            {f.value || '—'}
+                                        </span>
+                                    )
+                                ) : (
+                                    <span style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap' }}>{f.value || '—'}</span>
+                                )}
                             </div>
                         ))}
                     </div>
