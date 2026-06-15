@@ -15,6 +15,7 @@ import DossierPhase from '../pages/DossierPhase';
 import KlientDetail from '../pages/KlientDetail';
 import ExterneDetail from '../pages/ExterneDetail';
 import Standorte from '../pages/Standorte';
+import Gantt from '../pages/Gantt';
 import ManagementDashboard from '../pages/management/ManagementDashboard';
 import Auslastung from '../pages/management/Auslastung';
 import Benutzer from '../pages/management/Benutzer';
@@ -31,6 +32,7 @@ const NAV = [
     { path: '/dossiers',  label: 'Klientendossiers',   icon: '📁' },
     { path: '/termine',   label: 'Termine',            icon: '📅' },
     { path: '/praesenz',  label: 'Präsenzkontrolle',   icon: '✓' },
+    { path: '/gantt',     label: 'Auslastungsplanung', icon: '📅', rollen: ['kader', 'leitungsteam'] },
     { section: 'Stammdaten' },
     { path: '/klienten',  label: 'Klienten',           icon: '👥' },
     { path: '/externe',   label: 'Externe Personen',   icon: '🏢' },
@@ -167,7 +169,7 @@ export default function Layout() {
                 overflowY: 'auto',
                 padding: '.5rem 0 1.5rem'
             }}>
-                {aktivNav.map((item, i) => {
+                {aktivNav.filter(item => !item.rollen || item.rollen.includes(benutzer?.system_rolle)).map((item, i) => {
                     if (item.section) {
                         return (
                             <div key={i} style={{
@@ -207,6 +209,7 @@ export default function Layout() {
                     <Route path="/dossiers"  element={<Dossiers />} />
                     <Route path="/termine"   element={<Termine />} />
                     <Route path="/praesenz"  element={<Praesenz />} />
+                    <Route path="/gantt"     element={<Gantt />} />
                     <Route path="/klienten"  element={<Klienten />} />
                     <Route path="/externe"   element={<Externe />} />
                     <Route path="/programme" element={<Programme />} />
