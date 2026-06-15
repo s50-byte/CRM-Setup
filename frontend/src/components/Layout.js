@@ -32,7 +32,7 @@ const NAV = [
     { path: '/dossiers',  label: 'Klientendossiers',   icon: '📁' },
     { path: '/termine',   label: 'Termine',            icon: '📅' },
     { path: '/praesenz',  label: 'Präsenzkontrolle',   icon: '✓' },
-    { path: '/gantt',     label: 'Auslastungsplanung', icon: '📅', rollen: ['kader', 'leitungsteam'] },
+    { path: '/gantt',     label: 'Auslastungsplanung', icon: '📅' },
     { section: 'Stammdaten' },
     { path: '/klienten',  label: 'Klienten',           icon: '👥' },
     { path: '/externe',   label: 'Externe Personen',   icon: '🏢' },
@@ -169,7 +169,7 @@ export default function Layout() {
                 overflowY: 'auto',
                 padding: '.5rem 0 1.5rem'
             }}>
-                {aktivNav.filter(item => !item.rollen || item.rollen.includes(benutzer?.system_rolle)).map((item, i) => {
+                {aktivNav.map((item, i) => {
                     if (item.section) {
                         return (
                             <div key={i} style={{
