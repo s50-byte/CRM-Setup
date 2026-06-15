@@ -61,6 +61,7 @@ export default function KlientDetail() {
     const [laden, setLaden] = useState(true);
     const [aktTab, setAktTab] = useState('stamm');
     const [form, setForm] = useState({});
+    const [anredeModus, setAnredeModus] = useState('');
     const [speichern, setSpeichern] = useState(false);
     const [gespeichert, setGespeichert] = useState(false);
     const [lvForm, setLvForm] = useState({});
@@ -90,7 +91,10 @@ export default function KlientDetail() {
 
     useEffect(() => {
         client.get(`/klienten/${id}`)
-            .then(r => { setKlient(r.data); setForm(r.data); initLvForm(r.data); })
+            .then(r => {
+                setKlient(r.data); setForm(r.data); initLvForm(r.data);
+                setAnredeModus(['Herr', 'Frau'].includes(r.data.anrede) ? r.data.anrede : (r.data.anrede ? 'Andere' : ''));
+            })
             .catch(console.error)
             .finally(() => setLaden(false));
     }, [id]);
@@ -230,6 +234,38 @@ export default function KlientDetail() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div style={CARD}>
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Persönliche Daten</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+                                <span style={{ color: '#6B6860' }}>Anrede</span>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <select
+                                        value={anredeModus}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setAnredeModus(val);
+                                            if (val === 'Andere') {
+                                                setForm(f => ({ ...f, anrede: !['', 'Herr', 'Frau'].includes(f.anrede) ? f.anrede : '' }));
+                                            } else {
+                                                setForm(f => ({ ...f, anrede: val }));
+                                            }
+                                        }}
+                                        style={{ ...INPUT_STYLE, flex: anredeModus === 'Andere' ? '0 0 110px' : 1 }}
+                                    >
+                                        <option value="">—</option>
+                                        <option value="Herr">Herr</option>
+                                        <option value="Frau">Frau</option>
+                                        <option value="Andere">Andere</option>
+                                    </select>
+                                    {anredeModus === 'Andere' && (
+                                        <input
+                                            type="text"
+                                            value={form.anrede || ''}
+                                            onChange={e => setForm(f => ({ ...f, anrede: e.target.value }))}
+                                            placeholder="Anrede"
+                                            style={INPUT_STYLE}
+                                        />
+                                    )}
+                                </div>
+                            </div>
                             <FRow label="Nachname"    name="nachname"    form={form} onChange={handleChange} />
                             <FRow label="Vorname"     name="vorname"     form={form} onChange={handleChange} />
                             <FRow label="Geburtsdatum" name="geburtsdatum" type="date" form={form} onChange={handleChange} />

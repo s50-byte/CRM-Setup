@@ -149,7 +149,8 @@ router.put('/:id', auth, async (req, res) => {
         nachname, vorname, geburtsdatum, ahv_nummer,
         adresse, plz, ort, telefon, email,
         notfall_name, notfall_beziehung, notfall_telefon,
-        vertreter_name, vertreter_funktion, vertreter_telefon
+        vertreter_name, vertreter_funktion, vertreter_telefon,
+        anrede
     } = req.body;
 
     try {
@@ -160,8 +161,9 @@ router.put('/:id', auth, async (req, res) => {
                 telefon = $8, email = $9,
                 notfall_name = $10, notfall_beziehung = $11, notfall_telefon = $12,
                 vertreter_name = $13, vertreter_funktion = $14, vertreter_telefon = $15,
+                anrede = $16,
                 updated_at = NOW()
-             WHERE klient_id = $16 AND aktiv = TRUE
+             WHERE klient_id = $17 AND aktiv = TRUE
              RETURNING *`,
             [
                 nachname, vorname, geburtsdatum || null, ahv_nummer || null,
@@ -169,6 +171,7 @@ router.put('/:id', auth, async (req, res) => {
                 telefon || null, email || null,
                 notfall_name || null, notfall_beziehung || null, notfall_telefon || null,
                 vertreter_name || null, vertreter_funktion || null, vertreter_telefon || null,
+                anrede || null,
                 req.params.id
             ]
         );

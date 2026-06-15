@@ -422,12 +422,11 @@ export default function Praesenz() {
                         <div style={{ ...CARD, overflow: 'hidden' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: '#DCFCE7', borderBottom: '1px solid rgba(22,163,74,.2)' }}>
                                 <div style={{ ...TH_STYLE, color: '#15803D', borderRight: '1px solid rgba(22,163,74,.2)' }}>Geplant abwesend ({gefiltertFerien.length})</div>
-                                <div style={{ ...TH_STYLE, color: '#15803D' }}>Abwesenheit · Zeitraum</div>
+                                <div style={{ ...TH_STYLE, color: '#15803D' }}>Status · Zeitraum · Kommentar</div>
                             </div>
                             {gefiltertFerien.map(e => {
-                                const absTyp = e.hat_ferien
-                                    ? { label: 'Ferien', bg: '#F5F3FF', color: '#5B21B6' }
-                                    : statusOpt(e.status);
+                                const selectVal = e.status || 'anwesend';
+                                const selectOpt = statusOpt(selectVal);
                                 const zeitraum = e.hat_ferien
                                     ? (e.ferien_von ? `${fmtDatum(e.ferien_von)} – ${fmtDatum(e.ferien_bis)}` : null)
                                     : fmtDatum(datum);
@@ -446,14 +445,16 @@ export default function Praesenz() {
                                                 )}
                                             </div>
                                         </div>
-                                        <div style={{ borderBottom: '1px solid rgba(22,163,74,.1)', padding: '7px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 10, fontWeight: 500, background: absTyp.bg, color: absTyp.color, flexShrink: 0 }}>{absTyp.label}</span>
-                                                {zeitraum && <span style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{zeitraum}</span>}
-                                            </div>
-                                            {e.kommentar && (
-                                                <span style={{ fontSize: 11, color: '#9CA3AF', fontStyle: 'italic' }}>{e.kommentar}</span>
+                                        <div style={{ borderBottom: '1px solid rgba(22,163,74,.1)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            {e.hat_ferien ? (
+                                                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 10, fontWeight: 500, background: '#F5F3FF', color: '#5B21B6', flexShrink: 0 }}>Ferien</span>
+                                            ) : (
+                                                <select value={selectVal} onChange={ev => setStatus(e.klient_id, ev.target.value)} style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${e.status ? selectOpt.color + '44' : 'rgba(0,0,0,.09)'}`, background: e.status ? selectOpt.bg : '#F5F4F0', color: e.status ? selectOpt.color : '#6B6860', fontFamily: 'inherit', fontWeight: 500, outline: 'none', flexShrink: 0 }}>
+                                                    {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                </select>
                                             )}
+                                            {zeitraum && <span style={{ fontSize: 12, color: '#374151', fontWeight: 500, flexShrink: 0 }}>{zeitraum}</span>}
+                                            <input type="text" value={kommentare[e.klient_id] ?? ''} onChange={ev => setKommentare(prev => ({ ...prev, [e.klient_id]: ev.target.value }))} onBlur={() => saveKommentar(e.klient_id)} placeholder={e.status ? 'Kommentar…' : ''} disabled={!e.status} style={{ fontSize: 11, padding: '3px 7px', borderRadius: 4, flex: 1, maxWidth: 300, border: '1px solid rgba(0,0,0,.09)', background: e.status ? '#fff' : 'transparent', fontFamily: 'inherit', color: '#1A1917', outline: 'none' }} />
                                         </div>
                                     </div>
                                 );
