@@ -12,7 +12,6 @@ const STATUS_OPTS = [
     { value: 'ferien',         label: 'Ferien',          bg: '#F5F3FF', color: '#5B21B6' },
     { value: 'feiertag',       label: 'Feiertag',        bg: '#F5F4F0', color: '#6B6860' },
     { value: 'unfall',         label: 'Unfall',          bg: '#FEF2F2', color: '#B91C1C' },
-    { value: 'absenz',         label: 'Absenz',          bg: '#FFF7ED', color: '#C2410C' },
     { value: 'termin_extern',  label: 'Termin extern',   bg: '#F0F9FF', color: '#0369A1' },
 ];
 
@@ -286,7 +285,7 @@ export default function Praesenz() {
     }
 
     function istGeplantAbwesend(e) {
-        if (e.hat_ferien) return true;
+        if (e.hat_ferien === true || e.hat_ferien === 'true' || e.hat_ferien === 1) return true;
         if (['schule', 'feiertag', 'termin_extern'].includes(e.status)) return true;
         if (['krank', 'unfall'].includes(e.status) && datum > heute) return true;
         return false;
@@ -296,6 +295,9 @@ export default function Praesenz() {
         (!selAbteilung || k.abteilung === selAbteilung) &&
         (!selStandort || String(k.standort_id) === selStandort)
     );
+    if (gefiltert.length > 0) {
+        console.log('hat_ferien check:', gefiltert[0].hat_ferien, typeof gefiltert[0].hat_ferien);
+    }
     const gefiltertNormal = gefiltert.filter(k => !istGeplantAbwesend(k));
     const gefiltertFerien  = gefiltert.filter(k => istGeplantAbwesend(k));
 
