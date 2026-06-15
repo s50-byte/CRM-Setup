@@ -125,16 +125,31 @@ export default function Praesenz() {
 
     // Präsenz laden wenn Datum wechselt
     useEffect(() => {
-        setLaden(true);
-        client.get(`/praesenz/${datum}`)
-            .then(r => {
+        let abgebrochen = false;
+        function laden() {
+            return client.get(`/praesenz/${datum}`).then(r => {
+                if (abgebrochen) return r.data;
                 setEintraege(r.data);
                 const km = {};
                 r.data.forEach(e => { km[e.klient_id] = e.kommentar || ''; });
                 setKommentare(km);
-            }).catch(console.error)
-              .finally(() => setLaden(false));
-    }, [datum]);
+                return r.data;
+            });
+        }
+        setLaden(true);
+        laden()
+            .then(data => {
+                if (datum > heute) return;
+                const ohneEintrag = data.filter(k => k.status === null);
+                if (ohneEintrag.length === 0) return;
+                return Promise.all(
+                    ohneEintrag.map(k => client.post('/praesenz', { klient_id: k.klient_id, datum, status: 'anwesend' }))
+                ).then(() => laden());
+            })
+            .catch(console.error)
+            .finally(() => setLaden(false));
+        return () => { abgebrochen = true; };
+    }, [datum, heute]);
 
     function speichereFilter(abt, st) {
         client.put('/benutzer/einstellung/praesenz_filter', {
