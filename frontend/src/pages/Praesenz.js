@@ -156,14 +156,14 @@ export default function Praesenz() {
 
     async function saveKommentar(klient_id) {
         const eintrag = eintraege.find(e => e.klient_id === klient_id);
-        if (!eintrag?.status) return;
         const neu = kommentare[klient_id] || null;
-        const alt = eintrag.kommentar || null;
-        if (neu === alt) return;
+        const status = eintrag?.status || 'anwesend';
+        const alt = eintrag?.kommentar || null;
+        if (eintrag?.status && neu === alt) return;
         try {
-            await client.post('/praesenz', { klient_id, datum, status: eintrag.status, kommentar: neu });
+            await client.post('/praesenz', { klient_id, datum, status, kommentar: neu });
             setEintraege(prev => prev.map(e =>
-                e.klient_id === klient_id ? { ...e, kommentar: neu } : e
+                e.klient_id === klient_id ? { ...e, status, kommentar: neu } : e
             ));
         } catch (err) {
             console.error(err);
@@ -405,7 +405,7 @@ export default function Praesenz() {
                                         <select value={selectVal} onChange={ev => setStatus(e.klient_id, ev.target.value)} style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${e.status ? selectOpt.color + '44' : 'rgba(0,0,0,.09)'}`, background: e.status ? selectOpt.bg : '#F5F4F0', color: e.status ? selectOpt.color : '#6B6860', fontFamily: 'inherit', fontWeight: 500, outline: 'none', flexShrink: 0 }}>
                                             {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                         </select>
-                                        <input type="text" value={kommentare[e.klient_id] ?? ''} onChange={ev => setKommentare(prev => ({ ...prev, [e.klient_id]: ev.target.value }))} onBlur={() => saveKommentar(e.klient_id)} placeholder={e.status ? 'Kommentar…' : ''} disabled={!e.status} style={{ fontSize: 11, padding: '3px 7px', borderRadius: 4, flex: 1, maxWidth: 300, border: '1px solid rgba(0,0,0,.09)', background: e.status ? '#F5F4F0' : 'transparent', fontFamily: 'inherit', color: '#1A1917', outline: 'none' }} />
+                                        <input type="text" value={kommentare[e.klient_id] ?? ''} onChange={ev => setKommentare(prev => ({ ...prev, [e.klient_id]: ev.target.value }))} onBlur={() => saveKommentar(e.klient_id)} placeholder="Kommentar…" style={{ fontSize: 11, padding: '3px 7px', borderRadius: 4, flex: 1, maxWidth: 300, border: '1px solid rgba(0,0,0,.09)', background: '#F5F4F0', fontFamily: 'inherit', color: '#1A1917', outline: 'none' }} />
                                         {zeitstempel && <span style={{ fontSize: 10, color: '#A09D97', flexShrink: 0 }}>zuletzt {zeitstempel}</span>}
                                         {(e.zugewiesen || []).length > 0 && (
                                             <span style={{ fontSize: 10.5, color: '#A09D97', marginLeft: 'auto', flexShrink: 0 }}>
