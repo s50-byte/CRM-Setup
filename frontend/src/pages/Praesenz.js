@@ -9,7 +9,6 @@ const STATUS_OPTS = [
     { value: 'unentschuldigt', label: 'Unentschuldigt',  bg: '#FEF2F2', color: '#B91C1C' },
     { value: 'verspaetet',     label: 'Verspätet',       bg: '#FFFBEB', color: '#B45309' },
     { value: 'schule',         label: 'Schule',          bg: '#EEF3FE', color: '#1D4ED8' },
-    { value: 'ferien',         label: 'Ferien',          bg: '#F5F3FF', color: '#5B21B6' },
     { value: 'feiertag',       label: 'Feiertag',        bg: '#F5F4F0', color: '#6B6860' },
     { value: 'unfall',         label: 'Unfall',          bg: '#FEF2F2', color: '#B91C1C' },
     { value: 'termin_extern',  label: 'Termin extern',   bg: '#F0F9FF', color: '#0369A1' },
