@@ -13,6 +13,7 @@ const STATUS_OPTS = [
     { value: 'feiertag',       label: 'Feiertag',        bg: '#F5F4F0', color: '#6B6860' },
     { value: 'unfall',         label: 'Unfall',          bg: '#FEF2F2', color: '#B91C1C' },
     { value: 'absenz',         label: 'Absenz',          bg: '#FFF7ED', color: '#C2410C' },
+    { value: 'termin_extern',  label: 'Termin extern',   bg: '#F0F9FF', color: '#0369A1' },
 ];
 
 const LABEL_FARBEN = {
@@ -284,15 +285,19 @@ export default function Praesenz() {
         win.print();
     }
 
+    function istGeplantAbwesend(e) {
+        if (e.hat_ferien) return true;
+        if (['schule', 'feiertag', 'termin_extern'].includes(e.status)) return true;
+        if (['krank', 'unfall'].includes(e.status) && datum > heute) return true;
+        return false;
+    }
+
     const gefiltert = eintraege.filter(k =>
         (!selAbteilung || k.abteilung === selAbteilung) &&
         (!selStandort || String(k.standort_id) === selStandort)
     );
-    const gefiltertNormal = gefiltert.filter(k => !k.hat_ferien);
-    const gefiltertFerien  = gefiltert.filter(k => k.hat_ferien);
-    console.log('[debug] eintraege:', eintraege.length, '| gefiltert:', gefiltert.length, '| ferien:', gefiltertFerien.length, '| laden:', laden, '| selAbteilung:', selAbteilung, '| selStandort:', selStandort);
-    console.log('[debug] ferienKlienten:', gefiltertFerien);
-    console.log('[debug] ferien in eintraege (alle):', eintraege.filter(k => k.hat_ferien));
+    const gefiltertNormal = gefiltert.filter(k => !istGeplantAbwesend(k));
+    const gefiltertFerien  = gefiltert.filter(k => istGeplantAbwesend(k));
 
     const verlaufKlienten = [...new Map(verlaufData.map(e => [e.klient_id, e])).values()]
         .sort((a, b) => (a.nachname || '').localeCompare(b.nachname || ''));
@@ -417,30 +422,42 @@ export default function Praesenz() {
                         <div style={{ ...CARD, overflow: 'hidden' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: '#DCFCE7', borderBottom: '1px solid rgba(22,163,74,.2)' }}>
                                 <div style={{ ...TH_STYLE, color: '#15803D', borderRight: '1px solid rgba(22,163,74,.2)' }}>Geplant abwesend ({gefiltertFerien.length})</div>
-                                <div style={{ ...TH_STYLE, color: '#15803D' }}>Programm · Ferien-Zeitraum</div>
+                                <div style={{ ...TH_STYLE, color: '#15803D' }}>Abwesenheit · Zeitraum</div>
                             </div>
-                            {gefiltertFerien.map(e => (
-                                <div key={e.klient_id} style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: '#F0FDF4' }}>
-                                    <div style={{ borderRight: '1px solid rgba(22,163,74,.15)', borderBottom: '1px solid rgba(22,163,74,.1)', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <div style={{ width: 26, height: 26, borderRadius: 6, background: '#DCFCE7', color: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, flexShrink: 0 }}>
-                                            {(e.nachname?.[0] || '') + (e.vorname?.[0] || '')}
+                            {gefiltertFerien.map(e => {
+                                const absTyp = e.hat_ferien
+                                    ? { label: 'Ferien', bg: '#F5F3FF', color: '#5B21B6' }
+                                    : statusOpt(e.status);
+                                const zeitraum = e.hat_ferien
+                                    ? (e.ferien_von ? `${fmtDatum(e.ferien_von)} – ${fmtDatum(e.ferien_bis)}` : null)
+                                    : fmtDatum(datum);
+                                return (
+                                    <div key={e.klient_id} style={{ display: 'grid', gridTemplateColumns: '220px 1fr', background: '#F0FDF4' }}>
+                                        <div style={{ borderRight: '1px solid rgba(22,163,74,.15)', borderBottom: '1px solid rgba(22,163,74,.1)', padding: '7px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                            <div style={{ width: 26, height: 26, borderRadius: 6, background: '#DCFCE7', color: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, flexShrink: 0, marginTop: 1 }}>
+                                                {(e.nachname?.[0] || '') + (e.vorname?.[0] || '')}
+                                            </div>
+                                            <div style={{ minWidth: 0 }}>
+                                                <div onClick={() => e.dossier_id && navigate('/dossiers/' + e.dossier_id)} style={{ fontSize: 12.5, fontWeight: 600, cursor: e.dossier_id ? 'pointer' : 'default', color: e.dossier_id ? '#2563EB' : '#1A1917' }}>
+                                                    {e.nachname} {e.vorname}
+                                                </div>
+                                                {e.programm_name && (
+                                                    <span style={{ display: 'inline-block', marginTop: 3, fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 500, background: e.farbe_hex ? e.farbe_hex + '22' : '#EEF3FE', color: e.farbe_hex || '#1D4ED8', border: `1px solid ${e.farbe_hex ? e.farbe_hex + '44' : 'rgba(29,78,216,.15)'}`, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.programm_name}</span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div onClick={() => e.dossier_id && navigate('/dossiers/' + e.dossier_id)} style={{ fontSize: 12.5, fontWeight: 600, cursor: e.dossier_id ? 'pointer' : 'default', color: e.dossier_id ? '#2563EB' : '#1A1917' }}>
-                                            {e.nachname} {e.vorname}
+                                        <div style={{ borderBottom: '1px solid rgba(22,163,74,.1)', padding: '7px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 10, fontWeight: 500, background: absTyp.bg, color: absTyp.color, flexShrink: 0 }}>{absTyp.label}</span>
+                                                {zeitraum && <span style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{zeitraum}</span>}
+                                            </div>
+                                            {e.kommentar && (
+                                                <span style={{ fontSize: 11, color: '#9CA3AF', fontStyle: 'italic' }}>{e.kommentar}</span>
+                                            )}
                                         </div>
                                     </div>
-                                    <div style={{ borderBottom: '1px solid rgba(22,163,74,.1)', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        {e.programm_name && (
-                                            <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 500, background: e.farbe_hex ? e.farbe_hex + '22' : '#EEF3FE', color: e.farbe_hex || '#1D4ED8', border: `1px solid ${e.farbe_hex ? e.farbe_hex + '44' : 'rgba(29,78,216,.15)'}`, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>{e.programm_name}</span>
-                                        )}
-                                        {e.ferien_von && (
-                                            <span style={{ fontSize: 12, color: '#15803D', fontWeight: 500 }}>
-                                                {fmtDatum(e.ferien_von)} – {fmtDatum(e.ferien_bis)}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
