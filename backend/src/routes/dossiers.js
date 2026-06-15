@@ -464,14 +464,25 @@ router.put('/:id/arbeitgeber', auth, async (req, res) => {
     }
 });
 
-// PUT /api/dossiers/:id/felder — Zuweisende Person + Abteilung + Arbeitgeber
+// PUT /api/dossiers/:id/felder — Zuweisende Person + Abteilung + Arbeitgeber + Ausbildung
 router.put('/:id/felder', auth, async (req, res) => {
-    const { zuweisende_person_id, abteilung, arbeitgeber_id } = req.body;
+    const erlaubteFelder = [
+        'zuweisende_person_id', 'abteilung', 'arbeitgeber_id',
+        'ausbildung_beruf', 'ausbildung_abschluss', 'ausbildung_fachrichtung', 'ausbildung_lehrjahr',
+    ];
+    const sets = [];
+    const params = [];
+    let p = 1;
+    for (const feld of erlaubteFelder) {
+        if (feld in req.body) {
+            sets.push(`${feld} = $${p++}`);
+            params.push(req.body[feld] || null);
+        }
+    }
+    if (sets.length === 0) return res.json({ message: 'Keine Änderungen' });
+    params.push(req.params.id);
     try {
-        await db.query(
-            `UPDATE dossier SET zuweisende_person_id = $1, abteilung = $2, arbeitgeber_id = $3 WHERE dossier_id = $4`,
-            [zuweisende_person_id || null, abteilung || null, arbeitgeber_id || null, req.params.id]
-        );
+        await db.query(`UPDATE dossier SET ${sets.join(', ')} WHERE dossier_id = $${p}`, params);
         res.json({ message: 'Felder aktualisiert' });
     } catch (err) {
         console.error(err);

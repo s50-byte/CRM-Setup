@@ -47,6 +47,30 @@ const SECTION_HDR = {
     textTransform: 'uppercase', letterSpacing: '.06em',
 };
 
+const SELECT_STYLE = {
+    fontSize: 12.5, padding: '5px 8px', border: '1px solid rgba(0,0,0,.13)',
+    borderRadius: 5, background: '#fff', fontFamily: 'inherit', minWidth: 170, outline: 'none',
+};
+
+const BERUF_OPTIONEN_M = ['Informatiker', 'ICT-Fachmann', 'Kaufmann', 'Logistiker', 'Kundendialog-Spezialist'];
+const BERUF_OPTIONEN_F = ['Informatikerin', 'ICT-Fachfrau', 'Kauffrau', 'Logistikerin', 'Kundendialog-Spezialistin'];
+const FACHRICHTUNG_OPTIONEN = ['Applikationsentwicklung (API)', 'Plattformentwicklung (PFE)'];
+
+function abschlussOptionen(beruf) {
+    if (!beruf) return [];
+    if (beruf === 'Kaufmann' || beruf === 'Kauffrau' || beruf === 'Logistiker' || beruf === 'Logistikerin') {
+        return ['EFZ', 'EBA'];
+    }
+    return ['EFZ'];
+}
+
+function lehrjahrOptionen(beruf, abschluss) {
+    if (!beruf || !abschluss) return [];
+    if (abschluss === 'EBA') return ['1. Lehrjahr', '2. Lehrjahr'];
+    const jahre = (beruf === 'Informatiker' || beruf === 'Informatikerin') ? 4 : 3;
+    return Array.from({ length: jahre }, (_, i) => `${i + 1}. Lehrjahr`);
+}
+
 function fmt(dateStr) {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('de-CH');
@@ -88,12 +112,23 @@ export default function DossierDetail() {
     // Programmhistorie
     const [verlaufOffen, setVerlaufOffen] = useState(false);
 
+    // Ausbildung
+    const [ausbildung, setAusbildung] = useState({ beruf: '', abschluss: '', fachrichtung: '', lehrjahr: '' });
+    const [ausbildungSpeichern, setAusbildungSpeichern] = useState(false);
+    const [ausbildungGespeichert, setAusbildungGespeichert] = useState(false);
+
     useEffect(() => {
         async function load() {
             try {
                 const dosRes = await client.get(`/dossiers/${id}`);
                 setDossier(dosRes.data);
                 setZiele(dosRes.data.ziele || []);
+                setAusbildung({
+                    beruf:        dosRes.data.ausbildung_beruf || '',
+                    abschluss:    dosRes.data.ausbildung_abschluss || '',
+                    fachrichtung: dosRes.data.ausbildung_fachrichtung || '',
+                    lehrjahr:     dosRes.data.ausbildung_lehrjahr || '',
+                });
             } catch (err) {
                 console.error(err);
             } finally {
@@ -183,7 +218,48 @@ export default function DossierDetail() {
         client.get(`/dossiers/${id}`).then(r => {
             setDossier(r.data);
             setZiele(r.data.ziele || []);
+            setAusbildung({
+                beruf:        r.data.ausbildung_beruf || '',
+                abschluss:    r.data.ausbildung_abschluss || '',
+                fachrichtung: r.data.ausbildung_fachrichtung || '',
+                lehrjahr:     r.data.ausbildung_lehrjahr || '',
+            });
         });
+    }
+
+    function handleBerufChange(beruf) {
+        const abschlussOpts = abschlussOptionen(beruf);
+        const abschluss = abschlussOpts.includes(ausbildung.abschluss) ? ausbildung.abschluss : '';
+        const zeigtFachrichtung = beruf === 'Informatiker' || beruf === 'Informatikerin';
+        const fachrichtung = zeigtFachrichtung ? ausbildung.fachrichtung : '';
+        const lehrjahrOpts = lehrjahrOptionen(beruf, abschluss);
+        const lehrjahr = lehrjahrOpts.includes(ausbildung.lehrjahr) ? ausbildung.lehrjahr : '';
+        setAusbildung({ beruf, abschluss, fachrichtung, lehrjahr });
+    }
+
+    function handleAbschlussChange(abschluss) {
+        const lehrjahrOpts = lehrjahrOptionen(ausbildung.beruf, abschluss);
+        const lehrjahr = lehrjahrOpts.includes(ausbildung.lehrjahr) ? ausbildung.lehrjahr : '';
+        setAusbildung(a => ({ ...a, abschluss, lehrjahr }));
+    }
+
+    async function speichernAusbildung() {
+        setAusbildungSpeichern(true);
+        try {
+            await client.put(`/dossiers/${id}/felder`, {
+                ausbildung_beruf: ausbildung.beruf || null,
+                ausbildung_abschluss: ausbildung.abschluss || null,
+                ausbildung_fachrichtung: ausbildung.fachrichtung || null,
+                ausbildung_lehrjahr: ausbildung.lehrjahr || null,
+            });
+            reloadDossier();
+            setAusbildungGespeichert(true);
+            setTimeout(() => setAusbildungGespeichert(false), 2500);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setAusbildungSpeichern(false);
+        }
     }
 
     if (laden) return <div style={{ padding: '2rem', color: '#6B6860', fontSize: 13 }}>Laden…</div>;
@@ -297,6 +373,55 @@ export default function DossierDetail() {
                         ))}
                     </div>
                 </div>
+
+                {/* Ausbildung */}
+                {dossier.programm_name === 'Erstmalige berufliche Ausbildung' && (() => {
+                    const berufOptionen = dossier.anrede === 'Frau' ? BERUF_OPTIONEN_F : BERUF_OPTIONEN_M;
+                    const zeigtFachrichtung = ausbildung.beruf === 'Informatiker' || ausbildung.beruf === 'Informatikerin';
+                    return (
+                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.06)' }}>
+                            <div style={{ ...SECTION_HDR, marginBottom: 8 }}>Ausbildung</div>
+                            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    <label style={{ fontSize: 10.5, color: '#A09D97' }}>Beruf</label>
+                                    <select value={ausbildung.beruf} onChange={e => handleBerufChange(e.target.value)} style={SELECT_STYLE}>
+                                        <option value="">— Wählen —</option>
+                                        {berufOptionen.map(b => <option key={b} value={b}>{b}</option>)}
+                                    </select>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    <label style={{ fontSize: 10.5, color: '#A09D97' }}>Abschluss</label>
+                                    <select value={ausbildung.abschluss} onChange={e => handleAbschlussChange(e.target.value)} disabled={!ausbildung.beruf} style={SELECT_STYLE}>
+                                        <option value="">— Wählen —</option>
+                                        {abschlussOptionen(ausbildung.beruf).map(a => <option key={a} value={a}>{a}</option>)}
+                                    </select>
+                                </div>
+                                {zeigtFachrichtung && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                        <label style={{ fontSize: 10.5, color: '#A09D97' }}>Fachrichtung</label>
+                                        <select value={ausbildung.fachrichtung} onChange={e => setAusbildung(a => ({ ...a, fachrichtung: e.target.value }))} style={SELECT_STYLE}>
+                                            <option value="">— Wählen —</option>
+                                            {FACHRICHTUNG_OPTIONEN.map(f => <option key={f} value={f}>{f}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    <label style={{ fontSize: 10.5, color: '#A09D97' }}>Lehrjahr</label>
+                                    <select value={ausbildung.lehrjahr} onChange={e => setAusbildung(a => ({ ...a, lehrjahr: e.target.value }))} disabled={!ausbildung.abschluss} style={SELECT_STYLE}>
+                                        <option value="">— Wählen —</option>
+                                        {lehrjahrOptionen(ausbildung.beruf, ausbildung.abschluss).map(l => <option key={l} value={l}>{l}</option>)}
+                                    </select>
+                                </div>
+                                <button onClick={speichernAusbildung} disabled={ausbildungSpeichern} style={{
+                                    padding: '6px 14px', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap',
+                                    cursor: ausbildungSpeichern ? 'default' : 'pointer', border: 'none', borderRadius: 5,
+                                    background: ausbildungSpeichern ? '#93C5FD' : '#2563EB', color: '#fff', fontFamily: 'inherit'
+                                }}>{ausbildungSpeichern ? 'Speichern…' : 'Speichern'}</button>
+                                {ausbildungGespeichert && <span style={{ fontSize: 12.5, color: '#16A34A' }}>Gespeichert ✓</span>}
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {/* Warn-Banner */}
                 {tageVerbleibend !== null && tageVerbleibend < 28 && (
