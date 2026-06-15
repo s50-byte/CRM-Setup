@@ -131,7 +131,8 @@ router.get('/:datum', auth, async (req, res) => {
              LEFT JOIN LATERAL (
                 SELECT von, bis FROM ferienplanung fp2
                 WHERE fp2.klient_id = k.klient_id
-                AND $1::date BETWEEN fp2.von AND fp2.bis
+                AND fp2.bis >= $1::date
+                ORDER BY fp2.von ASC
                 LIMIT 1
              ) fp_lat ON TRUE
              WHERE k.aktiv = TRUE
