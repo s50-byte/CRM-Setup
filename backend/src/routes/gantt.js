@@ -39,6 +39,32 @@ router.get('/', auth, async (req, res) => {
                 pv.start_datum,
                 pv.geplantes_enddatum,
                 st.name AS standort_name,
+                (SELECT COALESCE(ROUND(SUM(vp2.soll_stunden), 1), 0)
+                 FROM verfuegung_position vp2
+                 JOIN verfuegung v2 ON v2.verfuegung_id = vp2.verfuegung_id
+                 WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv') AS soll_total,
+                (SELECT COALESCE(ROUND(SUM(j.dauer_minuten) FILTER (WHERE j.verrechenbar = TRUE) / 60.0, 1), 0)
+                 FROM journal_eintrag j WHERE j.klient_id = k.klient_id) AS ist_verrechenbar,
+                (SELECT COALESCE(ROUND(SUM(j.dauer_minuten) FILTER (WHERE j.verrechenbar = FALSE) / 60.0, 1), 0)
+                 FROM journal_eintrag j WHERE j.klient_id = k.klient_id) AS ist_nicht_verrechenbar,
+                (SELECT COALESCE(ROUND(SUM(j.dauer_minuten) / 60.0, 1), 0)
+                 FROM journal_eintrag j WHERE j.klient_id = k.klient_id) AS ist_total,
+                COALESCE(
+                    (SELECT JSON_AGG(JSONB_BUILD_OBJECT(
+                        'tarifnr', l.tarifnr,
+                        'bezeichnung', l.bezeichnung,
+                        'soll_stunden', vp2.soll_stunden,
+                        'ist_stunden', COALESCE(ROUND(
+                            (SELECT SUM(j2.dauer_minuten) / 60.0
+                             FROM journal_eintrag j2
+                             WHERE j2.klient_id = k.klient_id AND j2.leistung_id = vp2.leistung_id), 1), 0)
+                    ) ORDER BY vp2.reihenfolge)
+                     FROM verfuegung_position vp2
+                     JOIN verfuegung v2 ON v2.verfuegung_id = vp2.verfuegung_id
+                     JOIN leistung l ON l.leistung_id = vp2.leistung_id
+                     WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv'),
+                    '[]'
+                ) AS positionen,
                 COALESCE(
                     (SELECT JSON_AGG(JSONB_BUILD_OBJECT(
                         'phase_id', dp.phase_id,

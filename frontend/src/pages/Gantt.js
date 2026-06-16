@@ -155,6 +155,7 @@ export default function Gantt() {
     const [daten, setDaten] = useState([]);
     const [laden, setLaden] = useState(true);
     const [fehler, setFehler] = useState(null);
+    const [aufgeklappt, setAufgeklappt] = useState(new Set());
 
     const berechtigt = ERLAUBTE_ROLLEN.includes(benutzer?.system_rolle);
 
@@ -250,7 +251,25 @@ export default function Gantt() {
     const heutePct = pct(heuteISO());
     const heuteImBereich = new Date(heuteISO()) >= vonDate && new Date(heuteISO()) <= bisDate;
 
-    const ganttHeight = HEADER_H + daten.length * ROW_H;
+    const ganttHeight = HEADER_H + daten.reduce((s, row) => s + rowH(row), 0);
+
+    function toggleAufgeklappt(dossierId) {
+        setAufgeklappt(prev => {
+            const next = new Set(prev);
+            if (next.has(dossierId)) next.delete(dossierId);
+            else next.add(dossierId);
+            return next;
+        });
+    }
+
+    function detailH(row) {
+        const n = (row.positionen || []).length;
+        return 14 + 22 + (Math.max(n, 0) + 1) * 21 + 10;
+    }
+
+    function rowH(row) {
+        return ROW_H + (aufgeklappt.has(row.dossier_id) ? detailH(row) : 0);
+    }
 
     function verschiebeZeitraum(delta) {
         const v = new Date(von);
@@ -356,31 +375,72 @@ export default function Gantt() {
                                 fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em',
                                 borderBottom: '1px solid rgba(0,0,0,.09)', background: '#F5F4F0',
                             }}>Klient</div>
-                            {daten.map(row => (
-                                <div key={row.dossier_id} onClick={() => navigate(`/dossiers/${row.dossier_id}`)} style={{
-                                    height: ROW_H, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                                    padding: '0 12px', gap: 3, borderBottom: '1px solid rgba(0,0,0,.05)', cursor: 'pointer',
-                                    background: '#fff',
-                                }}>
-                                    <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.klient_name}</div>
-                                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                        {row.programm_name && (
-                                            <span style={{
-                                                fontSize: 10, padding: '1px 6px', borderRadius: 10, fontFamily: 'monospace',
-                                                background: `${row.programm_farbe || '#6B6860'}1A`, color: row.programm_farbe || '#6B6860',
-                                                border: `1px solid ${row.programm_farbe || '#6B6860'}33`,
-                                            }}>{row.programm_name}</span>
-                                        )}
-                                        {row.klient_label && LABEL_FARBEN[row.klient_label] && (
-                                            <span style={{
-                                                fontSize: 10, padding: '1px 6px', borderRadius: 10, fontFamily: 'monospace',
-                                                background: LABEL_FARBEN[row.klient_label].bg, color: LABEL_FARBEN[row.klient_label].color,
-                                                border: `1px solid ${LABEL_FARBEN[row.klient_label].color}33`,
-                                            }}>{row.klient_label}</span>
+                            {daten.map(row => {
+                                const offen = aufgeklappt.has(row.dossier_id);
+                                const soll = parseFloat(row.soll_total) || 0;
+                                const ist = parseFloat(row.ist_total) || 0;
+                                const positionen = row.positionen || [];
+                                return (
+                                    <div key={row.dossier_id} style={{ borderBottom: '1px solid rgba(0,0,0,.05)', background: '#fff' }}>
+                                        {/* Name-Zeile */}
+                                        <div style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: '0 8px 0 4px', gap: 4 }}>
+                                            <button
+                                                onClick={e => { e.stopPropagation(); toggleAufgeklappt(row.dossier_id); }}
+                                                style={{ width: 18, height: 18, flexShrink: 0, border: '1px solid rgba(0,0,0,.12)', borderRadius: 4, background: offen ? '#EEF3FE' : '#F5F4F0', cursor: 'pointer', fontSize: 8, color: '#6B6860', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                                            >{offen ? '▼' : '▶'}</button>
+                                            <div onClick={() => navigate(`/dossiers/${row.dossier_id}`)} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
+                                                <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.klient_name}</div>
+                                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
+                                                    {row.programm_name && (
+                                                        <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 10, fontFamily: 'monospace', background: `${row.programm_farbe || '#6B6860'}1A`, color: row.programm_farbe || '#6B6860', border: `1px solid ${row.programm_farbe || '#6B6860'}33` }}>{row.programm_name}</span>
+                                                    )}
+                                                    {row.klient_label && LABEL_FARBEN[row.klient_label] && (
+                                                        <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 10, fontFamily: 'monospace', background: LABEL_FARBEN[row.klient_label].bg, color: LABEL_FARBEN[row.klient_label].color, border: `1px solid ${LABEL_FARBEN[row.klient_label].color}33` }}>{row.klient_label}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {/* Detail-Tabelle */}
+                                        {offen && (
+                                            <div style={{ borderTop: '1px solid rgba(0,0,0,.07)', background: '#FAFAF9', padding: '6px 8px 8px' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'auto 36px 36px 42px', gap: '1px 4px', fontSize: 9.5, fontFamily: 'monospace' }}>
+                                                    <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.04em', paddingBottom: 4, fontFamily: 'inherit' }}>Leistung</div>
+                                                    <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 4, fontFamily: 'inherit' }}>SOLL</div>
+                                                    <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 4, fontFamily: 'inherit' }}>IST</div>
+                                                    <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 4, fontFamily: 'inherit' }}>Diff</div>
+                                                    {positionen.length === 0 && (
+                                                        <div style={{ gridColumn: '1 / -1', color: '#9CA3AF', fontSize: 9.5, padding: '3px 0' }}>Keine aktive Verfügung</div>
+                                                    )}
+                                                    {positionen.map((pos, pi) => {
+                                                        const ps = parseFloat(pos.soll_stunden) || 0;
+                                                        const pi2 = parseFloat(pos.ist_stunden) || 0;
+                                                        const diff = pi2 - ps;
+                                                        const ok = diff <= 0;
+                                                        const fc = ok ? '#15803D' : '#B91C1C';
+                                                        return [
+                                                            <div key={`l${pi}`} style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${pos.tarifnr} · ${pos.bezeichnung}`}>{pos.tarifnr}</div>,
+                                                            <div key={`s${pi}`} style={{ textAlign: 'right', color: '#6B6860' }}>{ps.toFixed(1)}</div>,
+                                                            <div key={`i${pi}`} style={{ textAlign: 'right', color: fc, fontWeight: 600 }}>{pi2.toFixed(1)}</div>,
+                                                            <div key={`d${pi}`} style={{ textAlign: 'right', color: fc }}>{(diff >= 0 ? '+' : '')}{diff.toFixed(1)}</div>,
+                                                        ];
+                                                    })}
+                                                    {positionen.length > 0 && (() => {
+                                                        const diff = ist - soll;
+                                                        const ok = diff <= 0;
+                                                        const fc = ok ? '#15803D' : '#B91C1C';
+                                                        return [
+                                                            <div key="tl" style={{ color: '#374151', fontWeight: 700, borderTop: '1px solid rgba(0,0,0,.1)', paddingTop: 3, marginTop: 1 }}>Total</div>,
+                                                            <div key="ts" style={{ textAlign: 'right', color: '#374151', fontWeight: 700, borderTop: '1px solid rgba(0,0,0,.1)', paddingTop: 3, marginTop: 1 }}>{soll.toFixed(1)}</div>,
+                                                            <div key="ti" style={{ textAlign: 'right', color: fc, fontWeight: 700, borderTop: '1px solid rgba(0,0,0,.1)', paddingTop: 3, marginTop: 1 }}>{ist.toFixed(1)}</div>,
+                                                            <div key="td" style={{ textAlign: 'right', color: fc, borderTop: '1px solid rgba(0,0,0,.1)', paddingTop: 3, marginTop: 1 }}>{(diff >= 0 ? '+' : '')}{diff.toFixed(1)}</div>,
+                                                        ];
+                                                    })()}
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         {/* RECHTE SPALTE — ZEITSTRAHL */}
@@ -433,36 +493,61 @@ export default function Gantt() {
                                 const left = bgStart ? pct(bgStart) : 0;
                                 const right = bgEnd ? pct(bgEnd) : 100;
                                 const width = Math.max(0, right - left);
+                                const offen = aufgeklappt.has(row.dossier_id);
+                                const soll = parseFloat(row.soll_total) || 0;
+                                const ist = parseFloat(row.ist_total) || 0;
+                                const pctIst = soll > 0 ? Math.min(100, (ist / soll) * 100) : 0;
+                                const istFarbe = soll > 0 ? (ist <= soll ? '#16A34A' : '#DC2626') : '#6B6860';
 
                                 return (
-                                    <div key={row.dossier_id} style={{ height: ROW_H, position: 'relative', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
-                                        {/* Grauer Hintergrund-Balken */}
-                                        <div title={`${row.programm_name || 'Massnahme'}: ${fmt(bgStart)} – ${fmt(bgEnd)}`} style={{
-                                            position: 'absolute', top: '50%', transform: 'translateY(-50%)',
-                                            left: `${left}%`, width: `${width}%`, height: BAR_H,
-                                            background: '#E5E7EB', borderRadius: 4,
-                                        }} />
-
-                                        {/* Phasen-Balken */}
-                                        {row.phasen.map(p => {
-                                            const pStart = p.start_datum || bgStart;
-                                            const pEnd = p.end_datum || bgEnd;
-                                            if (!pStart && !pEnd) return null;
-                                            const pLeft = pct(pStart || pEnd);
-                                            const pRight = pct(pEnd || pStart);
-                                            const pWidth = Math.max(0.6, pRight - pLeft);
-                                            const farbe = ROLLE_FARBEN[(p.rollen || [])[0]] || '#A09D97';
-                                            const rollenText = (p.rollen || []).join(', ') || '—';
-                                            return (
-                                                <div key={p.phase_id}
-                                                    title={`${p.phase_label}\n${fmt(p.start_datum)} – ${fmt(p.end_datum)}\nRollen: ${rollenText}`}
-                                                    style={{
-                                                        position: 'absolute', top: '50%', transform: 'translateY(-50%)',
-                                                        left: `${pLeft}%`, width: `${pWidth}%`, height: BAR_H,
-                                                        background: farbe, borderRadius: 4, cursor: 'default',
-                                                    }} />
-                                            );
-                                        })}
+                                    <div key={row.dossier_id} style={{ borderBottom: '1px solid rgba(0,0,0,.05)' }}>
+                                        {/* Gantt-Balken-Zeile */}
+                                        <div style={{ height: ROW_H, position: 'relative' }}>
+                                            {/* Grauer Hintergrund-Balken */}
+                                            <div title={`${row.programm_name || 'Massnahme'}: ${fmt(bgStart)} – ${fmt(bgEnd)}`} style={{
+                                                position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                                                left: `${left}%`, width: `${width}%`, height: BAR_H,
+                                                background: '#E5E7EB', borderRadius: 4,
+                                            }} />
+                                            {/* Phasen-Balken */}
+                                            {row.phasen.map(p => {
+                                                const pStart = p.start_datum || bgStart;
+                                                const pEnd = p.end_datum || bgEnd;
+                                                if (!pStart && !pEnd) return null;
+                                                const pLeft = pct(pStart || pEnd);
+                                                const pRight = pct(pEnd || pStart);
+                                                const pWidth = Math.max(0.6, pRight - pLeft);
+                                                const farbe = ROLLE_FARBEN[(p.rollen || [])[0]] || '#A09D97';
+                                                const rollenText = (p.rollen || []).join(', ') || '—';
+                                                return (
+                                                    <div key={p.phase_id}
+                                                        title={`${p.phase_label}\n${fmt(p.start_datum)} – ${fmt(p.end_datum)}\nRollen: ${rollenText}`}
+                                                        style={{
+                                                            position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                                                            left: `${pLeft}%`, width: `${pWidth}%`, height: BAR_H,
+                                                            background: farbe, borderRadius: 4, cursor: 'default',
+                                                        }} />
+                                                );
+                                            })}
+                                        </div>
+                                        {/* Aufwand-Detail */}
+                                        {offen && (
+                                            <div style={{ borderTop: '1px solid rgba(0,0,0,.07)', background: '#FAFAF9', height: detailH(row), display: 'flex', alignItems: 'center', padding: '0 20px' }}>
+                                                <div style={{ width: '100%', maxWidth: 420 }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, marginBottom: 5 }}>
+                                                        <span style={{ color: '#6B6860' }}>SOLL: {soll.toFixed(1)}h</span>
+                                                        <span style={{ color: istFarbe, fontWeight: 600 }}>IST: {ist.toFixed(1)}h{soll > 0 ? ` (${pctIst.toFixed(0)}%)` : ''}</span>
+                                                    </div>
+                                                    <div style={{ height: 8, background: '#E5E7EB', borderRadius: 4, overflow: 'hidden' }}>
+                                                        <div style={{ height: '100%', width: `${pctIst}%`, background: istFarbe, borderRadius: 4 }} />
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#9CA3AF', marginTop: 4 }}>
+                                                        <span>verr. {(parseFloat(row.ist_verrechenbar) || 0).toFixed(1)}h</span>
+                                                        <span>n.verr. {(parseFloat(row.ist_nicht_verrechenbar) || 0).toFixed(1)}h</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
