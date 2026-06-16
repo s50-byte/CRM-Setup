@@ -135,11 +135,6 @@ export default function ExterneDetail() {
         { key: 'stundenpreise', label: `Stundenpreise${stundenpreise.length > 0 ? ` (${stundenpreise.length})` : ''}` },
     ] : null;
 
-    const vollAdresse = [
-        person.adresse,
-        [person.plz, person.ort].filter(Boolean).join(' '),
-    ].filter(Boolean).join(', ');
-
     return (
         <div>
             <button onClick={() => navigate('/externe')} style={{
@@ -227,7 +222,10 @@ export default function ExterneDetail() {
                             <>
                                 <InfoRow label="Beziehung" value={person.typ} />
                                 <InfoRow label="Funktion"  value={person.funktion} />
-                                <InfoRow label="Adresse"   value={vollAdresse || person.adresse} />
+                                <InfoRow label="Adresse"   value={person.adresse} />
+                                {(person.plz || person.ort) && (
+                                    <InfoRow label="PLZ / Ort" value={[person.plz, person.ort].filter(Boolean).join(' ')} />
+                                )}
                                 <InfoRow label="Telefon"   value={person.telefon} />
                                 <InfoRow label="E-Mail"    value={person.email} link={!!person.email} />
                             </>
