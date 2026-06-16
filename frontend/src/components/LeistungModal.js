@@ -105,6 +105,7 @@ export default function LeistungModal({ open, onClose, leistung, onSaved }) {
                 produkt_nr:         form.produkt_nr.trim(),
                 tarifziffer:        form.tarifziffer.trim() || null,
                 bezeichnung:        form.bezeichnung.trim(),
+                einheit:            'Stunden',
                 entschaedigungsart: form.entschaedigungsart || null,
                 tarif:              form.tarif !== '' ? parseFloat(form.tarif) : null,
                 kostenart:          form.kostenart.trim() || null,
