@@ -73,8 +73,8 @@ function getKW(d) {
 
 const ZOOM_OPTS = [
     { key: 'wochen',   label: 'Wochen',   breite: 40 },
-    { key: 'monate',   label: 'Monate',   breite: 80 },
-    { key: 'quartale', label: 'Quartale', breite: 200 },
+    { key: 'monate',   label: 'Monate',   breite: 100 },
+    { key: 'quartale', label: 'Quartale', breite: 250 },
 ];
 
 function ZoomToggle({ value, onChange }) {
@@ -229,7 +229,7 @@ export default function Gantt() {
             cur = next;
         }
     }
-    const timelineWidth = Math.max(1200, spalten.length * colWidth);
+    const timelineWidth = spalten.length * colWidth;
 
     // Wochenlinien
     const wochenlinien = [];
@@ -316,14 +316,14 @@ export default function Gantt() {
             </div>
 
             {/* Gantt */}
-            <div style={{ ...CARD, overflow: 'hidden' }}>
+            <div style={{ ...CARD, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {laden && <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 13 }}>Laden…</div>}
                 {fehler && <div style={{ padding: '2rem', textAlign: 'center', color: '#B91C1C', fontSize: 13 }}>⚠ {fehler}</div>}
                 {!laden && !fehler && daten.length === 0 && (
                     <div style={{ padding: '2rem', textAlign: 'center', color: '#A09D97', fontSize: 12 }}>Keine Einträge für diese Filterung</div>
                 )}
                 {!laden && !fehler && daten.length > 0 && (
-                    <div style={{ display: 'flex', overflowX: 'auto' }}>
+                    <div style={{ display: 'flex', overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
                         {/* LINKE SPALTE */}
                         <div style={{ width: LEFT_W, flexShrink: 0, borderRight: '1px solid rgba(0,0,0,.09)', position: 'sticky', left: 0, zIndex: 5, background: '#fff' }}>
                             <div style={{
