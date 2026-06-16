@@ -65,14 +65,27 @@ export default function ExternePersonModal({ open, onClose, onSaved, person, def
     function set(f, v) { setForm(prev => ({ ...prev, [f]: v })); }
 
     async function handleSpeichern() {
-        if (!form.nachname.trim() || !form.vorname.trim()) {
-            setFehler('Nachname und Vorname sind erforderlich');
-            return;
+        if (form.ist_organisation) {
+            if (!form.firma.trim()) {
+                setFehler('Name der Organisation ist erforderlich');
+                return;
+            }
+        } else {
+            if (!form.nachname.trim() || !form.vorname.trim()) {
+                setFehler('Nachname und Vorname sind erforderlich');
+                return;
+            }
         }
         setFehler('');
         setSpeichern(true);
         try {
-            const body = { ...form, organisation_id: form.organisation_id || null };
+            const body = {
+                ...form,
+                organisation_id: form.organisation_id || null,
+                nachname: form.ist_organisation
+                    ? (form.nachname.trim() || form.firma.trim())
+                    : form.nachname,
+            };
             if (bearbeiten) {
                 await client.put(`/externe/${person.person_id}`, body);
             } else {
@@ -163,24 +176,47 @@ export default function ExternePersonModal({ open, onClose, onSaved, person, def
                         </label>
                     </div>
 
-                    <div style={rowStyle}>
-                        <FormField label={form.ist_organisation ? 'Organisationsname *' : 'Nachname *'}>
-                            <input style={inputStyle} value={form.nachname} onChange={e => set('nachname', e.target.value)}
-                                placeholder={form.ist_organisation ? 'z.B. IV-Stelle Zürich' : 'Muster'} autoFocus />
+                    {/* Organisation-Modus: Firma/Name als Pflichtfeld oben */}
+                    {form.ist_organisation && (
+                        <FormField label="Name der Organisation *">
+                            <input
+                                style={inputStyle}
+                                value={form.firma}
+                                onChange={e => set('firma', e.target.value)}
+                                placeholder="z.B. IV-Stelle Zürich"
+                                autoFocus
+                            />
                         </FormField>
-                        <FormField label={form.ist_organisation ? 'Kürzel / Kurzname' : 'Vorname *'}>
-                            <input style={inputStyle} value={form.vorname} onChange={e => set('vorname', e.target.value)}
-                                placeholder={form.ist_organisation ? 'z.B. IVZ' : 'Max'} />
+                    )}
+
+                    <div style={rowStyle}>
+                        <FormField label={form.ist_organisation ? 'Nachname (Ansprechperson)' : 'Nachname *'}>
+                            <input
+                                style={inputStyle}
+                                value={form.nachname}
+                                onChange={e => set('nachname', e.target.value)}
+                                placeholder="Muster"
+                                autoFocus={!form.ist_organisation}
+                            />
+                        </FormField>
+                        <FormField label={form.ist_organisation ? 'Vorname (Ansprechperson)' : 'Vorname *'}>
+                            <input
+                                style={inputStyle}
+                                value={form.vorname}
+                                onChange={e => set('vorname', e.target.value)}
+                                placeholder="Max"
+                            />
                         </FormField>
                     </div>
 
+                    {/* Person-Modus: Org-Zugehörigkeit */}
                     {!form.ist_organisation && (
                         <FormField label="Zugehörige Organisation">
                             <select style={inputStyle} value={form.organisation_id} onChange={e => set('organisation_id', e.target.value)}>
                                 <option value="">— Keine —</option>
                                 {organisationen.map(o => (
                                     <option key={o.person_id} value={o.person_id}>
-                                        {o.nachname}{o.vorname ? ` (${o.vorname})` : ''}
+                                        {o.firma || o.nachname}{o.vorname ? ` (${o.vorname})` : ''}
                                     </option>
                                 ))}
                             </select>
@@ -198,9 +234,12 @@ export default function ExternePersonModal({ open, onClose, onSaved, person, def
                         </FormField>
                     </div>
 
-                    <FormField label="Firma / Institution">
-                        <input style={inputStyle} value={form.firma} onChange={e => set('firma', e.target.value)} placeholder="z.B. IV-Stelle Kanton Zürich" />
-                    </FormField>
+                    {/* Firma: nur für Personen (für Orgs ist firma = Name der Organisation oben) */}
+                    {!form.ist_organisation && (
+                        <FormField label="Firma / Arbeitgeber">
+                            <input style={inputStyle} value={form.firma} onChange={e => set('firma', e.target.value)} placeholder="z.B. Musterfirma AG" />
+                        </FormField>
+                    )}
 
                     <div style={rowStyle}>
                         <FormField label="Telefon">

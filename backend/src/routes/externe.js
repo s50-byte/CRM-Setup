@@ -123,9 +123,13 @@ router.post('/', auth, async (req, res) => {
         ist_organisation, organisation_id,
     } = req.body;
 
-    if (!nachname || !vorname) {
-        return res.status(400).json({ error: 'Nachname und Vorname erforderlich' });
+    if (ist_organisation) {
+        if (!firma) return res.status(400).json({ error: 'Name der Organisation ist erforderlich' });
+    } else {
+        if (!nachname || !vorname) return res.status(400).json({ error: 'Nachname und Vorname erforderlich' });
     }
+
+    const effectiveNachname = ist_organisation ? (nachname || firma) : nachname;
 
     try {
         const result = await db.query(
@@ -134,7 +138,7 @@ router.post('/', auth, async (req, res) => {
                  ist_organisation, organisation_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              RETURNING *`,
-            [nachname, vorname, funktion || null, typ || 'Sonstiges',
+            [effectiveNachname, vorname || null, funktion || null, typ || 'Sonstiges',
              firma || null, telefon || null, email || null,
              adresse || null, bemerkung || null,
              ist_organisation || false, organisation_id || null]

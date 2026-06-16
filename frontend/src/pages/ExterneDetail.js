@@ -148,7 +148,9 @@ export default function ExterneDetail() {
                     <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: '-.3px' }}>
-                                {person.nachname}, {person.vorname}
+                                {istOrg
+                                    ? (person.firma || person.nachname)
+                                    : `${person.nachname}, ${person.vorname}`}
                             </div>
                             {istOrg && (
                                 <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 20, background: '#F5F3FF', color: '#5B21B6', border: '1px solid rgba(124,58,237,.15)', fontFamily: 'monospace' }}>Organisation</span>

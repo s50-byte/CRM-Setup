@@ -182,7 +182,7 @@ export default function Externe() {
                                             >
                                                 <span style={{ fontSize: 11, color: '#A09D97', width: 14, flexShrink: 0, fontFamily: 'monospace' }}>{expanded ? '▼' : '▶'}</span>
                                                 <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#1A1917' }}>
-                                                    {org.nachname}{org.vorname ? ` · ${org.vorname}` : ''}
+                                                    {org.firma || org.nachname}{org.vorname ? ` · ${org.vorname}` : ''}
                                                 </span>
                                                 <span style={{
                                                     fontSize: 11, padding: '2px 7px', borderRadius: 20,
