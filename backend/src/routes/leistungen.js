@@ -4,14 +4,17 @@ const auth = require('../middleware/auth');
 
 const LEITUNGSTEAM = ['kader', 'leitungsteam', 'management', 'teamleitung'];
 
+const FELDER = `leistung_id, tarifnr, bezeichnung, einheit, aktiv,
+    tarif, tarifziffer, entschaedigungsart, produkt_nr, kostenart, kostenstelle`;
+
 // GET /api/leistungen — alle aktiven Leistungen (alle authentifizierten Benutzer)
 router.get('/', auth, async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT leistung_id, tarifnr, bezeichnung, einheit, aktiv
+            `SELECT ${FELDER}
              FROM leistung
              WHERE aktiv = TRUE
-             ORDER BY tarifnr`
+             ORDER BY produkt_nr, tarifnr`
         );
         res.json(result.rows);
     } catch (err) {
@@ -27,9 +30,9 @@ router.get('/alle', auth, async (req, res) => {
     }
     try {
         const result = await db.query(
-            `SELECT leistung_id, tarifnr, bezeichnung, einheit, aktiv
+            `SELECT ${FELDER}
              FROM leistung
-             ORDER BY tarifnr`
+             ORDER BY produkt_nr, tarifnr`
         );
         res.json(result.rows);
     } catch (err) {
@@ -43,21 +46,23 @@ router.post('/', auth, async (req, res) => {
     if (!LEITUNGSTEAM.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
-    const { tarifnr, bezeichnung, einheit } = req.body;
-    if (!tarifnr || !bezeichnung) {
-        return res.status(400).json({ error: 'Tarifnr. und Bezeichnung sind erforderlich' });
+    const { bezeichnung, einheit, tarif, tarifziffer, entschaedigungsart, produkt_nr, kostenart, kostenstelle } = req.body;
+    if (!produkt_nr || !bezeichnung) {
+        return res.status(400).json({ error: 'Produkt-Nr. und Bezeichnung sind erforderlich' });
     }
     try {
         const result = await db.query(
-            `INSERT INTO leistung (tarifnr, bezeichnung, einheit)
-             VALUES ($1, $2, $3)
-             RETURNING leistung_id, tarifnr, bezeichnung, einheit, aktiv`,
-            [tarifnr.trim(), bezeichnung.trim(), einheit || 'Stunden']
+            `INSERT INTO leistung (tarifnr, bezeichnung, einheit, tarif, tarifziffer, entschaedigungsart, produkt_nr, kostenart, kostenstelle)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING ${FELDER}`,
+            [produkt_nr.trim(), bezeichnung.trim(), einheit || null,
+             tarif || null, tarifziffer?.trim() || null, entschaedigungsart || null,
+             produkt_nr.trim(), kostenart?.trim() || null, kostenstelle?.trim() || null]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
         if (err.code === '23505') {
-            return res.status(409).json({ error: 'Tarifnr. bereits vorhanden' });
+            return res.status(409).json({ error: 'Produkt-Nr. bereits vorhanden' });
         }
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Speichern der Leistung' });
@@ -69,23 +74,29 @@ router.put('/:id', auth, async (req, res) => {
     if (!LEITUNGSTEAM.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
-    const { tarifnr, bezeichnung, einheit } = req.body;
-    if (!tarifnr || !bezeichnung) {
-        return res.status(400).json({ error: 'Tarifnr. und Bezeichnung sind erforderlich' });
+    const { bezeichnung, einheit, tarif, tarifziffer, entschaedigungsart, produkt_nr, kostenart, kostenstelle } = req.body;
+    if (!produkt_nr || !bezeichnung) {
+        return res.status(400).json({ error: 'Produkt-Nr. und Bezeichnung sind erforderlich' });
     }
     try {
         const result = await db.query(
             `UPDATE leistung
-             SET tarifnr = $1, bezeichnung = $2, einheit = $3, updated_at = NOW()
-             WHERE leistung_id = $4
-             RETURNING leistung_id, tarifnr, bezeichnung, einheit, aktiv`,
-            [tarifnr.trim(), bezeichnung.trim(), einheit || 'Stunden', req.params.id]
+             SET tarifnr = $1, bezeichnung = $2, einheit = $3,
+                 tarif = $4, tarifziffer = $5, entschaedigungsart = $6,
+                 produkt_nr = $7, kostenart = $8, kostenstelle = $9,
+                 updated_at = NOW()
+             WHERE leistung_id = $10
+             RETURNING ${FELDER}`,
+            [produkt_nr.trim(), bezeichnung.trim(), einheit || null,
+             tarif || null, tarifziffer?.trim() || null, entschaedigungsart || null,
+             produkt_nr.trim(), kostenart?.trim() || null, kostenstelle?.trim() || null,
+             req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
         res.json(result.rows[0]);
     } catch (err) {
         if (err.code === '23505') {
-            return res.status(409).json({ error: 'Tarifnr. bereits vorhanden' });
+            return res.status(409).json({ error: 'Produkt-Nr. bereits vorhanden' });
         }
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Speichern der Leistung' });

@@ -26,13 +26,7 @@ router.get('/:dossier_id', auth, async (req, res) => {
                                 'einheit', l.einheit,
                                 'soll_stunden', vp.soll_stunden,
                                 'reihenfolge', vp.reihenfolge,
-                                'stundenpreis', (
-                                    SELECT sp.stundenpreis
-                                    FROM organisation_stundenpreis sp
-                                    JOIN dossier d ON d.zuweisende_person_id = sp.organisation_id
-                                    WHERE d.dossier_id = $1 AND sp.leistung_id = vp.leistung_id
-                                    LIMIT 1
-                                )
+                                'stundenpreis', l.tarif
                             ) ORDER BY vp.reihenfolge
                         ) FILTER (WHERE vp.position_id IS NOT NULL),
                         '[]'
@@ -51,7 +45,12 @@ router.get('/:dossier_id', auth, async (req, res) => {
             const betrag = parseFloat(v.betrag) || 0;
             const positionen = v.positionen || [];
             const sollStunden = positionen.reduce((s, p) => s + (parseFloat(p.soll_stunden) || 0), 0);
-            const stundenpreis = parseFloat(positionen[0]?.stundenpreis) || 0;
+            const tarifLeistung = parseFloat(positionen[0]?.stundenpreis) || 0;
+            // Pro Stunde: tarifLeistung ist der Stundenpreis direkt
+            // Monatspauschale/Fallpauschale: effektiver Stundenpreis aus betrag / soll_stunden
+            const stundenpreis = v.verrechnungsart === 'stundenpauschale'
+                ? tarifLeistung
+                : (sollStunden > 0 ? betrag / sollStunden : 0);
 
             let soll_total_ertrag = null;
             let soll_stunden_total = null;
@@ -63,12 +62,12 @@ router.get('/:dossier_id', auth, async (req, res) => {
                 switch (v.verrechnungsart) {
                     case 'monatspauschale':
                         soll_total_ertrag = r2(betrag * dauerMonate);
-                        soll_stunden_monat = stundenpreis > 0 ? r1(betrag / stundenpreis) : null;
+                        soll_stunden_monat = sollStunden > 0 ? r1(sollStunden) : (stundenpreis > 0 ? r1(betrag / stundenpreis) : null);
                         soll_stunden_total = soll_stunden_monat !== null ? r1(soll_stunden_monat * dauerMonate) : null;
                         break;
                     case 'fallpauschale':
                         soll_total_ertrag = r2(betrag);
-                        soll_stunden_total = stundenpreis > 0 ? r1(betrag / stundenpreis) : null;
+                        soll_stunden_total = sollStunden > 0 ? r1(sollStunden) : (stundenpreis > 0 ? r1(betrag / stundenpreis) : null);
                         soll_stunden_monat = soll_stunden_total !== null ? r1(soll_stunden_total / dauerMonate) : null;
                         break;
                     case 'stundenpauschale':

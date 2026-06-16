@@ -10,14 +10,30 @@ const CARD = {
     boxShadow: '0 1px 3px rgba(0,0,0,.07)',
 };
 
-const TH = ({ children, right }) => (
-    <th style={{ textAlign: right ? 'right' : 'left', padding: '7px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap', background: '#F5F4F0' }}>
+const TH = ({ children, right, onClick }) => (
+    <th
+        onClick={onClick}
+        style={{
+            textAlign: right ? 'right' : 'left',
+            padding: '7px 12px', fontSize: 10.5, fontWeight: 600,
+            color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em',
+            whiteSpace: 'nowrap', background: '#F5F4F0',
+            cursor: onClick ? 'pointer' : 'default',
+        }}
+    >
         {children}
     </th>
 );
 
-const TD = ({ children, right, muted }) => (
-    <td style={{ padding: '9px 12px', fontSize: 13, color: muted ? '#9CA3AF' : '#1A1917', textAlign: right ? 'right' : 'left', borderBottom: '1px solid rgba(0,0,0,.05)', verticalAlign: 'middle' }}>
+const TD = ({ children, right, muted, mono }) => (
+    <td style={{
+        padding: '9px 12px', fontSize: 13,
+        color: muted ? '#9CA3AF' : '#1A1917',
+        textAlign: right ? 'right' : 'left',
+        borderBottom: '1px solid rgba(0,0,0,.05)',
+        verticalAlign: 'middle',
+        fontFamily: mono ? 'monospace' : 'inherit',
+    }}>
         {children}
     </td>
 );
@@ -30,12 +46,19 @@ function AktivBadge({ aktiv }) {
     );
 }
 
+function formatTarif(tarif) {
+    if (tarif == null) return '—';
+    const n = parseFloat(tarif);
+    if (n === 0) return '—';
+    return n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export default function Leistungen() {
     const [liste, setListe] = useState([]);
     const [laden, setLaden] = useState(true);
     const [fehler, setFehler] = useState('');
     const [zeigeAlle, setZeigeAlle] = useState(false);
-    const [sortKey, setSortKey] = useState('tarifnr');
+    const [sortKey, setSortKey] = useState('produkt_nr');
     const [sortAsc, setSortAsc] = useState(true);
     const [modalOffen, setModalOffen] = useState(false);
     const [gewaehlte, setGewaehlte] = useState(null);
@@ -76,9 +99,17 @@ export default function Leistungen() {
     }
 
     const sortiert = [...liste].sort((a, b) => {
-        const va = a[sortKey] ?? '';
-        const vb = b[sortKey] ?? '';
-        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+        const va = a[sortKey];
+        const vb = b[sortKey];
+        if (va == null && vb == null) return 0;
+        if (va == null) return sortAsc ? 1 : -1;
+        if (vb == null) return sortAsc ? -1 : 1;
+        if (typeof va === 'number' && typeof vb === 'number') {
+            return sortAsc ? va - vb : vb - va;
+        }
+        return sortAsc
+            ? String(va).localeCompare(String(vb))
+            : String(vb).localeCompare(String(va));
     });
 
     function oeffneNeu() { setGewaehlte(null); setModalOffen(true); }
@@ -107,7 +138,7 @@ export default function Leistungen() {
                 </div>
             </div>
 
-            <div style={CARD}>
+            <div style={{ ...CARD, padding: 0, overflow: 'hidden' }}>
                 {laden && (
                     <div style={{ textAlign: 'center', color: '#6B6860', fontSize: 13, padding: '2rem 0' }}>Laden…</div>
                 )}
@@ -115,58 +146,86 @@ export default function Leistungen() {
                     <div style={{ color: '#B91C1C', fontSize: 13, padding: '1rem' }}>{fehler}</div>
                 )}
                 {!laden && !fehler && (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr>
-                                <TH>
-                                    <span onClick={() => handleSort('tarifnr')} style={{ cursor: 'pointer' }}>
-                                        Tarifnr.<SortIcon k="tarifnr" />
-                                    </span>
-                                </TH>
-                                <TH>
-                                    <span onClick={() => handleSort('bezeichnung')} style={{ cursor: 'pointer' }}>
-                                        Bezeichnung<SortIcon k="bezeichnung" />
-                                    </span>
-                                </TH>
-                                <TH>Einheit</TH>
-                                <TH>Status</TH>
-                                <TH right>Aktionen</TH>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sortiert.length === 0 && (
-                                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: 13 }}>Keine Einträge</td></tr>
-                            )}
-                            {sortiert.map(l => (
-                                <tr key={l.leistung_id} style={{ background: l.aktiv ? 'transparent' : 'rgba(0,0,0,.015)' }}>
-                                    <TD muted={!l.aktiv}>
-                                        <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{l.tarifnr}</span>
-                                    </TD>
-                                    <TD muted={!l.aktiv}>{l.bezeichnung}</TD>
-                                    <TD muted={!l.aktiv}>{l.einheit}</TD>
-                                    <TD><AktivBadge aktiv={l.aktiv} /></TD>
-                                    <TD right>
-                                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                                            <button
-                                                onClick={() => oeffneBearbeiten(l)}
-                                                style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 5, background: '#fff', fontFamily: 'inherit', color: '#1A1917' }}
-                                            >
-                                                Bearbeiten
-                                            </button>
-                                            {l.aktiv && (
-                                                <button
-                                                    onClick={() => deaktivieren(l.leistung_id)}
-                                                    style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(185,28,28,.2)', borderRadius: 5, background: '#FEF2F2', fontFamily: 'inherit', color: '#B91C1C' }}
-                                                >
-                                                    Deaktivieren
-                                                </button>
-                                            )}
-                                        </div>
-                                    </TD>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr>
+                                    <TH onClick={() => handleSort('produkt_nr')}>
+                                        Produkt-Nr.<SortIcon k="produkt_nr" />
+                                    </TH>
+                                    <TH onClick={() => handleSort('tarifziffer')}>
+                                        Tarifziffer<SortIcon k="tarifziffer" />
+                                    </TH>
+                                    <TH onClick={() => handleSort('bezeichnung')}>
+                                        ABEA-Bezeichnung<SortIcon k="bezeichnung" />
+                                    </TH>
+                                    <TH onClick={() => handleSort('entschaedigungsart')}>
+                                        Entschädigungsart<SortIcon k="entschaedigungsart" />
+                                    </TH>
+                                    <TH right onClick={() => handleSort('tarif')}>
+                                        Tarif CHF<SortIcon k="tarif" />
+                                    </TH>
+                                    <TH onClick={() => handleSort('kostenart')}>
+                                        Kostenart<SortIcon k="kostenart" />
+                                    </TH>
+                                    <TH onClick={() => handleSort('kostenstelle')}>
+                                        Kostenstelle<SortIcon k="kostenstelle" />
+                                    </TH>
+                                    <TH>Status</TH>
+                                    <TH right>Aktionen</TH>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {sortiert.length === 0 && (
+                                    <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: 13 }}>Keine Einträge</td></tr>
+                                )}
+                                {sortiert.map(l => (
+                                    <tr key={l.leistung_id} style={{ background: l.aktiv ? 'transparent' : 'rgba(0,0,0,.015)' }}>
+                                        <TD muted={!l.aktiv} mono>
+                                            <span style={{ fontSize: 12 }}>{l.produkt_nr || l.tarifnr}</span>
+                                        </TD>
+                                        <TD muted={!l.aktiv} mono>
+                                            <span style={{ fontSize: 11.5 }}>{l.tarifziffer || '—'}</span>
+                                        </TD>
+                                        <TD muted={!l.aktiv}>{l.bezeichnung}</TD>
+                                        <TD muted={!l.aktiv}>
+                                            {l.entschaedigungsart
+                                                ? <span style={{ fontSize: 11.5, padding: '2px 7px', borderRadius: 9, background: '#EEF3FE', color: '#1D4ED8' }}>{l.entschaedigungsart}</span>
+                                                : '—'}
+                                        </TD>
+                                        <TD muted={!l.aktiv} right mono>
+                                            <span style={{ fontSize: 12 }}>{formatTarif(l.tarif)}</span>
+                                        </TD>
+                                        <TD muted={!l.aktiv} mono>
+                                            <span style={{ fontSize: 11.5 }}>{l.kostenart || '—'}</span>
+                                        </TD>
+                                        <TD muted={!l.aktiv} mono>
+                                            <span style={{ fontSize: 11.5 }}>{l.kostenstelle || '—'}</span>
+                                        </TD>
+                                        <TD><AktivBadge aktiv={l.aktiv} /></TD>
+                                        <TD right>
+                                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                                <button
+                                                    onClick={() => oeffneBearbeiten(l)}
+                                                    style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 5, background: '#fff', fontFamily: 'inherit', color: '#1A1917' }}
+                                                >
+                                                    Bearbeiten
+                                                </button>
+                                                {l.aktiv && (
+                                                    <button
+                                                        onClick={() => deaktivieren(l.leistung_id)}
+                                                        style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(185,28,28,.2)', borderRadius: 5, background: '#FEF2F2', fontFamily: 'inherit', color: '#B91C1C' }}
+                                                    >
+                                                        Deaktivieren
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </TD>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 
