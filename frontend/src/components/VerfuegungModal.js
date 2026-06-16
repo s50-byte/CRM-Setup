@@ -179,6 +179,11 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
                                 />
                             </div>
                         )}
+                        {verrechnungsart === 'stundenpauschale' && (
+                            <div style={{ display: 'flex', alignItems: 'center', padding: '7px 10px', background: '#EEF3FE', border: '1px solid rgba(37,99,235,.15)', borderRadius: 6, fontSize: 12, color: '#1D4ED8' }}>
+                                Stunden werden in den Positionen erfasst (Tab Positionen)
+                            </div>
+                        )}
                     </div>
                     <div>
                         <FieldLabel>Bemerkung</FieldLabel>

@@ -3,10 +3,8 @@ import Modal from './Modal';
 import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } from './FormField';
 import client from '../api/client';
 
-const TYPEN = ['IV-Stelle', 'RAV', 'Sozialdienst', 'Arbeitgeber', 'Arzt / Therapeut', 'Gesetzl. Vertreter', 'Sonstiges'];
-
 const LEER = {
-    nachname: '', vorname: '', funktion: '', typ: 'Sonstiges',
+    nachname: '', vorname: '', funktion: '',
     firma: '', telefon: '', email: '', adresse: '', bemerkung: '',
     ist_organisation: false, organisation_id: '',
 };
@@ -36,7 +34,6 @@ export default function ExternePersonModal({ open, onClose, onSaved, person, def
             nachname: person.nachname || '',
             vorname: person.vorname || '',
             funktion: person.funktion || '',
-            typ: person.typ || 'Sonstiges',
             firma: person.firma || '',
             telefon: person.telefon || '',
             email: person.email || '',
@@ -223,16 +220,9 @@ export default function ExternePersonModal({ open, onClose, onSaved, person, def
                         </FormField>
                     )}
 
-                    <div style={rowStyle}>
-                        <FormField label="Funktion">
-                            <input style={inputStyle} value={form.funktion} onChange={e => set('funktion', e.target.value)} placeholder="z.B. Sachbearbeiterin" />
-                        </FormField>
-                        <FormField label="Typ">
-                            <select style={inputStyle} value={form.typ} onChange={e => set('typ', e.target.value)}>
-                                {TYPEN.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                        </FormField>
-                    </div>
+                    <FormField label="Funktion">
+                        <input style={inputStyle} value={form.funktion} onChange={e => set('funktion', e.target.value)} placeholder="z.B. Sachbearbeiterin" />
+                    </FormField>
 
                     {/* Firma: nur für Personen (für Orgs ist firma = Name der Organisation oben) */}
                     {!form.ist_organisation && (

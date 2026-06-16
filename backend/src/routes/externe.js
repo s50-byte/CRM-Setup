@@ -173,6 +173,7 @@ router.post('/:id/stundenpreise', auth, async (req, res) => {
 
 // PUT /api/externe/:id — Person / Organisation aktualisieren
 router.put('/:id', auth, async (req, res) => {
+    console.log('PUT /externe/:id body:', req.body);
     const {
         nachname, vorname, funktion, typ,
         firma, telefon, email, adresse, bemerkung,
