@@ -12,6 +12,7 @@ router.get('/', auth, async (req, res) => {
             `SELECT
                 ep.person_id, ep.nachname, ep.vorname, ep.funktion,
                 ep.typ, ep.firma, ep.telefon, ep.email, ep.adresse,
+                ep.plz, ep.ort, ep.fax,
                 ep.bemerkung, ep.aktiv,
                 ep.ist_organisation, ep.organisation_id,
                 COUNT(DISTINCT epd.dossier_id) AS anzahl_klienten,
@@ -59,6 +60,22 @@ router.get('/', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden der externen Personen' });
+    }
+});
+
+// GET /api/externe/organisationen — Nur Organisationen (für Dropdowns)
+router.get('/organisationen', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT person_id, firma, nachname, typ, adresse, plz, ort, telefon, email
+             FROM externe_person
+             WHERE ist_organisation = TRUE AND aktiv = TRUE
+             ORDER BY COALESCE(firma, nachname)`
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der Organisationen' });
     }
 });
 
@@ -120,7 +137,7 @@ router.post('/', auth, async (req, res) => {
     console.log('POST /externe body:', req.body);
     const {
         nachname, vorname, funktion, typ,
-        firma, telefon, email, adresse, bemerkung,
+        firma, telefon, fax, email, adresse, plz, ort, bemerkung,
         ist_organisation, organisation_id,
     } = req.body;
 
@@ -130,20 +147,20 @@ router.post('/', auth, async (req, res) => {
         if (!nachname || !vorname) return res.status(400).json({ error: 'Nachname und Vorname erforderlich' });
     }
 
-    // vorname ist in der DB NOT NULL — für Organisationen '' als Fallback (kein Einzelkontakt)
     const effectiveNachname = ist_organisation ? (nachname || firma) : nachname;
     const effectiveVorname = ist_organisation ? (vorname || '') : vorname;
 
     try {
         const result = await db.query(
             `INSERT INTO externe_person
-                (nachname, vorname, funktion, typ, firma, telefon, email, adresse, bemerkung,
+                (nachname, vorname, funktion, typ, firma,
+                 telefon, fax, email, adresse, plz, ort, bemerkung,
                  ist_organisation, organisation_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
              RETURNING *`,
             [effectiveNachname, effectiveVorname, funktion || null, typ || 'Sonstiges',
-             firma || null, telefon || null, email || null,
-             adresse || null, bemerkung || null,
+             firma || null, telefon || null, fax || null, email || null,
+             adresse || null, plz || null, ort || null, bemerkung || null,
              ist_organisation || false, organisation_id || null]
         );
         res.status(201).json(result.rows[0]);
@@ -179,22 +196,26 @@ router.put('/:id', auth, async (req, res) => {
     console.log('PUT /externe/:id body:', req.body);
     const {
         nachname, vorname, funktion, typ,
-        firma, telefon, email, adresse, bemerkung,
+        firma, telefon, fax, email, adresse, plz, ort, bemerkung,
         ist_organisation, organisation_id,
     } = req.body;
+
+    const effectiveNachname = ist_organisation ? (nachname || firma) : nachname;
+    const effectiveVorname = ist_organisation ? (vorname || '') : vorname;
 
     try {
         const result = await db.query(
             `UPDATE externe_person SET
                 nachname = $1, vorname = $2, funktion = $3, typ = $4,
-                firma = $5, telefon = $6, email = $7,
-                adresse = $8, bemerkung = $9, updated_at = NOW(),
-                ist_organisation = $10, organisation_id = $11
-             WHERE person_id = $12
+                firma = $5, telefon = $6, fax = $7, email = $8,
+                adresse = $9, plz = $10, ort = $11,
+                bemerkung = $12, updated_at = NOW(),
+                ist_organisation = $13, organisation_id = $14
+             WHERE person_id = $15
              RETURNING *`,
-            [nachname, vorname, funktion || null, typ || 'Sonstiges',
-             firma || null, telefon || null, email || null,
-             adresse || null, bemerkung || null,
+            [effectiveNachname, effectiveVorname, funktion || null, typ || 'Sonstiges',
+             firma || null, telefon || null, fax || null, email || null,
+             adresse || null, plz || null, ort || null, bemerkung || null,
              ist_organisation || false, organisation_id || null,
              req.params.id]
         );

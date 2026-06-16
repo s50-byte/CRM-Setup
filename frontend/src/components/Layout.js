@@ -35,7 +35,7 @@ const NAV = [
     { path: '/praesenz',  label: 'Präsenzkontrolle',   icon: '✓' },
     { section: 'Stammdaten' },
     { path: '/klienten',  label: 'Klienten',           icon: '👥' },
-    { path: '/externe',   label: 'Externe Personen',   icon: '🏢' },
+    { path: '/externe',   label: 'Externe Kontakte',   icon: '🏢' },
     { section: 'Verwaltung' },
     { path: '/programme', label: 'Programmübersicht',   icon: '⚙' },
     { path: '/profil',    label: 'Mein Profil',        icon: '👤' },

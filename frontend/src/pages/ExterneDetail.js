@@ -1,16 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
-import ExternePersonModal from '../components/ExternePersonModal';
+import OrganisationModal from '../components/OrganisationModal';
+import KontaktModal from '../components/KontaktModal';
 
 const TYP_STYLE = {
-    'IV-Stelle':         { bg: '#EEF3FE', color: '#1D4ED8' },
-    'RAV':               { bg: '#ECFDF5', color: '#15803D' },
-    'Sozialdienst':      { bg: '#F5F3FF', color: '#5B21B6' },
-    'Arbeitgeber':       { bg: '#FFF7ED', color: '#9A3412' },
-    'Arzt / Therapeut':  { bg: '#FFFBEB', color: '#B45309' },
-    'Gesetzl. Vertreter':{ bg: '#FEF2F2', color: '#B91C1C' },
-    'Sonstiges':         { bg: '#F5F4F0', color: '#6B6860' },
+    'IV-Stelle':                 { bg: '#EEF3FE', color: '#1D4ED8' },
+    'RAV':                       { bg: '#ECFDF5', color: '#15803D' },
+    'Sozialdienst':              { bg: '#F5F3FF', color: '#5B21B6' },
+    'Arbeitgeber / Partnerfirma':{ bg: '#FFF7ED', color: '#9A3412' },
+    'Arbeitgeber':               { bg: '#FFF7ED', color: '#9A3412' },
+    'Krankenversicherung':       { bg: '#F0FDF4', color: '#166534' },
+    'Betreutes Wohnen':          { bg: '#FDF4FF', color: '#7E22CE' },
+    'Schule':                    { bg: '#FFFBEB', color: '#B45309' },
+    'Ausgleichskasse':           { bg: '#FEF2F2', color: '#B91C1C' },
+    'Elternteil':                { bg: '#FDF4FF', color: '#7E22CE' },
+    'Gesetzlicher Vertreter':    { bg: '#FEF2F2', color: '#B91C1C' },
+    'Gesetzl. Vertreter':        { bg: '#FEF2F2', color: '#B91C1C' },
+    'Partner/in':                { bg: '#F0FDF4', color: '#166534' },
+    'Lehrperson':                { bg: '#FFFBEB', color: '#B45309' },
+    'Therapeut':                 { bg: '#E0F2FE', color: '#0369A1' },
+    'Arzt':                      { bg: '#EEF3FE', color: '#1D4ED8' },
+    'Arzt / Therapeut':          { bg: '#FFFBEB', color: '#B45309' },
+    'Sonstiges':                 { bg: '#F5F4F0', color: '#6B6860' },
 };
 
 const CARD = {
@@ -71,7 +83,7 @@ export default function ExterneDetail() {
                 }
                 if (r.data.organisation_id) {
                     client.get(`/externe/${r.data.organisation_id}`)
-                        .then(or => setOrgName(or.data.nachname || ''))
+                        .then(or => setOrgName(or.data.firma || or.data.nachname || ''))
                         .catch(console.error);
                 }
             })
@@ -118,16 +130,23 @@ export default function ExterneDetail() {
     }
 
     if (laden) return <div style={{ padding: '2rem', color: '#6B6860', fontSize: 13 }}>Laden…</div>;
-    if (!person) return <div style={{ padding: '2rem', color: '#B91C1C', fontSize: 13 }}>Person nicht gefunden</div>;
+    if (!person) return <div style={{ padding: '2rem', color: '#B91C1C', fontSize: 13 }}>Kontakt nicht gefunden</div>;
 
     const typStyle = TYP_STYLE[person.typ] || TYP_STYLE['Sonstiges'];
-    const initials = (person.vorname?.[0] || '') + (person.nachname?.[0] || '');
     const istOrg = !!person.ist_organisation;
+    const initials = istOrg
+        ? (person.firma || person.nachname || '?')[0]
+        : ((person.vorname?.[0] || '') + (person.nachname?.[0] || ''));
 
     const tabs = istOrg ? [
         { key: 'uebersicht', label: 'Übersicht' },
         { key: 'stundenpreise', label: `Stundenpreise${stundenpreise.length > 0 ? ` (${stundenpreise.length})` : ''}` },
     ] : null;
+
+    const vollAdresse = [
+        person.adresse,
+        [person.plz, person.ort].filter(Boolean).join(' '),
+    ].filter(Boolean).join(', ');
 
     return (
         <div>
@@ -161,13 +180,12 @@ export default function ExterneDetail() {
                                 fontSize: 11, padding: '2px 8px', borderRadius: 20,
                                 background: typStyle.bg, color: typStyle.color,
                                 border: `1px solid ${typStyle.color}33`, fontFamily: 'monospace'
-                            }}>{person.typ}</span>
+                            }}>{person.typ || 'Sonstiges'}</span>
                             {person.funktion && <span style={{ fontSize: 12, color: '#6B6860' }}>{person.funktion}</span>}
-                            {person.firma && <span style={{ fontSize: 12, color: '#6B6860' }}>· {person.firma}</span>}
-                            {person.organisation_id && orgName && (
+                            {!istOrg && person.organisation_id && orgName && (
                                 <span
                                     onClick={() => navigate(`/externe/${person.organisation_id}`)}
-                                    style={{ fontSize: 11.5, color: '#2563EB', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                                    style={{ fontSize: 11.5, color: '#2563EB', cursor: 'pointer' }}
                                 >
                                     Mitglied von: {orgName} →
                                 </span>
@@ -182,7 +200,7 @@ export default function ExterneDetail() {
                 </div>
             </div>
 
-            {/* Tabs (only for orgs) */}
+            {/* Tabs (nur für Organisationen) */}
             {tabs && (
                 <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,.09)', marginBottom: '.875rem', background: '#fff', borderRadius: '10px 10px 0 0', border: '1px solid rgba(0,0,0,.09)', padding: '0 1rem' }}>
                     {tabs.map(tab => (
@@ -201,14 +219,27 @@ export default function ExterneDetail() {
             {/* Tab: Übersicht */}
             {aktTab === 'uebersicht' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    {/* Kontaktdaten */}
                     <div style={CARD}>
                         <div style={LABEL}>Kontaktdaten</div>
-                        <InfoRow label="Telefon"  value={person.telefon} />
-                        <InfoRow label="E-Mail"   value={person.email} link={!!person.email} />
-                        <InfoRow label="Adresse"  value={person.adresse} />
-                        <InfoRow label="Firma"    value={person.firma} />
-                        <InfoRow label="Funktion" value={person.funktion} />
+                        {istOrg ? (
+                            <>
+                                <InfoRow label="Adresse"  value={person.adresse} />
+                                {(person.plz || person.ort) && (
+                                    <InfoRow label="PLZ / Ort" value={[person.plz, person.ort].filter(Boolean).join(' ')} />
+                                )}
+                                <InfoRow label="Telefon"  value={person.telefon} />
+                                {person.fax && <InfoRow label="Fax" value={person.fax} />}
+                                <InfoRow label="E-Mail"   value={person.email} link={!!person.email} />
+                            </>
+                        ) : (
+                            <>
+                                <InfoRow label="Beziehung" value={person.typ} />
+                                <InfoRow label="Funktion"  value={person.funktion} />
+                                <InfoRow label="Adresse"   value={vollAdresse || person.adresse} />
+                                <InfoRow label="Telefon"   value={person.telefon} />
+                                <InfoRow label="E-Mail"    value={person.email} link={!!person.email} />
+                            </>
+                        )}
                         {person.bemerkung && (
                             <div style={{ marginTop: 10, padding: '9px 12px', background: '#F5F4F0', borderRadius: 6, fontSize: 12, color: '#6B6860', borderLeft: '3px solid rgba(0,0,0,.09)', lineHeight: 1.5 }}>
                                 {person.bemerkung}
@@ -216,7 +247,6 @@ export default function ExterneDetail() {
                         )}
                     </div>
 
-                    {/* Verknüpfte Klienten */}
                     <div style={CARD}>
                         <div style={LABEL}>
                             Verknüpfte Klienten
@@ -228,11 +258,7 @@ export default function ExterneDetail() {
                             <div
                                 key={i}
                                 onClick={() => navigate(`/dossiers/${k.dossier_id}`)}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: 10,
-                                    padding: '7px 0', borderBottom: '1px solid rgba(0,0,0,.05)',
-                                    cursor: 'pointer'
-                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid rgba(0,0,0,.05)', cursor: 'pointer' }}
                                 onMouseOver={e => e.currentTarget.style.background = '#F5F4F0'}
                                 onMouseOut={e => e.currentTarget.style.background = ''}
                             >
@@ -242,9 +268,7 @@ export default function ExterneDetail() {
                                     color: k.farbe_hex || '#1D4ED8',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     fontSize: 10, fontWeight: 600
-                                }}>
-                                    {(k.vorname?.[0] || '') + (k.nachname?.[0] || '')}
-                                </div>
+                                }}>{(k.vorname?.[0] || '') + (k.nachname?.[0] || '')}</div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontSize: 12.5, fontWeight: 500, color: '#1A1917' }}>
                                         {k.nachname}, {k.vorname}
@@ -268,7 +292,7 @@ export default function ExterneDetail() {
                 </div>
             )}
 
-            {/* Tab: Stundenpreise (nur für Organisationen) */}
+            {/* Tab: Stundenpreise */}
             {aktTab === 'stundenpreise' && (
                 <div style={CARD}>
                     <div style={LABEL}>Stundenpreise pro Leistung</div>
@@ -344,12 +368,11 @@ export default function ExterneDetail() {
                 </div>
             )}
 
-            <ExternePersonModal
-                open={modal}
-                onClose={() => setModal(false)}
-                onSaved={handleGespeichert}
-                person={person}
-            />
+            {/* Modal: je nach Typ */}
+            {istOrg
+                ? <OrganisationModal open={modal} onClose={() => setModal(false)} onSaved={handleGespeichert} organisation={person} />
+                : <KontaktModal open={modal} onClose={() => setModal(false)} onSaved={handleGespeichert} kontakt={person} />
+            }
         </div>
     );
 }
