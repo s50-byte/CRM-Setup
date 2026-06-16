@@ -393,16 +393,18 @@ export default function DossierDetail() {
                                 </div>
                             ))}
                         </div>
-                        {/* IST-Aufwand — nur wenn aktive Verfügung mit Verrechnungsart */}
+                        {/* SOLL/IST-Aufwand — nur wenn aktive Verfügung mit Verrechnungsart, kein CHF */}
                         {verfuegungen.some(v => v.status === 'aktiv' && v.verrechnungsart) && (() => {
                             const ist = parseFloat(dossier.ist_total) || 0;
+                            const soll = parseFloat(dossier.soll_total) || 0;
                             const verr = parseFloat(dossier.ist_verrechenbar) || 0;
                             const nverr = parseFloat(dossier.ist_nicht_verrechenbar) || 0;
+                            const istFarbe = soll > 0 ? (ist < soll ? '#15803D' : ist > soll ? '#B91C1C' : '#1A1917') : '#1A1917';
                             return (
                                 <div style={{ borderTop: '1px solid rgba(0,0,0,.06)', paddingTop: 6 }}>
                                     <span style={{ fontSize: 10.5, color: '#A09D97', display: 'block', marginBottom: 2 }}>Aufwand</span>
                                     <span style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap' }}>
-                                        IST: {ist.toFixed(1)}h
+                                        SOLL: {soll.toFixed(1)}h / <span style={{ color: istFarbe }}>IST: {ist.toFixed(1)}h</span>
                                         <span style={{ color: '#9CA3AF', fontSize: 10.5 }}> (verr. {verr.toFixed(1)} + n.v. {nverr.toFixed(1)}h)</span>
                                     </span>
                                 </div>

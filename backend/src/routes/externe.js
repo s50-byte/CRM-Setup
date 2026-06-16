@@ -117,6 +117,7 @@ router.get('/:id', auth, async (req, res) => {
 
 // POST /api/externe — Neue externe Person / Organisation
 router.post('/', auth, async (req, res) => {
+    console.log('POST /externe body:', req.body);
     const {
         nachname, vorname, funktion, typ,
         firma, telefon, email, adresse, bemerkung,
@@ -129,7 +130,9 @@ router.post('/', auth, async (req, res) => {
         if (!nachname || !vorname) return res.status(400).json({ error: 'Nachname und Vorname erforderlich' });
     }
 
+    // vorname ist in der DB NOT NULL — für Organisationen '' als Fallback (kein Einzelkontakt)
     const effectiveNachname = ist_organisation ? (nachname || firma) : nachname;
+    const effectiveVorname = ist_organisation ? (vorname || '') : vorname;
 
     try {
         const result = await db.query(
@@ -138,7 +141,7 @@ router.post('/', auth, async (req, res) => {
                  ist_organisation, organisation_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              RETURNING *`,
-            [effectiveNachname, vorname || null, funktion || null, typ || 'Sonstiges',
+            [effectiveNachname, effectiveVorname, funktion || null, typ || 'Sonstiges',
              firma || null, telefon || null, email || null,
              adresse || null, bemerkung || null,
              ist_organisation || false, organisation_id || null]
