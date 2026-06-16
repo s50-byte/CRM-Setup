@@ -117,6 +117,16 @@ router.get('/:id', auth, async (req, res) => {
                     ph.label AS phase_label,
                     st.name AS standort_name, st.kuerzel AS standort_kuerzel,
                     lv.pensum_pct,
+                    (SELECT COALESCE(ROUND(SUM(dauer_minuten) FILTER (WHERE verrechenbar = TRUE) / 60.0, 1), 0)
+                     FROM journal_eintrag WHERE klient_id = d.klient_id) AS ist_verrechenbar,
+                    (SELECT COALESCE(ROUND(SUM(dauer_minuten) FILTER (WHERE verrechenbar = FALSE) / 60.0, 1), 0)
+                     FROM journal_eintrag WHERE klient_id = d.klient_id) AS ist_nicht_verrechenbar,
+                    (SELECT COALESCE(ROUND(SUM(dauer_minuten) / 60.0, 1), 0)
+                     FROM journal_eintrag WHERE klient_id = d.klient_id) AS ist_total,
+                    (SELECT COALESCE(ROUND(SUM(vp.soll_stunden), 1), 0)
+                     FROM verfuegung_position vp
+                     JOIN verfuegung v ON v.verfuegung_id = vp.verfuegung_id
+                     WHERE v.dossier_id = d.dossier_id AND v.status = 'aktiv') AS soll_total,
                     ag.person_id AS arbeitgeber_id,
                     ag.vorname AS arbeitgeber_vorname,
                     ag.nachname AS arbeitgeber_nachname,

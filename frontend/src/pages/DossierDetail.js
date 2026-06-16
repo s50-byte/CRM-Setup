@@ -8,6 +8,7 @@ import ExterneZuweisungModal from '../components/ExterneZuweisungModal';
 import DossierFelderModal from '../components/DossierFelderModal';
 import FerienModal from '../components/FerienModal';
 import VerfuegungModal from '../components/VerfuegungModal';
+import JournalModal from '../components/JournalModal';
 
 const LABEL_FARBEN = {
     'LE': { bg: '#ECFDF5', color: '#15803D' },
@@ -72,6 +73,13 @@ function lehrjahrOptionen(beruf, abschluss) {
     return Array.from({ length: jahre }, (_, i) => `${i + 1}. Lehrjahr`);
 }
 
+function fmtDauer(min) {
+    if (!min) return null;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${h}:${m.toString().padStart(2, '0')}h`;
+}
+
 function fmt(dateStr) {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('de-CH');
@@ -88,11 +96,7 @@ export default function DossierDetail() {
     const [laden, setLaden] = useState(true);
     const [aktTab, setAktTab] = useState('journal');
 
-    // Journal-Formular
-    const [jKat, setJKat] = useState('Standortgespräch');
-    const [jDatum, setJDatum] = useState(new Date().toISOString().slice(0, 10));
-    const [jText, setJText] = useState('');
-    const [jFormOpen, setJFormOpen] = useState(false);
+    const [journalModal, setJournalModal] = useState(false);
 
     // Kommentar / Zeitachse
     const [kommentar, setKommentar] = useState('');
@@ -160,21 +164,6 @@ export default function DossierDetail() {
     useEffect(() => {
         client.get(`/verfuegungen/${id}`).then(r => setVerfuegungen(r.data)).catch(console.error);
     }, [id]);
-
-    async function addJournal() {
-        if (!jText.trim()) return;
-        try {
-            const res = await client.post('/journal', {
-                klient_id: dossier.klient_id,
-                kategorie: jKat,
-                datum: jDatum,
-                text: jText,
-            });
-            setJournal(prev => [res.data, ...prev]);
-            setJText('');
-            setJFormOpen(false);
-        } catch (err) { console.error(err); }
-    }
 
     async function addKommentar() {
         if (!kommentar.trim()) return;
@@ -355,7 +344,7 @@ export default function DossierDetail() {
                         </div>
                         {/* Buttons horizontal, kompakt */}
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-                            <button onClick={() => { setJFormOpen(true); setAktTab('journal'); }} style={{
+                            <button onClick={() => setJournalModal(true)} style={{
                                 padding: '5px 12px', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap',
                                 cursor: 'pointer', border: 'none', borderRadius: 5,
                                 background: '#2563EB', color: '#fff', fontFamily: 'inherit'
@@ -384,44 +373,63 @@ export default function DossierDetail() {
                     </div>
 
                     {/* Info-Grid zweispaltig, rechts */}
-                    <div style={{ flexShrink: 0, display: 'grid', gridTemplateColumns: 'auto auto', gap: '7px 20px', alignSelf: 'flex-start' }}>
-                        {[
-                            { label: 'Programm',          value: dossier.programm_name },
-                            { label: 'Pensum',             value: dossier.pensum_pct ? `${dossier.pensum_pct}%` : null },
-                            { label: 'Zuweisende Stelle',  value: dossier.auftraggeber },
-                            { label: 'Start',              value: dossier.laufend_start_datum ? fmt(dossier.laufend_start_datum) : null },
-                            (dossier.zuweisende_person_nachname
-                                ? { label: 'Zuweisende Person', value: `${dossier.zuweisende_person_vorname || ''} ${dossier.zuweisende_person_nachname}`.trim() + (dossier.zuweisende_person_firma ? ` · ${dossier.zuweisende_person_firma}` : '') }
-                                : null),
-                            { label: 'Ende (geplant)',     value: dossier.geplantes_enddatum ? fmt(dossier.geplantes_enddatum) : null, key: 'enddatum' },
-                            { label: 'Standort',           value: dossier.standort_name },
-                            { label: 'Arbeitsort',         value: dossier.abteilung ? `Intern: ${dossier.abteilung}` : dossier.arbeitgeber_firma ? `Extern: ${dossier.arbeitgeber_firma}` : null },
-                        ].filter(Boolean).map((f, i) => (
-                            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                <span style={{ fontSize: 10.5, color: '#A09D97', whiteSpace: 'nowrap' }}>{f.label}</span>
-                                {f.key === 'enddatum' ? (
-                                    endeBearbeiten ? (
-                                        <input
-                                            type="date"
-                                            autoFocus
-                                            defaultValue={dossier.geplantes_enddatum ? dossier.geplantes_enddatum.slice(0, 10) : ''}
-                                            onBlur={e => speichernEnddatum(e.target.value)}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter') e.target.blur();
-                                                if (e.key === 'Escape') setEndeBearbeiten(false);
-                                            }}
-                                            style={{ fontSize: 12, padding: '1px 4px', border: '1px solid rgba(0,0,0,.13)', borderRadius: 4, fontFamily: 'inherit', color: '#1A1917' }}
-                                        />
+                    <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, alignSelf: 'flex-start' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '7px 20px' }}>
+                            {[
+                                { label: 'Programm',          value: dossier.programm_name },
+                                { label: 'Pensum',             value: dossier.pensum_pct ? `${dossier.pensum_pct}%` : null },
+                                { label: 'Zuweisende Stelle',  value: dossier.auftraggeber },
+                                { label: 'Start',              value: dossier.laufend_start_datum ? fmt(dossier.laufend_start_datum) : null },
+                                (dossier.zuweisende_person_nachname
+                                    ? { label: 'Zuweisende Person', value: `${dossier.zuweisende_person_vorname || ''} ${dossier.zuweisende_person_nachname}`.trim() + (dossier.zuweisende_person_firma ? ` · ${dossier.zuweisende_person_firma}` : '') }
+                                    : null),
+                                { label: 'Ende (geplant)',     value: dossier.geplantes_enddatum ? fmt(dossier.geplantes_enddatum) : null, key: 'enddatum' },
+                                { label: 'Standort',           value: dossier.standort_name },
+                                { label: 'Arbeitsort',         value: dossier.abteilung ? `Intern: ${dossier.abteilung}` : dossier.arbeitgeber_firma ? `Extern: ${dossier.arbeitgeber_firma}` : null },
+                            ].filter(Boolean).map((f, i) => (
+                                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    <span style={{ fontSize: 10.5, color: '#A09D97', whiteSpace: 'nowrap' }}>{f.label}</span>
+                                    {f.key === 'enddatum' ? (
+                                        endeBearbeiten ? (
+                                            <input
+                                                type="date"
+                                                autoFocus
+                                                defaultValue={dossier.geplantes_enddatum ? dossier.geplantes_enddatum.slice(0, 10) : ''}
+                                                onBlur={e => speichernEnddatum(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter') e.target.blur();
+                                                    if (e.key === 'Escape') setEndeBearbeiten(false);
+                                                }}
+                                                style={{ fontSize: 12, padding: '1px 4px', border: '1px solid rgba(0,0,0,.13)', borderRadius: 4, fontFamily: 'inherit', color: '#1A1917' }}
+                                            />
+                                        ) : (
+                                            <span onClick={() => setEndeBearbeiten(true)} style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dashed #C7C4BC' }}>
+                                                {f.value || '—'}
+                                            </span>
+                                        )
                                     ) : (
-                                        <span onClick={() => setEndeBearbeiten(true)} style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dashed #C7C4BC' }}>
-                                            {f.value || '—'}
-                                        </span>
-                                    )
-                                ) : (
-                                    <span style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap' }}>{f.value || '—'}</span>
-                                )}
-                            </div>
-                        ))}
+                                        <span style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap' }}>{f.value || '—'}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        {/* SOLL/IST-Aufwand */}
+                        {(() => {
+                            const ist = parseFloat(dossier.ist_total) || 0;
+                            const soll = parseFloat(dossier.soll_total) || 0;
+                            const verr = parseFloat(dossier.ist_verrechenbar) || 0;
+                            const nverr = parseFloat(dossier.ist_nicht_verrechenbar) || 0;
+                            const istFarbe = soll > 0 ? (ist < soll ? '#15803D' : ist > soll ? '#B91C1C' : '#1A1917') : '#1A1917';
+                            return (
+                                <div style={{ borderTop: '1px solid rgba(0,0,0,.06)', paddingTop: 6 }}>
+                                    <span style={{ fontSize: 10.5, color: '#A09D97', display: 'block', marginBottom: 2 }}>Aufwand</span>
+                                    <span style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap' }}>
+                                        SOLL: {soll.toFixed(1)}h / <span style={{ color: istFarbe }}>IST: {ist.toFixed(1)}h</span>
+                                        <span style={{ color: '#9CA3AF', fontSize: 10.5 }}> (verr. {verr.toFixed(1)} + n.v. {nverr.toFixed(1)}h)</span>
+                                    </span>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
 
@@ -608,39 +616,40 @@ export default function DossierDetail() {
                             {/* Journal Tab */}
                             {aktTab === 'journal' && (
                                 <div>
-                                    {!jFormOpen ? (
-                                        <button onClick={() => setJFormOpen(true)} style={{
-                                            width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 12.5,
-                                            border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#F5F4F0',
-                                            color: '#6B6860', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 12
-                                        }}>+ Neuer Journal-Eintrag…</button>
-                                    ) : (
-                                        <div style={{ background: '#F5F4F0', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, padding: 10, marginBottom: 10 }}>
-                                            <div style={{ display: 'flex', gap: 7, marginBottom: 7, flexWrap: 'wrap' }}>
-                                                <select value={jKat} onChange={e => setJKat(e.target.value)} style={{ flex: 1, minWidth: 160, fontSize: 12, padding: '5px 9px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit' }}>
-                                                    {Object.keys(JKAT).map(k => <option key={k}>{k}</option>)}
-                                                </select>
-                                                <input type="date" value={jDatum} onChange={e => setJDatum(e.target.value)} style={{ flex: '0 0 130px', fontSize: 12, padding: '5px 9px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff' }} />
-                                            </div>
-                                            <textarea value={jText} onChange={e => setJText(e.target.value)} placeholder="Notiz erfassen…" style={{ width: '100%', fontSize: 12, padding: '7px 9px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', minHeight: 70, resize: 'vertical', lineHeight: 1.5, fontFamily: 'inherit', marginBottom: 7, boxSizing: 'border-box' }} />
-                                            <div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
-                                                <button onClick={() => setJFormOpen(false)} style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}>Abbrechen</button>
-                                                <button onClick={addJournal} style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: 'none', borderRadius: 5, background: '#2563EB', color: '#fff', fontFamily: 'inherit' }}>Speichern</button>
-                                            </div>
-                                        </div>
-                                    )}
+                                    <button onClick={() => setJournalModal(true)} style={{
+                                        width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 12.5,
+                                        border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#F5F4F0',
+                                        color: '#6B6860', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 12
+                                    }}>+ Neuer Journal-Eintrag…</button>
                                     {journal.length === 0 ? (
                                         <div style={{ fontSize: 12, color: '#6B6860' }}>Noch keine Journal-Einträge</div>
                                     ) : journal.map((j, i) => {
                                         const s = JKAT[j.kategorie] || JKAT['Sonstiges'];
+                                        const zeitBadge = fmtDauer(j.dauer_minuten);
                                         return (
                                             <div key={i} style={{ border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, marginBottom: 6, overflow: 'hidden' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 11px', background: '#F5F4F0' }}>
-                                                    <div style={{ flex: 1 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', background: '#F5F4F0' }}>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
                                                         <div style={{ fontSize: 11.5, fontWeight: 500 }}>{j.kategorie}</div>
                                                         <div style={{ fontSize: 10.5, color: '#6B6860', marginTop: 1 }}>{fmt(j.datum)} · {j.erfasst_von}</div>
                                                     </div>
-                                                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 20, background: s.bg, color: s.color, textTransform: 'uppercase', letterSpacing: '.03em' }}>{j.kategorie}</span>
+                                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                                                        {zeitBadge && (
+                                                            <span style={{
+                                                                fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 10, fontFamily: 'monospace',
+                                                                background: j.verrechenbar ? '#ECFDF5' : '#F0F0EE',
+                                                                color: j.verrechenbar ? '#15803D' : '#6B6860',
+                                                                border: `1px solid ${j.verrechenbar ? 'rgba(22,163,74,.15)' : 'rgba(0,0,0,.09)'}`,
+                                                            }}>{zeitBadge}</span>
+                                                        )}
+                                                        {j.leistung_tarifnr && (
+                                                            <span style={{
+                                                                fontSize: 10, padding: '2px 6px', borderRadius: 10, fontFamily: 'monospace',
+                                                                background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(37,99,235,.15)',
+                                                            }}>{j.leistung_tarifnr}</span>
+                                                        )}
+                                                        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 20, background: s.bg, color: s.color, textTransform: 'uppercase', letterSpacing: '.03em' }}>{j.kategorie}</span>
+                                                    </div>
                                                 </div>
                                                 <div style={{ padding: '8px 11px', fontSize: 11.5, color: '#6B6860', lineHeight: 1.6 }}>{j.text}</div>
                                             </div>
@@ -903,6 +912,16 @@ export default function DossierDetail() {
                 dossierId={id}
                 verfuegung={gewaehlteVerfuegung}
                 onSaved={reloadVerfuegungen}
+            />
+
+            <JournalModal
+                open={journalModal}
+                onClose={() => setJournalModal(false)}
+                klientId={dossier?.klient_id}
+                onSaved={(newEntry) => {
+                    setJournal(prev => [newEntry, ...prev]);
+                    reloadDossier();
+                }}
             />
 
             <Modal open={agModal} onClose={() => setAgModal(false)} title="Arbeitgeber / Partnerfirma zuweisen" width={480}>

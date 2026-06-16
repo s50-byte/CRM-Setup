@@ -9,11 +9,14 @@ const auth = require('../middleware/auth');
 router.get('/:klient_id', auth, async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT 
+            `SELECT
                 j.eintrag_id, j.kategorie, j.datum, j.text, j.created_at,
+                j.dauer_minuten, j.verrechenbar, j.leistung_id,
+                l.tarifnr AS leistung_tarifnr, l.bezeichnung AS leistung_bezeichnung,
                 u.full_name AS erfasst_von, u.avatar_initials
              FROM journal_eintrag j
              JOIN benutzer u ON u.user_id = j.user_id
+             LEFT JOIN leistung l ON l.leistung_id = j.leistung_id
              WHERE j.klient_id = $1
              ORDER BY j.datum DESC, j.created_at DESC`,
             [req.params.klient_id]
@@ -27,7 +30,7 @@ router.get('/:klient_id', auth, async (req, res) => {
 
 // POST /api/journal — Neuer Eintrag
 router.post('/', auth, async (req, res) => {
-    const { klient_id, kategorie, datum, text } = req.body;
+    const { klient_id, kategorie, datum, text, dauer_minuten, verrechenbar, leistung_id } = req.body;
 
     if (!klient_id || !text) {
         return res.status(400).json({ error: 'Klient und Text erforderlich' });
@@ -35,11 +38,12 @@ router.post('/', auth, async (req, res) => {
 
     try {
         const result = await db.query(
-            `INSERT INTO journal_eintrag (klient_id, user_id, kategorie, datum, text)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO journal_eintrag (klient_id, user_id, kategorie, datum, text, dauer_minuten, verrechenbar, leistung_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING *`,
             [klient_id, req.user.user_id, kategorie || 'Sonstiges',
-             datum || new Date().toISOString().slice(0, 10), text]
+             datum || new Date().toISOString().slice(0, 10), text,
+             dauer_minuten || 0, verrechenbar || false, leistung_id || null]
         );
 
         // Zeitachse-Eintrag
