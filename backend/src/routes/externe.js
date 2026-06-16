@@ -14,9 +14,9 @@ router.get('/', auth, async (req, res) => {
                 ep.typ, ep.firma, ep.telefon, ep.email, ep.fax,
                 ep.bemerkung, ep.aktiv,
                 ep.ist_organisation, ep.organisation_id,
-                COALESCE(NULLIF(ep.adresse, ''), MAX(org.adresse)) AS adresse,
-                COALESCE(NULLIF(ep.plz,     ''), MAX(org.plz))    AS plz,
-                COALESCE(NULLIF(ep.ort,     ''), MAX(org.ort))    AS ort,
+                CASE WHEN ep.organisation_id IS NOT NULL THEN MAX(org.adresse) ELSE ep.adresse END AS adresse,
+                CASE WHEN ep.organisation_id IS NOT NULL THEN MAX(org.plz)     ELSE ep.plz     END AS plz,
+                CASE WHEN ep.organisation_id IS NOT NULL THEN MAX(org.ort)     ELSE ep.ort     END AS ort,
                 MAX(org.firma) AS organisation_name,
                 COUNT(DISTINCT epd.dossier_id) AS anzahl_klienten,
                 COALESCE(
@@ -111,9 +111,9 @@ router.get('/:id', auth, async (req, res) => {
                 ep.telefon, ep.fax, ep.email, ep.bemerkung, ep.aktiv,
                 ep.ist_organisation, ep.organisation_id,
                 ep.created_at, ep.updated_at,
-                COALESCE(NULLIF(ep.adresse, ''), org.adresse) AS adresse,
-                COALESCE(NULLIF(ep.plz,     ''), org.plz)    AS plz,
-                COALESCE(NULLIF(ep.ort,     ''), org.ort)    AS ort,
+                CASE WHEN ep.organisation_id IS NOT NULL THEN org.adresse ELSE ep.adresse END AS adresse,
+                CASE WHEN ep.organisation_id IS NOT NULL THEN org.plz     ELSE ep.plz     END AS plz,
+                CASE WHEN ep.organisation_id IS NOT NULL THEN org.ort     ELSE ep.ort     END AS ort,
                 org.firma AS organisation_name
              FROM externe_person ep
              LEFT JOIN externe_person org ON org.person_id = ep.organisation_id
@@ -124,8 +124,6 @@ router.get('/:id', auth, async (req, res) => {
         if (person.rows.length === 0) {
             return res.status(404).json({ error: 'Person nicht gefunden' });
         }
-
-        console.log('GET /:id Adressfelder:', JSON.stringify({ adresse: person.rows[0].adresse, plz: person.rows[0].plz, ort: person.rows[0].ort, organisation_name: person.rows[0].organisation_name }));
 
         const klienten = await db.query(
             `SELECT
