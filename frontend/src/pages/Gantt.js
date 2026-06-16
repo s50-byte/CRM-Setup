@@ -49,6 +49,12 @@ function plus6MonateISO() {
     return isoDate(d);
 }
 
+function minus1MonatISO() {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return isoDate(d);
+}
+
 function fmt(dateStr) {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('de-CH');
@@ -135,7 +141,7 @@ export default function Gantt() {
     const { benutzer } = useAuth();
     const navigate = useNavigate();
 
-    const [von, setVon] = useState(heuteISO());
+    const [von, setVon] = useState(minus1MonatISO());
     const [bis, setBis] = useState(plus6MonateISO());
     const [standortIds, setStandortIds] = useState([]);
     const [programmIds, setProgrammIds] = useState([]);
@@ -243,6 +249,25 @@ export default function Gantt() {
 
     const heutePct = pct(heuteISO());
     const heuteImBereich = new Date(heuteISO()) >= vonDate && new Date(heuteISO()) <= bisDate;
+
+    const ganttHeight = HEADER_H + daten.length * ROW_H;
+
+    function verschiebeZeitraum(delta) {
+        const v = new Date(von);
+        const b = new Date(bis);
+        if (zoomLevel === 'wochen') {
+            v.setDate(v.getDate() + delta * 7);
+            b.setDate(b.getDate() + delta * 7);
+        } else if (zoomLevel === 'quartale') {
+            v.setMonth(v.getMonth() + delta * 3);
+            b.setMonth(b.getMonth() + delta * 3);
+        } else {
+            v.setMonth(v.getMonth() + delta);
+            b.setMonth(b.getMonth() + delta);
+        }
+        setVon(isoDate(v));
+        setBis(isoDate(b));
+    }
 
     return (
         <div>
@@ -359,18 +384,24 @@ export default function Gantt() {
                         </div>
 
                         {/* RECHTE SPALTE — ZEITSTRAHL */}
-                        <div style={{ position: 'relative', width: timelineWidth, flexShrink: 0 }}>
+                        <div style={{ position: 'relative', width: timelineWidth, flexShrink: 0, height: ganttHeight }}>
                             {/* Wochenlinien */}
                             {wochenlinien.map((p, i) => (
-                                <div key={`w${i}`} style={{ position: 'absolute', top: 0, bottom: 0, left: `${p}%`, width: 1, background: 'rgba(0,0,0,.045)', zIndex: 1 }} />
+                                <div key={`w${i}`} style={{ position: 'absolute', top: 0, bottom: 0, height: '100%', left: `${p}%`, width: 1, background: 'rgba(0,0,0,.045)', zIndex: 1 }} />
                             ))}
                             {/* Heute-Linie */}
                             {heuteImBereich && (
-                                <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${heutePct}%`, width: 2, background: '#DC2626', zIndex: 2 }} />
+                                <div style={{ position: 'absolute', top: 0, bottom: 0, height: '100%', left: `${heutePct}%`, width: 2, background: '#DC2626', zIndex: 2 }} />
                             )}
 
-                            {/* Spalten-Header */}
-                            <div style={{ display: 'flex', height: HEADER_H, borderBottom: '1px solid rgba(0,0,0,.09)', background: '#F5F4F0', position: 'relative', zIndex: 1 }}>
+                            {/* Spalten-Header mit Navigations-Pfeilen */}
+                            <div style={{ display: 'flex', height: HEADER_H, borderBottom: '1px solid rgba(0,0,0,.09)', background: '#F5F4F0', position: 'relative', zIndex: 3 }}>
+                                <button onClick={() => verschiebeZeitraum(-1)} style={{
+                                    position: 'sticky', left: LEFT_W, zIndex: 4, width: 32, flexShrink: 0,
+                                    border: 'none', borderRight: '1px solid rgba(0,0,0,.09)',
+                                    background: '#F5F4F0', cursor: 'pointer', fontSize: 15, color: '#6B6860',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>‹</button>
                                 {spalten.map((s, i) => (
                                     <div key={i} style={{
                                         flex: s.days, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -379,6 +410,12 @@ export default function Gantt() {
                                         whiteSpace: 'nowrap', overflow: 'hidden',
                                     }}>{s.label}</div>
                                 ))}
+                                <button onClick={() => verschiebeZeitraum(+1)} style={{
+                                    position: 'sticky', right: 0, zIndex: 4, width: 32, flexShrink: 0,
+                                    border: 'none', borderLeft: '1px solid rgba(0,0,0,.09)',
+                                    background: '#F5F4F0', cursor: 'pointer', fontSize: 15, color: '#6B6860',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>›</button>
                             </div>
 
                             {/* Zeilen */}
