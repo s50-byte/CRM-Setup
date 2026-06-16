@@ -917,6 +917,7 @@ export default function DossierDetail() {
                 open={journalModal}
                 onClose={() => setJournalModal(false)}
                 klientId={dossier?.klient_id}
+                dossierId={id}
                 onSaved={(newEntry) => {
                     setJournal(prev => [newEntry, ...prev]);
                     reloadDossier();

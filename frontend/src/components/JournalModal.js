@@ -24,7 +24,7 @@ function FieldLabel({ children, required }) {
     );
 }
 
-export default function JournalModal({ open, onClose, klientId, onSaved }) {
+export default function JournalModal({ open, onClose, klientId, dossierId, onSaved }) {
     const [kat, setKat] = useState('Standortgespräch');
     const [datum, setDatum] = useState('');
     const [leistungId, setLeistungId] = useState('');
@@ -37,7 +37,6 @@ export default function JournalModal({ open, onClose, klientId, onSaved }) {
 
     useEffect(() => {
         if (!open) return;
-        client.get('/leistungen').then(r => setLeistungen(r.data)).catch(console.error);
         setKat('Standortgespräch');
         setDatum(new Date().toISOString().slice(0, 10));
         setLeistungId('');
@@ -45,7 +44,29 @@ export default function JournalModal({ open, onClose, klientId, onSaved }) {
         setVerrechenbar(false);
         setText('');
         setFehler('');
-    }, [open]);
+
+        const ladeLeistungenFallback = () =>
+            client.get('/leistungen').then(r => setLeistungen(r.data)).catch(console.error);
+
+        if (dossierId) {
+            client.get(`/verfuegungen/${dossierId}`)
+                .then(r => {
+                    const aktiv = r.data.find(v => v.status === 'aktiv');
+                    if (aktiv && aktiv.positionen && aktiv.positionen.length > 0) {
+                        setLeistungen(aktiv.positionen.map(p => ({
+                            leistung_id: p.leistung_id,
+                            tarifnr: p.leistung_tarifnr,
+                            bezeichnung: p.leistung_bezeichnung,
+                        })));
+                    } else {
+                        ladeLeistungenFallback();
+                    }
+                })
+                .catch(ladeLeistungenFallback);
+        } else {
+            ladeLeistungenFallback();
+        }
+    }, [open, dossierId]);
 
     function handleLeistungChange(id) {
         setLeistungId(id);

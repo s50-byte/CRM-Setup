@@ -39,6 +39,15 @@ router.get('/', auth, async (req, res) => {
                 pv.start_datum,
                 pv.geplantes_enddatum,
                 st.name AS standort_name,
+                GREATEST(1, COALESCE(
+                    (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
+                   + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int,
+                    1
+                )) AS dauer_monate,
+                (SELECT v2.betrag FROM verfuegung v2
+                 WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv' LIMIT 1) AS verfuegung_betrag,
+                (SELECT v2.verrechnungsart FROM verfuegung v2
+                 WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv' LIMIT 1) AS verrechnungsart,
                 (SELECT COALESCE(ROUND(SUM(vp2.soll_stunden), 1), 0)
                  FROM verfuegung_position vp2
                  JOIN verfuegung v2 ON v2.verfuegung_id = vp2.verfuegung_id
@@ -49,6 +58,11 @@ router.get('/', auth, async (req, res) => {
                  FROM journal_eintrag j WHERE j.klient_id = k.klient_id) AS ist_nicht_verrechenbar,
                 (SELECT COALESCE(ROUND(SUM(j.dauer_minuten) / 60.0, 1), 0)
                  FROM journal_eintrag j WHERE j.klient_id = k.klient_id) AS ist_total,
+                (SELECT COALESCE(ROUND(
+                    SUM(j.dauer_minuten / 60.0 * COALESCE(l2.tarif, 0)), 2), 0)
+                 FROM journal_eintrag j
+                 LEFT JOIN leistung l2 ON l2.leistung_id = j.leistung_id
+                 WHERE j.klient_id = k.klient_id AND j.verrechenbar = TRUE) AS ist_ertrag,
                 COALESCE(
                     (SELECT JSON_AGG(JSONB_BUILD_OBJECT(
                         'tarifnr', l.tarifnr,
@@ -57,7 +71,14 @@ router.get('/', auth, async (req, res) => {
                         'ist_stunden', COALESCE(ROUND(
                             (SELECT SUM(j2.dauer_minuten) / 60.0
                              FROM journal_eintrag j2
-                             WHERE j2.klient_id = k.klient_id AND j2.leistung_id = vp2.leistung_id), 1), 0)
+                             WHERE j2.klient_id = k.klient_id AND j2.leistung_id = vp2.leistung_id), 1), 0),
+                        'soll_chf', COALESCE(ROUND(vp2.soll_stunden * COALESCE(l.tarif, 0), 2), 0),
+                        'ist_chf', COALESCE(ROUND(
+                            COALESCE((SELECT SUM(j2.dauer_minuten) / 60.0
+                                      FROM journal_eintrag j2
+                                      WHERE j2.klient_id = k.klient_id
+                                        AND j2.leistung_id = vp2.leistung_id
+                                        AND j2.verrechenbar = TRUE), 0) * COALESCE(l.tarif, 0), 2), 0)
                     ) ORDER BY vp2.reihenfolge)
                      FROM verfuegung_position vp2
                      JOIN verfuegung v2 ON v2.verfuegung_id = vp2.verfuegung_id
@@ -111,7 +132,26 @@ router.get('/', auth, async (req, res) => {
             [von, bis, standortIds, programmIds, userId]
         );
 
-        let rows = result.rows;
+        let rows = result.rows.map(row => {
+            const betrag = parseFloat(row.verfuegung_betrag) || 0;
+            const dauerMonate = Math.max(1, parseInt(row.dauer_monate) || 1);
+            const positionen = row.positionen || [];
+            let soll_ertrag = null;
+            if (betrag > 0) {
+                switch (row.verrechnungsart) {
+                    case 'monatspauschale':
+                        soll_ertrag = Math.round(betrag * dauerMonate * 100) / 100;
+                        break;
+                    case 'fallpauschale':
+                        soll_ertrag = betrag;
+                        break;
+                    case 'stundenpauschale':
+                        soll_ertrag = Math.round(positionen.reduce((s, p) => s + (parseFloat(p.soll_chf) || 0), 0) * 100) / 100;
+                        break;
+                }
+            }
+            return { ...row, soll_ertrag };
+        });
 
         if (rolle && rolle !== 'Alle') {
             rows = rows

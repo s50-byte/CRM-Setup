@@ -262,9 +262,17 @@ export default function Gantt() {
         });
     }
 
+    function fmtChf(v) {
+        const n = parseFloat(v);
+        if (!n) return '—';
+        return Math.round(n).toLocaleString('de-CH');
+    }
+
     function detailH(row) {
         const n = (row.positionen || []).length;
-        return 14 + 22 + (Math.max(n, 0) + 1) * 21 + 10;
+        const hoursH = 14 + 22 + (Math.max(n, 0) + 1) * 21 + 10;
+        const chfH = n > 0 ? (8 + 14 + (n + 1) * 18 + 4) : 0;
+        return hoursH + chfH;
     }
 
     function rowH(row) {
@@ -403,10 +411,11 @@ export default function Gantt() {
                                         {/* Detail-Tabelle */}
                                         {offen && (
                                             <div style={{ borderTop: '1px solid rgba(0,0,0,.07)', background: '#FAFAF9', padding: '6px 8px 8px' }}>
+                                                {/* Stunden-Grid */}
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'auto 36px 36px 42px', gap: '1px 4px', fontSize: 9.5, fontFamily: 'monospace' }}>
                                                     <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.04em', paddingBottom: 4, fontFamily: 'inherit' }}>Leistung</div>
-                                                    <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 4, fontFamily: 'inherit' }}>SOLL</div>
-                                                    <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 4, fontFamily: 'inherit' }}>IST</div>
+                                                    <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 4, fontFamily: 'inherit' }}>SOLL h</div>
+                                                    <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 4, fontFamily: 'inherit' }}>IST h</div>
                                                     <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 4, fontFamily: 'inherit' }}>Diff</div>
                                                     {positionen.length === 0 && (
                                                         <div style={{ gridColumn: '1 / -1', color: '#9CA3AF', fontSize: 9.5, padding: '3px 0' }}>Keine aktive Verfügung</div>
@@ -436,6 +445,36 @@ export default function Gantt() {
                                                         ];
                                                     })()}
                                                 </div>
+                                                {/* CHF-Grid */}
+                                                {positionen.length > 0 && (
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 56px 56px', gap: '1px 4px', fontSize: 9.5, fontFamily: 'monospace', marginTop: 8, borderTop: '1px solid rgba(0,0,0,.07)', paddingTop: 6 }}>
+                                                        <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.04em', paddingBottom: 3, fontFamily: 'inherit' }}>Leistung</div>
+                                                        <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 3, fontFamily: 'inherit' }}>SOLL CHF</div>
+                                                        <div style={{ fontSize: 9, fontWeight: 600, color: '#A09D97', textAlign: 'right', paddingBottom: 3, fontFamily: 'inherit' }}>IST CHF</div>
+                                                        {positionen.map((pos, pi) => {
+                                                            const sc = parseFloat(pos.soll_chf) || 0;
+                                                            const ic = parseFloat(pos.ist_chf) || 0;
+                                                            const ok = ic <= sc;
+                                                            const fc = sc > 0 ? (ok ? '#15803D' : '#B91C1C') : '#6B6860';
+                                                            return [
+                                                                <div key={`cl${pi}`} style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${pos.tarifnr} · ${pos.bezeichnung}`}>{pos.tarifnr}</div>,
+                                                                <div key={`cs${pi}`} style={{ textAlign: 'right', color: '#6B6860' }}>{fmtChf(sc)}</div>,
+                                                                <div key={`ci${pi}`} style={{ textAlign: 'right', color: fc, fontWeight: 600 }}>{fmtChf(ic)}</div>,
+                                                            ];
+                                                        })}
+                                                        {(() => {
+                                                            const sollE = row.soll_ertrag;
+                                                            const istE = parseFloat(row.ist_ertrag) || 0;
+                                                            const ok = sollE == null || istE <= sollE;
+                                                            const fc = sollE != null ? (ok ? '#15803D' : '#B91C1C') : '#6B6860';
+                                                            return [
+                                                                <div key="ctl" style={{ color: '#374151', fontWeight: 700, borderTop: '1px solid rgba(0,0,0,.1)', paddingTop: 3, marginTop: 1 }}>Total</div>,
+                                                                <div key="cts" style={{ textAlign: 'right', color: '#374151', fontWeight: 700, borderTop: '1px solid rgba(0,0,0,.1)', paddingTop: 3, marginTop: 1 }}>{fmtChf(sollE)}</div>,
+                                                                <div key="cti" style={{ textAlign: 'right', color: fc, fontWeight: 700, borderTop: '1px solid rgba(0,0,0,.1)', paddingTop: 3, marginTop: 1 }}>{fmtChf(istE)}</div>,
+                                                            ];
+                                                        })()}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
