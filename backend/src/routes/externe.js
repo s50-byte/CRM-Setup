@@ -125,6 +125,8 @@ router.get('/:id', auth, async (req, res) => {
             return res.status(404).json({ error: 'Person nicht gefunden' });
         }
 
+        console.log('GET /:id Adressfelder:', JSON.stringify({ adresse: person.rows[0].adresse, plz: person.rows[0].plz, ort: person.rows[0].ort, organisation_name: person.rows[0].organisation_name }));
+
         const klienten = await db.query(
             `SELECT
                 d.dossier_id, k.nachname, k.vorname,
