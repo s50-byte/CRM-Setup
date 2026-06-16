@@ -16,6 +16,7 @@ import KlientDetail from '../pages/KlientDetail';
 import ExterneDetail from '../pages/ExterneDetail';
 import Standorte from '../pages/Standorte';
 import Gantt from '../pages/Gantt';
+import Leistungen from '../pages/management/Leistungen';
 import ManagementDashboard from '../pages/management/ManagementDashboard';
 import Auslastung from '../pages/management/Auslastung';
 import Benutzer from '../pages/management/Benutzer';
@@ -47,6 +48,7 @@ const MANAGEMENT_NAV = [
     { path: '/management/auslastung',  label: 'Auslastung', icon: '👥' },
     { path: '/gantt',                  label: 'Auslastungsplanung', icon: '📅' },
     { path: '/management/finanzen',    label: 'Finanzen',   icon: '💰' },
+    { path: '/management/leistungen',  label: 'Leistungskatalog', icon: '📋' },
     { path: '/management/benutzer',    label: 'Benutzer',   icon: '⚙' },
 ];
 
@@ -222,6 +224,7 @@ export default function Layout() {
                     <Route path="/management"              element={<ManagementDashboard />} />
                     <Route path="/management/auslastung"   element={<Auslastung />} />
                     <Route path="/management/finanzen"     element={<Platzhalter titel="Finanzen" />} />
+                    <Route path="/management/leistungen"   element={<Leistungen />} />
                     <Route path="/management/benutzer"     element={<Benutzer />} />
                 </Routes>
             </div>
