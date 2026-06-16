@@ -11,10 +11,13 @@ router.get('/', auth, async (req, res) => {
         const result = await db.query(
             `SELECT
                 ep.person_id, ep.nachname, ep.vorname, ep.funktion,
-                ep.typ, ep.firma, ep.telefon, ep.email, ep.adresse,
-                ep.plz, ep.ort, ep.fax,
+                ep.typ, ep.firma, ep.telefon, ep.email, ep.fax,
                 ep.bemerkung, ep.aktiv,
                 ep.ist_organisation, ep.organisation_id,
+                COALESCE(ep.adresse, MAX(org.adresse)) AS adresse,
+                COALESCE(ep.plz,    MAX(org.plz))    AS plz,
+                COALESCE(ep.ort,    MAX(org.ort))    AS ort,
+                MAX(org.firma) AS organisation_name,
                 COUNT(DISTINCT epd.dossier_id) AS anzahl_klienten,
                 COALESCE(
                     JSON_AGG(
@@ -45,6 +48,7 @@ router.get('/', auth, async (req, res) => {
                     )
                 ELSE '[]'::json END AS mitglieder
              FROM externe_person ep
+             LEFT JOIN externe_person org ON org.person_id = ep.organisation_id
              LEFT JOIN externe_person_dossier epd ON epd.person_id = ep.person_id
              LEFT JOIN dossier d ON d.dossier_id = epd.dossier_id
              LEFT JOIN klient k ON k.klient_id = d.klient_id
@@ -102,7 +106,18 @@ router.get('/:id/stundenpreise', auth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
     try {
         const person = await db.query(
-            `SELECT * FROM externe_person WHERE person_id = $1`,
+            `SELECT
+                ep.person_id, ep.nachname, ep.vorname, ep.funktion, ep.typ, ep.firma,
+                ep.telefon, ep.fax, ep.email, ep.bemerkung, ep.aktiv,
+                ep.ist_organisation, ep.organisation_id,
+                ep.created_at, ep.updated_at,
+                COALESCE(ep.adresse, org.adresse) AS adresse,
+                COALESCE(ep.plz,    org.plz)    AS plz,
+                COALESCE(ep.ort,    org.ort)    AS ort,
+                org.firma AS organisation_name
+             FROM externe_person ep
+             LEFT JOIN externe_person org ON org.person_id = ep.organisation_id
+             WHERE ep.person_id = $1`,
             [req.params.id]
         );
 

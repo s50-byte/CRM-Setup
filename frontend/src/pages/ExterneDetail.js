@@ -62,8 +62,6 @@ export default function ExterneDetail() {
     const [spBusy, setSpBusy] = useState(false);
     const [spFehler, setSpFehler] = useState('');
 
-    const [orgName, setOrgName] = useState('');
-
     function ladeStundenpreise() {
         client.get(`/externe/${id}/stundenpreise`)
             .then(r => setStundenpreise(r.data))
@@ -72,7 +70,6 @@ export default function ExterneDetail() {
 
     const ladeData = useCallback(() => {
         setLaden(true);
-        setOrgName('');
         setStundenpreise([]);
         client.get(`/externe/${id}`)
             .then(r => {
@@ -80,11 +77,6 @@ export default function ExterneDetail() {
                 if (r.data.ist_organisation) {
                     client.get('/leistungen').then(lr => setLeistungen(lr.data)).catch(console.error);
                     client.get(`/externe/${id}/stundenpreise`).then(sr => setStundenpreise(sr.data)).catch(console.error);
-                }
-                if (r.data.organisation_id) {
-                    client.get(`/externe/${r.data.organisation_id}`)
-                        .then(or => setOrgName(or.data.firma || or.data.nachname || ''))
-                        .catch(console.error);
                 }
             })
             .catch(console.error)
@@ -182,12 +174,12 @@ export default function ExterneDetail() {
                                 border: `1px solid ${typStyle.color}33`, fontFamily: 'monospace'
                             }}>{person.typ || 'Sonstiges'}</span>
                             {person.funktion && <span style={{ fontSize: 12, color: '#6B6860' }}>{person.funktion}</span>}
-                            {!istOrg && person.organisation_id && orgName && (
+                            {!istOrg && person.organisation_id && person.organisation_name && (
                                 <span
                                     onClick={() => navigate(`/externe/${person.organisation_id}`)}
                                     style={{ fontSize: 11.5, color: '#2563EB', cursor: 'pointer' }}
                                 >
-                                    Mitglied von: {orgName} →
+                                    Mitglied von: {person.organisation_name} →
                                 </span>
                             )}
                         </div>
