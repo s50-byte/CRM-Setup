@@ -105,7 +105,7 @@ router.get('/', auth, async (req, res) => {
                    SELECT 1 FROM klient_user ku2
                    WHERE ku2.klient_id = k.klient_id AND ku2.user_id = $5::uuid AND ku2.aktiv = TRUE
                ))
-             GROUP BY d.dossier_id, k.vorname, k.nachname, p.name, p.farbe_hex,
+             GROUP BY d.dossier_id, k.klient_id, k.vorname, k.nachname, p.name, p.farbe_hex,
                       pv.klient_label, pv.start_datum, pv.geplantes_enddatum, st.name
              ORDER BY k.nachname, k.vorname`,
             [von, bis, standortIds, programmIds, userId]
