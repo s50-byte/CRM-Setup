@@ -1,0 +1,392 @@
+const router = require('express').Router();
+const db = require('../db');
+const auth = require('../middleware/auth');
+
+const ERLAUBTE_ROLLEN = ['management', 'teamleitung', 'kader', 'leitungsteam'];
+
+function generierePeriodenListe(typ, von, bis) {
+    const result = [];
+    const startDate = new Date(von);
+    const endDate = new Date(bis);
+
+    if (typ === 'quartale') {
+        let year = startDate.getFullYear();
+        let q = Math.floor(startDate.getMonth() / 3);
+        while (true) {
+            const qStart = new Date(year, q * 3, 1);
+            if (qStart > endDate) break;
+            const qEnd = new Date(year, q * 3 + 3, 0);
+            result.push({ key: `Q${q + 1} ${year}`, von: qStart, bis: qEnd });
+            q++;
+            if (q > 3) { q = 0; year++; }
+        }
+    } else if (typ === 'jahr') {
+        for (let y = startDate.getFullYear(); y <= endDate.getFullYear(); y++) {
+            result.push({ key: `${y}`, von: new Date(y, 0, 1), bis: new Date(y, 11, 31) });
+        }
+    } else if (typ === 'wochen') {
+        const wochentag = startDate.getDay();
+        const diff = startDate.getDate() - wochentag + (wochentag === 0 ? -6 : 1);
+        let current = new Date(startDate);
+        current.setDate(diff);
+        while (current <= endDate) {
+            const ende = new Date(current);
+            ende.setDate(ende.getDate() + 6);
+            const d = new Date(Date.UTC(current.getFullYear(), current.getMonth(), current.getDate()));
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const kw = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            result.push({ key: `KW ${kw} ${current.getFullYear()}`, von: new Date(current), bis: ende });
+            current.setDate(current.getDate() + 7);
+        }
+    } else {
+        // Monate (default)
+        let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        while (current <= endDate) {
+            const monatsEnde = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+            const label = current.toLocaleDateString('de-CH', { month: 'short', year: 'numeric' });
+            result.push({ key: label, von: new Date(current), bis: monatsEnde });
+            current.setMonth(current.getMonth() + 1);
+        }
+    }
+    return result;
+}
+
+function ueberlapp(startA, endA, startB, endB) {
+    const sa = startA instanceof Date ? startA : new Date(startA);
+    const ea = endA instanceof Date ? endA : new Date(endA);
+    return sa <= endB && ea >= startB;
+}
+
+function getDimKey(row, dim) {
+    switch (dim) {
+        case 'kader': return row.kader_id ? String(row.kader_id) : '__kein_kader__';
+        case 'klient': return row.klient_id ? String(row.klient_id) : '__';
+        case 'standort': return row.standort_id ? String(row.standort_id) : '__kein_standort__';
+        case 'massnahme': return row.programm_id ? String(row.programm_id) : '__kein_programm__';
+        case 'abteilung': return row.abteilung || 'Keine Abteilung';
+        case 'auftraggeber_typ': return row.auftraggeber || 'Unbekannt';
+        default: return '__';
+    }
+}
+
+function getDimLabel(row, dim) {
+    switch (dim) {
+        case 'kader': return row.kader_name || '(Kein Kader)';
+        case 'klient': return row.klient_name || '(Unbekannt)';
+        case 'standort': return row.standort_name || '(Kein Standort)';
+        case 'massnahme': return row.programm_name || '(Kein Programm)';
+        case 'abteilung': return row.abteilung || 'Keine Abteilung';
+        case 'auftraggeber_typ': return row.auftraggeber || 'Unbekannt';
+        default: return '(Unbekannt)';
+    }
+}
+
+function berechneWerte(dossierList, journalList, periode, kennzahlen) {
+    const { von: vonDate, bis: bisDate } = periode;
+    let einnahmen_soll = 0;
+    let stunden_soll = 0;
+    const klientenSet = new Set();
+
+    for (const dos of dossierList) {
+        if (!ueberlapp(dos.start_datum, dos.geplantes_enddatum, vonDate, bisDate)) continue;
+        const betrag = parseFloat(dos.betrag) || 0;
+        const dauerMonate = Math.max(1, parseInt(dos.dauer_monate) || 1);
+        const sollLeistungTotal = parseFloat(dos.soll_leistung_total) || 0;
+        const sollStundenTotal = parseFloat(dos.soll_stunden_total) || 0;
+
+        switch (dos.verrechnungsart) {
+            case 'monatspauschale': einnahmen_soll += betrag; break;
+            case 'fallpauschale':   einnahmen_soll += betrag / dauerMonate; break;
+            case 'stundenpauschale': einnahmen_soll += sollLeistungTotal / dauerMonate; break;
+        }
+        stunden_soll += sollStundenTotal / dauerMonate;
+        klientenSet.add(String(dos.klient_id));
+    }
+
+    let einnahmen_ist = 0;
+    let stunden_ist = 0;
+    for (const j of (journalList || [])) {
+        const jDate = new Date(j.datum);
+        if (jDate < vonDate || jDate > bisDate) continue;
+        const minuten = parseFloat(j.dauer_minuten) || 0;
+        const stunden = minuten / 60;
+        stunden_ist += stunden;
+        if (j.verrechenbar) einnahmen_ist += stunden * (parseFloat(j.tarif) || 0);
+        klientenSet.add(String(j.klient_id));
+    }
+
+    const anzahl_klienten = klientenSet.size;
+    const r = {};
+    if (kennzahlen.includes('einnahmen_soll')) r.einnahmen_soll = Math.round(einnahmen_soll * 100) / 100;
+    if (kennzahlen.includes('einnahmen_ist'))  r.einnahmen_ist  = Math.round(einnahmen_ist * 100) / 100;
+    if (kennzahlen.includes('stunden_soll'))   r.stunden_soll   = Math.round(stunden_soll * 10) / 10;
+    if (kennzahlen.includes('stunden_ist'))    r.stunden_ist    = Math.round(stunden_ist * 10) / 10;
+    if (kennzahlen.includes('anzahl_klienten')) r.anzahl_klienten = anzahl_klienten;
+    if (kennzahlen.includes('auslastung_pct'))  r.auslastung_pct  = einnahmen_soll > 0 ? Math.round(einnahmen_ist / einnahmen_soll * 1000) / 10 : null;
+    if (kennzahlen.includes('avg_std_klient'))  r.avg_std_klient  = anzahl_klienten > 0 ? Math.round(stunden_ist / anzahl_klienten * 100) / 100 : 0;
+    if (kennzahlen.includes('freie_kapazitaet')) r.freie_kapazitaet = Math.round((stunden_soll - stunden_ist) * 10) / 10;
+    return r;
+}
+
+// GET /api/reporting/optionen
+router.get('/optionen', auth, async (req, res) => {
+    if (!ERLAUBTE_ROLLEN.includes(req.user.system_rolle)) return res.status(403).json({ error: 'Keine Berechtigung' });
+    try {
+        const [kader, klienten, standorte, massnahmen, abteilungen] = await Promise.all([
+            db.query(`SELECT DISTINCT u.user_id, u.full_name FROM benutzer u
+                      JOIN klient_user ku ON ku.user_id = u.user_id
+                      WHERE ku.aktiv = TRUE AND ku.rolle_im_fall = 'kader'
+                      ORDER BY u.full_name`),
+            db.query(`SELECT k.klient_id, k.vorname || ' ' || k.nachname AS name
+                      FROM klient k WHERE k.aktiv = TRUE ORDER BY k.nachname, k.vorname`),
+            db.query(`SELECT standort_id, name FROM standort ORDER BY name`),
+            db.query(`SELECT programm_id, name FROM programm ORDER BY name`),
+            db.query(`SELECT DISTINCT abteilung FROM dossier WHERE abteilung IS NOT NULL AND abteilung != '' ORDER BY abteilung`),
+        ]);
+        res.json({
+            kader: kader.rows,
+            klienten: klienten.rows,
+            standorte: standorte.rows,
+            massnahmen: massnahmen.rows,
+            abteilungen: abteilungen.rows.map(r => r.abteilung),
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der Optionen' });
+    }
+});
+
+// GET /api/reporting/ansichten
+router.get('/ansichten', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT id, name, konfiguration, erstellt_at FROM reporting_ansicht
+             WHERE user_id = $1 ORDER BY erstellt_at DESC`,
+            [req.user.user_id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der Ansichten' });
+    }
+});
+
+// POST /api/reporting/ansichten
+router.post('/ansichten', auth, async (req, res) => {
+    const { name, konfiguration } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name erforderlich' });
+    try {
+        const result = await db.query(
+            `INSERT INTO reporting_ansicht (user_id, name, konfiguration) VALUES ($1, $2, $3) RETURNING *`,
+            [req.user.user_id, name, JSON.stringify(konfiguration)]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern der Ansicht' });
+    }
+});
+
+// DELETE /api/reporting/ansichten/:id
+router.delete('/ansichten/:id', auth, async (req, res) => {
+    try {
+        await db.query(
+            `DELETE FROM reporting_ansicht WHERE id = $1 AND user_id = $2`,
+            [req.params.id, req.user.user_id]
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Löschen der Ansicht' });
+    }
+});
+
+// POST /api/reporting/query
+router.post('/query', auth, async (req, res) => {
+    if (!ERLAUBTE_ROLLEN.includes(req.user.system_rolle)) return res.status(403).json({ error: 'Keine Berechtigung' });
+
+    const { zeilen = ['kader'], spalten = ['monate'], kennzahlen = ['einnahmen_soll', 'einnahmen_ist'], filter = {} } = req.body;
+    const von = filter.von || new Date().toISOString().slice(0, 10);
+    const bis = filter.bis || new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString().slice(0, 10);
+    const zeileDim = zeilen[0] || 'kader';
+    const spaltenTyp = spalten[0] || 'monate';
+    const perioden = generierePeriodenListe(spaltenTyp, von, bis);
+
+    try {
+        const params = [von, bis];
+        const dossierClauses = [];
+        const journalClauses = [];
+
+        if (filter.standort_ids?.length > 0) {
+            params.push(filter.standort_ids);
+            const p = `$${params.length}::uuid[]`;
+            dossierClauses.push(`d.standort_id = ANY(${p})`);
+            journalClauses.push(`d.standort_id = ANY(${p})`);
+        }
+        if (filter.programm_ids?.length > 0) {
+            params.push(filter.programm_ids);
+            const p = `$${params.length}::uuid[]`;
+            dossierClauses.push(`pv.programm_id = ANY(${p})`);
+            journalClauses.push(`d.programm_id = ANY(${p})`);
+        }
+        if (filter.user_ids?.length > 0) {
+            params.push(filter.user_ids);
+            const p = `$${params.length}::uuid[]`;
+            const c = `EXISTS (SELECT 1 FROM klient_user ku2 WHERE ku2.klient_id = k.klient_id AND ku2.user_id = ANY(${p}) AND ku2.aktiv = TRUE)`;
+            dossierClauses.push(c);
+            journalClauses.push(c);
+        }
+        if (filter.abteilungen?.length > 0) {
+            params.push(filter.abteilungen);
+            const p = `$${params.length}::text[]`;
+            dossierClauses.push(`d.abteilung = ANY(${p})`);
+            journalClauses.push(`d.abteilung = ANY(${p})`);
+        }
+        if (filter.klient_ids?.length > 0) {
+            params.push(filter.klient_ids);
+            const p = `$${params.length}::uuid[]`;
+            dossierClauses.push(`k.klient_id = ANY(${p})`);
+            journalClauses.push(`k.klient_id = ANY(${p})`);
+        }
+        if (filter.auftraggeber_typ) {
+            params.push(filter.auftraggeber_typ);
+            const p = `$${params.length}`;
+            dossierClauses.push(`d.auftraggeber ILIKE '%' || ${p} || '%'`);
+            journalClauses.push(`d.auftraggeber ILIKE '%' || ${p} || '%'`);
+        }
+
+        const dossierWhere = dossierClauses.length > 0 ? 'AND ' + dossierClauses.join(' AND ') : '';
+        const journalWhere = journalClauses.length > 0 ? 'AND ' + journalClauses.join(' AND ') : '';
+
+        const [dossierResult, journalResult] = await Promise.all([
+            db.query(
+                `SELECT
+                    d.dossier_id, k.klient_id,
+                    k.vorname || ' ' || k.nachname AS klient_name,
+                    d.standort_id, st.name AS standort_name,
+                    d.abteilung, d.auftraggeber,
+                    pv.programm_id, prog.name AS programm_name,
+                    pv.start_datum, pv.geplantes_enddatum,
+                    GREATEST(1, COALESCE(
+                        (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
+                       + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int, 1
+                    )) AS dauer_monate,
+                    v.betrag, v.verrechnungsart,
+                    COALESCE(SUM(vp.soll_stunden * COALESCE(l.tarif, 0)), 0) AS soll_leistung_total,
+                    COALESCE(SUM(vp.soll_stunden), 0) AS soll_stunden_total,
+                    (SELECT u2.user_id FROM klient_user ku2
+                     JOIN benutzer u2 ON u2.user_id = ku2.user_id
+                     WHERE ku2.klient_id = k.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'kader'
+                     LIMIT 1) AS kader_id,
+                    (SELECT u2.full_name FROM klient_user ku2
+                     JOIN benutzer u2 ON u2.user_id = ku2.user_id
+                     WHERE ku2.klient_id = k.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'kader'
+                     LIMIT 1) AS kader_name
+                 FROM dossier d
+                 JOIN klient k ON k.klient_id = d.klient_id
+                 JOIN programm_verlauf pv ON pv.dossier_id = d.dossier_id AND pv.status = 'Laufend'
+                 LEFT JOIN standort st ON st.standort_id = d.standort_id
+                 LEFT JOIN programm prog ON prog.programm_id = pv.programm_id
+                 LEFT JOIN LATERAL (
+                     SELECT v2.verfuegung_id, v2.betrag, v2.verrechnungsart
+                     FROM verfuegung v2
+                     WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv'
+                     LIMIT 1
+                 ) v ON true
+                 LEFT JOIN verfuegung_position vp ON vp.verfuegung_id = v.verfuegung_id
+                 LEFT JOIN leistung l ON l.leistung_id = vp.leistung_id
+                 WHERE k.aktiv = TRUE
+                   AND pv.geplantes_enddatum >= $1 AND pv.start_datum <= $2
+                   ${dossierWhere}
+                 GROUP BY d.dossier_id, k.klient_id, k.vorname, k.nachname, d.standort_id, st.name,
+                          d.abteilung, d.auftraggeber, pv.programm_id, prog.name,
+                          pv.start_datum, pv.geplantes_enddatum, v.betrag, v.verrechnungsart`,
+                params
+            ),
+            db.query(
+                `SELECT
+                    j.klient_id, j.datum, j.dauer_minuten, j.verrechenbar,
+                    COALESCE(l.tarif, 0) AS tarif,
+                    (SELECT ku2.user_id FROM klient_user ku2
+                     WHERE ku2.klient_id = j.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'kader'
+                     LIMIT 1) AS kader_id,
+                    d.standort_id, d.abteilung, d.auftraggeber, d.programm_id
+                 FROM journal_eintrag j
+                 JOIN klient k ON k.klient_id = j.klient_id
+                 LEFT JOIN LATERAL (
+                     SELECT dos.standort_id, dos.abteilung, dos.auftraggeber, pv_l.programm_id
+                     FROM dossier dos
+                     JOIN programm_verlauf pv_l ON pv_l.dossier_id = dos.dossier_id AND pv_l.status = 'Laufend'
+                     WHERE dos.klient_id = j.klient_id
+                     LIMIT 1
+                 ) d ON true
+                 LEFT JOIN leistung l ON l.leistung_id = j.leistung_id
+                 WHERE k.aktiv = TRUE
+                   AND j.datum BETWEEN $1 AND $2
+                   ${journalWhere}`,
+                params
+            ),
+        ]);
+
+        const dossiers = dossierResult.rows;
+        const journalRows = journalResult.rows;
+
+        // Build dimension groups
+        const gruppenMap = new Map();
+        for (const dos of dossiers) {
+            const key = getDimKey(dos, zeileDim);
+            if (!gruppenMap.has(key)) {
+                gruppenMap.set(key, { id: key, label: getDimLabel(dos, zeileDim), dossiers: [] });
+            }
+            gruppenMap.get(key).dossiers.push(dos);
+        }
+
+        const journalByDim = new Map();
+        for (const j of journalRows) {
+            const key = getDimKey(j, zeileDim);
+            if (!journalByDim.has(key)) journalByDim.set(key, []);
+            journalByDim.get(key).push(j);
+            if (!gruppenMap.has(key)) {
+                gruppenMap.set(key, { id: key, label: getDimLabel(j, zeileDim), dossiers: [] });
+            }
+        }
+
+        // Compute result
+        const totalPeriode = { von: new Date(von), bis: new Date(bis) };
+        const zeilen_result = [];
+
+        for (const [key, gruppe] of gruppenMap) {
+            const jList = journalByDim.get(key) || [];
+            const werte = {};
+            for (const p of perioden) {
+                werte[p.key] = berechneWerte(gruppe.dossiers, jList, p, kennzahlen);
+            }
+            zeilen_result.push({
+                label: gruppe.label,
+                id: gruppe.id,
+                werte,
+                total: berechneWerte(gruppe.dossiers, jList, totalPeriode, kennzahlen),
+            });
+        }
+
+        zeilen_result.sort((a, b) => a.label.localeCompare(b.label, 'de'));
+
+        // Global totals per period
+        const globalTotal = {};
+        for (const p of perioden) {
+            globalTotal[p.key] = berechneWerte(dossiers, journalRows, p, kennzahlen);
+        }
+
+        res.json({
+            spalten: perioden.map(p => p.key),
+            zeilen: zeilen_result,
+            total: globalTotal,
+            total_gesamt: berechneWerte(dossiers, journalRows, totalPeriode, kennzahlen),
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Ausführen der Abfrage' });
+    }
+});
+
+module.exports = router;
