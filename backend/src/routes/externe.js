@@ -1,11 +1,11 @@
 // ============================================================
-// Route: Externe Personen
+// Route: Externe Personen & Organisationen
 // ============================================================
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-// GET /api/externe — Alle externen Personen
+// GET /api/externe — Organisationen und Einzelpersonen getrennt
 router.get('/', auth, async (req, res) => {
     try {
         const result = await db.query(
@@ -13,6 +13,7 @@ router.get('/', auth, async (req, res) => {
                 ep.person_id, ep.nachname, ep.vorname, ep.funktion,
                 ep.typ, ep.firma, ep.telefon, ep.email, ep.adresse,
                 ep.bemerkung, ep.aktiv,
+                ep.ist_organisation, ep.organisation_id,
                 COUNT(DISTINCT epd.dossier_id) AS anzahl_klienten,
                 COALESCE(
                     JSON_AGG(
@@ -26,7 +27,22 @@ router.get('/', auth, async (req, res) => {
                         )
                     ) FILTER (WHERE epd.dossier_id IS NOT NULL),
                     '[]'
-                ) AS klienten
+                ) AS klienten,
+                CASE WHEN ep.ist_organisation = TRUE THEN
+                    COALESCE(
+                        (SELECT JSON_AGG(JSONB_BUILD_OBJECT(
+                            'person_id', m.person_id,
+                            'vorname', m.vorname,
+                            'nachname', m.nachname,
+                            'funktion', m.funktion,
+                            'telefon', m.telefon,
+                            'email', m.email
+                        ) ORDER BY m.nachname, m.vorname)
+                         FROM externe_person m
+                         WHERE m.organisation_id = ep.person_id AND m.aktiv = TRUE),
+                        '[]'
+                    )
+                ELSE '[]'::json END AS mitglieder
              FROM externe_person ep
              LEFT JOIN externe_person_dossier epd ON epd.person_id = ep.person_id
              LEFT JOIN dossier d ON d.dossier_id = epd.dossier_id
@@ -34,12 +50,34 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
              WHERE ep.aktiv = TRUE
              GROUP BY ep.person_id
-             ORDER BY ep.nachname, ep.vorname`
+             ORDER BY ep.ist_organisation DESC NULLS LAST, ep.nachname, ep.vorname`
+        );
+        const alle = result.rows;
+        const organisationen = alle.filter(p => p.ist_organisation);
+        const personen = alle.filter(p => !p.ist_organisation && !p.organisation_id);
+        res.json({ organisationen, personen });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der externen Personen' });
+    }
+});
+
+// GET /api/externe/:id/stundenpreise — Stundenpreise einer Organisation
+router.get('/:id/stundenpreise', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT sp.id, sp.organisation_id, sp.leistung_id, sp.stundenpreis,
+                    l.tarifnr, l.bezeichnung, l.einheit
+             FROM organisation_stundenpreis sp
+             JOIN leistung l ON l.leistung_id = sp.leistung_id
+             WHERE sp.organisation_id = $1
+             ORDER BY l.tarifnr`,
+            [req.params.id]
         );
         res.json(result.rows);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Fehler beim Laden der externen Personen' });
+        res.status(500).json({ error: 'Fehler beim Laden der Stundenpreise' });
     }
 });
 
@@ -77,11 +115,12 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
-// POST /api/externe — Neue externe Person
+// POST /api/externe — Neue externe Person / Organisation
 router.post('/', auth, async (req, res) => {
     const {
         nachname, vorname, funktion, typ,
-        firma, telefon, email, adresse, bemerkung
+        firma, telefon, email, adresse, bemerkung,
+        ist_organisation, organisation_id,
     } = req.body;
 
     if (!nachname || !vorname) {
@@ -91,12 +130,14 @@ router.post('/', auth, async (req, res) => {
     try {
         const result = await db.query(
             `INSERT INTO externe_person
-                (nachname, vorname, funktion, typ, firma, telefon, email, adresse, bemerkung)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                (nachname, vorname, funktion, typ, firma, telefon, email, adresse, bemerkung,
+                 ist_organisation, organisation_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              RETURNING *`,
             [nachname, vorname, funktion || null, typ || 'Sonstiges',
              firma || null, telefon || null, email || null,
-             adresse || null, bemerkung || null]
+             adresse || null, bemerkung || null,
+             ist_organisation || false, organisation_id || null]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -105,11 +146,33 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
-// PUT /api/externe/:id — Person aktualisieren
+// POST /api/externe/:id/stundenpreise — Stundenpreis upsert
+router.post('/:id/stundenpreise', auth, async (req, res) => {
+    const { leistung_id, stundenpreis } = req.body;
+    if (!leistung_id || stundenpreis == null) {
+        return res.status(400).json({ error: 'leistung_id und stundenpreis erforderlich' });
+    }
+    try {
+        const result = await db.query(
+            `INSERT INTO organisation_stundenpreis (organisation_id, leistung_id, stundenpreis)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (organisation_id, leistung_id) DO UPDATE SET stundenpreis = $3
+             RETURNING *`,
+            [req.params.id, leistung_id, stundenpreis]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern des Stundenpreises' });
+    }
+});
+
+// PUT /api/externe/:id — Person / Organisation aktualisieren
 router.put('/:id', auth, async (req, res) => {
     const {
         nachname, vorname, funktion, typ,
-        firma, telefon, email, adresse, bemerkung
+        firma, telefon, email, adresse, bemerkung,
+        ist_organisation, organisation_id,
     } = req.body;
 
     try {
@@ -117,17 +180,38 @@ router.put('/:id', auth, async (req, res) => {
             `UPDATE externe_person SET
                 nachname = $1, vorname = $2, funktion = $3, typ = $4,
                 firma = $5, telefon = $6, email = $7,
-                adresse = $8, bemerkung = $9, updated_at = NOW()
-             WHERE person_id = $10
+                adresse = $8, bemerkung = $9, updated_at = NOW(),
+                ist_organisation = $10, organisation_id = $11
+             WHERE person_id = $12
              RETURNING *`,
             [nachname, vorname, funktion || null, typ || 'Sonstiges',
              firma || null, telefon || null, email || null,
-             adresse || null, bemerkung || null, req.params.id]
+             adresse || null, bemerkung || null,
+             ist_organisation || false, organisation_id || null,
+             req.params.id]
         );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Aktualisieren' });
+    }
+});
+
+// DELETE /api/externe/:id/stundenpreise/:leistung_id — Stundenpreis löschen
+router.delete('/:id/stundenpreise/:leistung_id', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `DELETE FROM organisation_stundenpreis
+             WHERE organisation_id = $1 AND leistung_id = $2
+             RETURNING id`,
+            [req.params.id, req.params.leistung_id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
+        res.json({ ok: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Löschen' });
     }
 });
 

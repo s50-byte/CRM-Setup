@@ -7,6 +7,15 @@ router.get('/:dossier_id', auth, async (req, res) => {
     try {
         const result = await db.query(
             `SELECT v.verfuegung_id, v.nummer, v.datum, v.bemerkung, v.status,
+                    v.verrechnungsart, v.betrag,
+                    (SELECT GREATEST(1, COALESCE(
+                        (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
+                       + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int,
+                        1
+                    ))
+                     FROM programm_verlauf pv
+                     WHERE pv.dossier_id = $1 AND pv.status = 'Laufend'
+                     LIMIT 1) AS dauer_monate,
                     COALESCE(
                         JSON_AGG(
                             JSONB_BUILD_OBJECT(
@@ -16,7 +25,14 @@ router.get('/:dossier_id', auth, async (req, res) => {
                                 'leistung_tarifnr', l.tarifnr,
                                 'einheit', l.einheit,
                                 'soll_stunden', vp.soll_stunden,
-                                'reihenfolge', vp.reihenfolge
+                                'reihenfolge', vp.reihenfolge,
+                                'stundenpreis', (
+                                    SELECT sp.stundenpreis
+                                    FROM organisation_stundenpreis sp
+                                    JOIN dossier d ON d.zuweisende_person_id = sp.organisation_id
+                                    WHERE d.dossier_id = $1 AND sp.leistung_id = vp.leistung_id
+                                    LIMIT 1
+                                )
                             ) ORDER BY vp.reihenfolge
                         ) FILTER (WHERE vp.position_id IS NOT NULL),
                         '[]'
@@ -29,7 +45,46 @@ router.get('/:dossier_id', auth, async (req, res) => {
              ORDER BY (v.status = 'aktiv') DESC, v.datum DESC NULLS LAST`,
             [req.params.dossier_id]
         );
-        res.json(result.rows);
+
+        const rows = result.rows.map(v => {
+            const dauerMonate = Math.max(1, parseInt(v.dauer_monate) || 1);
+            const betrag = parseFloat(v.betrag) || 0;
+            const positionen = v.positionen || [];
+            const sollStunden = positionen.reduce((s, p) => s + (parseFloat(p.soll_stunden) || 0), 0);
+            const stundenpreis = parseFloat(positionen[0]?.stundenpreis) || 0;
+
+            let soll_total_ertrag = null;
+            let soll_stunden_total = null;
+            let soll_stunden_monat = null;
+
+            if (v.verrechnungsart && betrag > 0) {
+                const r1 = n => Math.round(n * 10) / 10;
+                const r2 = n => Math.round(n * 100) / 100;
+                switch (v.verrechnungsart) {
+                    case 'monatspauschale':
+                        soll_total_ertrag = r2(betrag * dauerMonate);
+                        soll_stunden_monat = stundenpreis > 0 ? r1(betrag / stundenpreis) : null;
+                        soll_stunden_total = soll_stunden_monat !== null ? r1(soll_stunden_monat * dauerMonate) : null;
+                        break;
+                    case 'fallpauschale':
+                        soll_total_ertrag = r2(betrag);
+                        soll_stunden_total = stundenpreis > 0 ? r1(betrag / stundenpreis) : null;
+                        soll_stunden_monat = soll_stunden_total !== null ? r1(soll_stunden_total / dauerMonate) : null;
+                        break;
+                    case 'stundenpauschale':
+                        soll_stunden_total = r1(sollStunden);
+                        soll_stunden_monat = dauerMonate > 0 ? r1(sollStunden / dauerMonate) : null;
+                        soll_total_ertrag = stundenpreis > 0 ? r2(sollStunden * stundenpreis) : null;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            return { ...v, dauer_monate: dauerMonate, soll_total_ertrag, soll_stunden_total, soll_stunden_monat };
+        });
+
+        res.json(rows);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden der Verfügungen' });
@@ -38,7 +93,7 @@ router.get('/:dossier_id', auth, async (req, res) => {
 
 // POST /api/verfuegungen
 router.post('/', auth, async (req, res) => {
-    const { dossier_id, nummer, datum, bemerkung, status } = req.body;
+    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag } = req.body;
     if (!dossier_id || !nummer) {
         return res.status(400).json({ error: 'dossier_id und Nummer sind erforderlich' });
     }
@@ -54,10 +109,11 @@ router.post('/', auth, async (req, res) => {
             );
         }
         const result = await pgClient.query(
-            `INSERT INTO verfuegung (dossier_id, nummer, datum, bemerkung, status)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO verfuegung (dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING *`,
-            [dossier_id, nummer.trim(), datum || null, bemerkung?.trim() || null, stat]
+            [dossier_id, nummer.trim(), datum || null, bemerkung?.trim() || null, stat,
+             verrechnungsart || null, betrag || null]
         );
         await pgClient.query('COMMIT');
         res.status(201).json(result.rows[0]);
@@ -72,7 +128,7 @@ router.post('/', auth, async (req, res) => {
 
 // PUT /api/verfuegungen/:id
 router.put('/:id', auth, async (req, res) => {
-    const { dossier_id, nummer, datum, bemerkung, status } = req.body;
+    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag } = req.body;
     if (!nummer) return res.status(400).json({ error: 'Nummer ist erforderlich' });
     const pgClient = await db.connect();
     try {
@@ -86,10 +142,12 @@ router.put('/:id', auth, async (req, res) => {
         }
         const result = await pgClient.query(
             `UPDATE verfuegung
-             SET nummer = $1, datum = $2, bemerkung = $3, status = $4, updated_at = NOW()
-             WHERE verfuegung_id = $5
+             SET nummer = $1, datum = $2, bemerkung = $3, status = $4,
+                 verrechnungsart = $5, betrag = $6, updated_at = NOW()
+             WHERE verfuegung_id = $7
              RETURNING *`,
-            [nummer.trim(), datum || null, bemerkung?.trim() || null, status || 'aktiv', req.params.id]
+            [nummer.trim(), datum || null, bemerkung?.trim() || null, status || 'aktiv',
+             verrechnungsart || null, betrag || null, req.params.id]
         );
         if (result.rows.length === 0) {
             await pgClient.query('ROLLBACK');
