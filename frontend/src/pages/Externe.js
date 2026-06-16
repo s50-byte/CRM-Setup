@@ -164,6 +164,7 @@ export default function Externe() {
                 )}
             </div>
 
+            <div>
             {laden ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: '#6B6860', fontSize: 13 }}>Laden…</div>
             ) : (
@@ -301,6 +302,7 @@ export default function Externe() {
                     </div>
                 </>
             )}
+            </div>
 
             <OrganisationModal
                 open={orgModal}

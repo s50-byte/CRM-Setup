@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Modal from './Modal';
 import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } from './FormField';
 import client from '../api/client';
@@ -23,16 +23,17 @@ export default function KontaktModal({ open, onClose, onSaved, kontakt }) {
     const [speichern, setSpeichern] = useState(false);
     const [organisationen, setOrganisationen] = useState([]);
     const [orgAdresse, setOrgAdresse] = useState('');
+    const initialisiertRef = useRef(false);
 
     useEffect(() => {
-        if (!open) return;
+        if (!open) { initialisiertRef.current = false; return; }
+        if (initialisiertRef.current) return;
+        initialisiertRef.current = true;
+
         setFehler('');
-        client.get('/externe/organisationen').then(r => {
-            console.log('organisationen geladen:', r.data);
-            setOrganisationen(r.data);
-        }).catch(err => {
-            console.error('Fehler beim Laden der Organisationen:', err);
-        });
+        client.get('/externe/organisationen')
+            .then(r => setOrganisationen(r.data))
+            .catch(console.error);
 
         if (kontakt) {
             const hatOrg = !!kontakt.organisation_id;
@@ -57,10 +58,8 @@ export default function KontaktModal({ open, onClose, onSaved, kontakt }) {
     }, [open, kontakt]);
 
     useEffect(() => {
-        console.log('orgAdresse useEffect — organisation_id:', form.organisation_id, 'organisationen.length:', organisationen.length);
         if (!form.organisation_id || organisationen.length === 0) { setOrgAdresse(''); return; }
         const org = organisationen.find(o => String(o.person_id) === String(form.organisation_id));
-        console.log('gefundene org:', org);
         setOrgAdresse(org
             ? [org.adresse || '', [org.plz || '', org.ort || ''].filter(Boolean).join(' ')].filter(Boolean).join(', ')
             : '');
@@ -167,10 +166,7 @@ export default function KontaktModal({ open, onClose, onSaved, kontakt }) {
             ) : (
                 <>
                     <FormField label="Organisation *">
-                        <select style={inputStyle} value={form.organisation_id} onChange={e => {
-                            console.log('selectedOrgId:', e.target.value);
-                            set('organisation_id', e.target.value);
-                        }}>
+                        <select style={inputStyle} value={form.organisation_id} onChange={e => set('organisation_id', e.target.value)}>
                             <option value="">— Organisation wählen —</option>
                             {organisationen.map(o => (
                                 <option key={o.person_id} value={o.person_id}>
