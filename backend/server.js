@@ -24,7 +24,8 @@ app.use('/api/management', require('./src/routes/management'));
 app.use('/api/dokumente',  require('./src/routes/dokumente'));
 app.use('/api/meldungen',  require('./src/routes/meldungen'));
 app.use('/api/gantt',      require('./src/routes/gantt'));
-app.use('/api/leistungen', require('./src/routes/leistungen'));
+app.use('/api/leistungen',   require('./src/routes/leistungen'));
+app.use('/api/verfuegungen', require('./src/routes/verfuegungen'));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

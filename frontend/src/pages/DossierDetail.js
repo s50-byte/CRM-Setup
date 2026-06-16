@@ -7,6 +7,7 @@ import Modal from '../components/Modal';
 import ExterneZuweisungModal from '../components/ExterneZuweisungModal';
 import DossierFelderModal from '../components/DossierFelderModal';
 import FerienModal from '../components/FerienModal';
+import VerfuegungModal from '../components/VerfuegungModal';
 
 const LABEL_FARBEN = {
     'LE': { bg: '#ECFDF5', color: '#15803D' },
@@ -120,6 +121,12 @@ export default function DossierDetail() {
     // Programmende (geplant)
     const [endeBearbeiten, setEndeBearbeiten] = useState(false);
 
+    // Verfügungen
+    const [verfuegungen, setVerfuegungen] = useState([]);
+    const [verfuegungModal, setVerfuegungModal] = useState(false);
+    const [gewaehlteVerfuegung, setGewaehlteVerfuegung] = useState(null);
+    const [abgeschlosseneOffen, setAbgeschlosseneOffen] = useState(false);
+
     useEffect(() => {
         async function load() {
             try {
@@ -149,6 +156,10 @@ export default function DossierDetail() {
             setJournal(j.data);
         }).catch(console.error);
     }, [dossier?.klient_id]);
+
+    useEffect(() => {
+        client.get(`/verfuegungen/${id}`).then(r => setVerfuegungen(r.data)).catch(console.error);
+    }, [id]);
 
     async function addJournal() {
         if (!jText.trim()) return;
@@ -215,6 +226,10 @@ export default function DossierDetail() {
             setDossier(r.data);
             setAgModal(false);
         } catch (err) { console.error(err); }
+    }
+
+    function reloadVerfuegungen() {
+        client.get(`/verfuegungen/${id}`).then(r => setVerfuegungen(r.data)).catch(console.error);
     }
 
     function reloadDossier() {
@@ -711,6 +726,76 @@ export default function DossierDetail() {
                         })}
                     </div>
 
+                    {/* Verfügungen */}
+                    <div style={{ ...CARD, padding: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
+                            <span style={SECTION_HDR}>Verfügungen</span>
+                            <button onClick={() => { setGewaehlteVerfuegung(null); setVerfuegungModal(true); }} style={{ fontSize: 11, padding: '3px 9px', cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5, background: '#fff', fontFamily: 'inherit', color: '#2563EB', fontWeight: 500 }}>+ Erfassen</button>
+                        </div>
+
+                        {verfuegungen.length === 0 && (
+                            <div style={{ fontSize: 12, color: '#6B6860' }}>Noch keine Verfügungen</div>
+                        )}
+
+                        {/* Aktive Verfügungen */}
+                        {verfuegungen.filter(v => v.status === 'aktiv').map(v => (
+                            <div key={v.verfuegung_id} style={{ background: '#F0FDF4', border: '1px solid rgba(22,163,74,.2)', borderRadius: 7, padding: '8px 10px', marginBottom: 8 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <div>
+                                        <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>{v.nummer}</div>
+                                        {v.datum && <div style={{ fontSize: 10.5, color: '#6B6860', marginTop: 1 }}>{fmt(v.datum)}</div>}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
+                                        <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 10, background: '#ECFDF5', color: '#15803D', fontFamily: 'monospace' }}>aktiv</span>
+                                        <button onClick={() => { setGewaehlteVerfuegung(v); setVerfuegungModal(true); }} style={{ fontSize: 11, padding: '2px 7px', cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 4, background: '#fff', fontFamily: 'inherit', color: '#1A1917' }}>Bearbeiten</button>
+                                    </div>
+                                </div>
+                                {(v.positionen || []).length > 0 && (
+                                    <div style={{ marginTop: 8, borderTop: '1px solid rgba(22,163,74,.15)', paddingTop: 7 }}>
+                                        {v.positionen.map((p, i) => (
+                                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '2px 0', borderBottom: i < v.positionen.length - 1 ? '1px solid rgba(0,0,0,.04)' : 'none' }}>
+                                                <span style={{ color: '#374151' }}>{p.leistung_bezeichnung}</span>
+                                                <span style={{ fontFamily: 'monospace', color: '#6B6860', flexShrink: 0, marginLeft: 8 }}>{Number(p.soll_stunden)} {p.einheit}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {v.bemerkung && <div style={{ fontSize: 11, color: '#6B6860', marginTop: 7, fontStyle: 'italic' }}>{v.bemerkung}</div>}
+                            </div>
+                        ))}
+
+                        {/* Abgeschlossene (aufklappbar) */}
+                        {verfuegungen.filter(v => v.status !== 'aktiv').length > 0 && (
+                            <div>
+                                <button onClick={() => setAbgeschlosseneOffen(o => !o)} style={{ width: '100%', textAlign: 'left', fontSize: 11, color: '#6B6860', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'flex', justifyContent: 'space-between', fontFamily: 'inherit' }}>
+                                    <span>{verfuegungen.filter(v => v.status !== 'aktiv').length} abgeschlossene</span>
+                                    <span>{abgeschlosseneOffen ? '▴' : '▾'}</span>
+                                </button>
+                                {abgeschlosseneOffen && verfuegungen.filter(v => v.status !== 'aktiv').map(v => (
+                                    <div key={v.verfuegung_id} style={{ background: '#F5F4F0', border: '1px solid rgba(0,0,0,.07)', borderRadius: 6, padding: '7px 9px', marginTop: 5 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#6B6860' }}>{v.nummer}</span>
+                                                {v.datum && <span style={{ fontSize: 10.5, color: '#A09D97', marginLeft: 7 }}>{fmt(v.datum)}</span>}
+                                            </div>
+                                            <button onClick={() => { setGewaehlteVerfuegung(v); setVerfuegungModal(true); }} style={{ fontSize: 11, padding: '2px 7px', cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 4, background: '#fff', fontFamily: 'inherit', color: '#1A1917' }}>Bearbeiten</button>
+                                        </div>
+                                        {(v.positionen || []).length > 0 && (
+                                            <div style={{ marginTop: 5 }}>
+                                                {v.positionen.map((p, i) => (
+                                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9CA3AF', padding: '1px 0' }}>
+                                                        <span>{p.leistung_bezeichnung}</span>
+                                                        <span style={{ fontFamily: 'monospace', flexShrink: 0, marginLeft: 8 }}>{Number(p.soll_stunden)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     {/* Klientendaten kompakt */}
                     <div style={{ ...CARD, padding: '1rem' }}>
                         <div style={{ ...SECTION_HDR, marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>Klientendaten</div>
@@ -810,6 +895,14 @@ export default function DossierDetail() {
                 onClose={() => setFerienModal(false)}
                 klientId={dossier.klient_id}
                 onSaved={() => setFerienModal(false)}
+            />
+
+            <VerfuegungModal
+                open={verfuegungModal}
+                onClose={() => setVerfuegungModal(false)}
+                dossierId={id}
+                verfuegung={gewaehlteVerfuegung}
+                onSaved={reloadVerfuegungen}
             />
 
             <Modal open={agModal} onClose={() => setAgModal(false)} title="Arbeitgeber / Partnerfirma zuweisen" width={480}>
