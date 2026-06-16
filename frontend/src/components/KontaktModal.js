@@ -22,7 +22,7 @@ export default function KontaktModal({ open, onClose, onSaved, kontakt }) {
     const [fehler, setFehler] = useState('');
     const [speichern, setSpeichern] = useState(false);
     const [organisationen, setOrganisationen] = useState([]);
-    const [gewaehlteOrg, setGewaehlteOrg] = useState(null);
+    const [orgAdresse, setOrgAdresse] = useState('');
 
     useEffect(() => {
         if (!open) return;
@@ -52,9 +52,11 @@ export default function KontaktModal({ open, onClose, onSaved, kontakt }) {
     }, [open, kontakt]);
 
     useEffect(() => {
-        if (!form.organisation_id || organisationen.length === 0) { setGewaehlteOrg(null); return; }
+        if (!form.organisation_id || organisationen.length === 0) { setOrgAdresse(''); return; }
         const org = organisationen.find(o => String(o.person_id) === String(form.organisation_id));
-        setGewaehlteOrg(org || null);
+        setOrgAdresse(org
+            ? [org.adresse || '', [org.plz || '', org.ort || ''].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+            : '');
     }, [form.organisation_id, organisationen]);
 
     function set(f, v) { setForm(prev => ({ ...prev, [f]: v })); }
@@ -90,10 +92,6 @@ export default function KontaktModal({ open, onClose, onSaved, kontakt }) {
         }
     }
 
-    const orgAdresse = gewaehlteOrg
-        ? [gewaehlteOrg.adresse, [gewaehlteOrg.plz, gewaehlteOrg.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')
-        : null;
-
     return (
         <Modal open={open} onClose={onClose} title={bearbeiten ? 'Kontakt bearbeiten' : 'Neuer Kontakt'} width={560}>
             {/* Toggle Privatperson / Org-Kontakt */}
@@ -101,10 +99,13 @@ export default function KontaktModal({ open, onClose, onSaved, kontakt }) {
                 {[['Privatperson', false], ['Kontakt einer Organisation', true]].map(([label, val]) => (
                     <button
                         key={label}
-                        onClick={() => !bearbeiten && setIstOrgKontakt(val)}
+                        onClick={() => {
+                            setIstOrgKontakt(val);
+                            if (!val) set('organisation_id', '');
+                        }}
                         style={{
                             flex: 1, padding: '8px 12px', fontSize: 12.5,
-                            cursor: bearbeiten ? 'default' : 'pointer',
+                            cursor: 'pointer',
                             border: 'none',
                             background: istOrgKontakt === val ? '#2563EB' : '#F5F4F0',
                             color: istOrgKontakt === val ? '#fff' : '#6B6860',
@@ -179,14 +180,14 @@ export default function KontaktModal({ open, onClose, onSaved, kontakt }) {
                             <input type="email" style={inputStyle} value={form.email} onChange={e => set('email', e.target.value)} placeholder="name@organisation.ch" />
                         </FormField>
                     </div>
-                    {gewaehlteOrg && (
-                        <div style={{ background: '#F5F4F0', borderRadius: 6, padding: '8px 12px', marginBottom: 10, border: '1px solid rgba(0,0,0,.07)' }}>
-                            <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 3 }}>
-                                Adresse der Organisation
-                            </span>
-                            <span style={{ fontSize: 12, color: '#6B6860' }}>{orgAdresse || '—'}</span>
-                        </div>
-                    )}
+                    <FormField label="Adresse (aus Organisation)">
+                        <input
+                            style={{ ...inputStyle, background: '#F5F4F0', color: '#6B6860', cursor: 'default' }}
+                            value={orgAdresse}
+                            readOnly
+                            placeholder="Wird aus der gewählten Organisation gezogen"
+                        />
+                    </FormField>
                 </>
             )}
 
