@@ -3,12 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import ZuweisungModal from '../components/ZuweisungModal';
-import Modal from '../components/Modal';
 import ExterneZuweisungModal from '../components/ExterneZuweisungModal';
 import DossierFelderModal from '../components/DossierFelderModal';
 import FerienModal from '../components/FerienModal';
 import VerfuegungModal from '../components/VerfuegungModal';
 import JournalModal from '../components/JournalModal';
+
 
 const LABEL_FARBEN = {
     'LE': { bg: '#ECFDF5', color: '#15803D' },
@@ -108,11 +108,8 @@ export default function DossierDetail() {
     // Modals
     const [zuweisungModal, setZuweisungModal] = useState(false);
     const [externeModal, setExterneModal] = useState(false);
-    const [agModal, setAgModal] = useState(false);
     const [felderModal, setFelderModal] = useState(false);
     const [ferienModal, setFerienModal] = useState(false);
-    const [agListe, setAgListe] = useState([]);
-    const [agAuswahl, setAgAuswahl] = useState('');
 
     // Programmhistorie
     const [verlaufOffen, setVerlaufOffen] = useState(false);
@@ -197,23 +194,6 @@ export default function DossierDetail() {
         try {
             await client.delete(`/dossiers/${id}/ziele/${ziel_id}`);
             setZiele(prev => prev.filter(z => z.ziel_id !== ziel_id));
-        } catch (err) { console.error(err); }
-    }
-
-    async function oeffneAgModal() {
-        client.get('/externe').then(r => {
-            setAgListe(r.data.filter(p => p.typ === 'Arbeitgeber'));
-            setAgAuswahl(dossier.arbeitgeber_id || '');
-            setAgModal(true);
-        }).catch(console.error);
-    }
-
-    async function speichernArbeitgeber() {
-        try {
-            await client.put(`/dossiers/${id}/arbeitgeber`, { arbeitgeber_id: agAuswahl || null });
-            const r = await client.get(`/dossiers/${id}`);
-            setDossier(r.data);
-            setAgModal(false);
         } catch (err) { console.error(err); }
     }
 
@@ -420,11 +400,12 @@ export default function DossierDetail() {
                             const verr = parseFloat(dossier.ist_verrechenbar) || 0;
                             const nverr = parseFloat(dossier.ist_nicht_verrechenbar) || 0;
                             const istFarbe = soll > 0 ? (ist < soll ? '#15803D' : ist > soll ? '#B91C1C' : '#1A1917') : '#1A1917';
+                            const gesamtErtrag = verfuegungen.filter(v => v.status === 'aktiv').reduce((s, v) => s + (parseFloat(v.soll_total_ertrag) || 0), 0);
                             return (
                                 <div style={{ borderTop: '1px solid rgba(0,0,0,.06)', paddingTop: 6 }}>
                                     <span style={{ fontSize: 10.5, color: '#A09D97', display: 'block', marginBottom: 2 }}>Aufwand</span>
                                     <span style={{ fontSize: 12, color: '#1A1917', whiteSpace: 'nowrap' }}>
-                                        SOLL: {soll.toFixed(1)}h / <span style={{ color: istFarbe }}>IST: {ist.toFixed(1)}h</span>
+                                        SOLL: {soll.toFixed(1)}h{gesamtErtrag > 0 ? <span style={{ color: '#6B6860' }}> (CHF {gesamtErtrag.toFixed(2)})</span> : ''} / <span style={{ color: istFarbe }}>IST: {ist.toFixed(1)}h</span>
                                         <span style={{ color: '#9CA3AF', fontSize: 10.5 }}> (verr. {verr.toFixed(1)} + n.v. {nverr.toFixed(1)}h)</span>
                                     </span>
                                 </div>
@@ -747,31 +728,50 @@ export default function DossierDetail() {
                         )}
 
                         {/* Aktive Verfügungen */}
-                        {verfuegungen.filter(v => v.status === 'aktiv').map(v => (
-                            <div key={v.verfuegung_id} style={{ background: '#F0FDF4', border: '1px solid rgba(22,163,74,.2)', borderRadius: 7, padding: '8px 10px', marginBottom: 8 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                    <div>
-                                        <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>{v.nummer}</div>
-                                        {v.datum && <div style={{ fontSize: 10.5, color: '#6B6860', marginTop: 1 }}>{fmt(v.datum)}</div>}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
-                                        <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 10, background: '#ECFDF5', color: '#15803D', fontFamily: 'monospace' }}>aktiv</span>
-                                        <button onClick={() => { setGewaehlteVerfuegung(v); setVerfuegungModal(true); }} style={{ fontSize: 11, padding: '2px 7px', cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 4, background: '#fff', fontFamily: 'inherit', color: '#1A1917' }}>Bearbeiten</button>
-                                    </div>
-                                </div>
-                                {(v.positionen || []).length > 0 && (
-                                    <div style={{ marginTop: 8, borderTop: '1px solid rgba(22,163,74,.15)', paddingTop: 7 }}>
-                                        {v.positionen.map((p, i) => (
-                                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '2px 0', borderBottom: i < v.positionen.length - 1 ? '1px solid rgba(0,0,0,.04)' : 'none' }}>
-                                                <span style={{ color: '#374151' }}>{p.leistung_bezeichnung}</span>
-                                                <span style={{ fontFamily: 'monospace', color: '#6B6860', flexShrink: 0, marginLeft: 8 }}>{Number(p.soll_stunden)} {p.einheit}</span>
+                        {verfuegungen.filter(v => v.status === 'aktiv').map(v => {
+                            const VART_LABEL = { monatspauschale: 'Monatspausch.', fallpauschale: 'Fallpausch.', stundenpauschale: 'Std.pausch.' };
+                            return (
+                                <div key={v.verfuegung_id} style={{ background: '#F0FDF4', border: '1px solid rgba(22,163,74,.2)', borderRadius: 7, padding: '8px 10px', marginBottom: 8 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>{v.nummer}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2, flexWrap: 'wrap' }}>
+                                                {v.datum && <span style={{ fontSize: 10.5, color: '#6B6860' }}>{fmt(v.datum)}</span>}
+                                                {v.verrechnungsart && (
+                                                    <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(37,99,235,.15)', fontFamily: 'monospace' }}>
+                                                        {VART_LABEL[v.verrechnungsart] || v.verrechnungsart}
+                                                    </span>
+                                                )}
                                             </div>
-                                        ))}
+                                            {(v.soll_stunden_monat != null || v.soll_stunden_total != null || v.soll_total_ertrag != null) && (
+                                                <div style={{ fontSize: 10.5, color: '#374151', marginTop: 3 }}>
+                                                    {[
+                                                        v.soll_stunden_monat != null && `${v.soll_stunden_monat}h/Mt.`,
+                                                        v.soll_stunden_total != null && `${v.soll_stunden_total}h ges.`,
+                                                        v.soll_total_ertrag != null && `CHF ${parseFloat(v.soll_total_ertrag).toFixed(2)}`,
+                                                    ].filter(Boolean).join(' · ')}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
+                                            <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 10, background: '#ECFDF5', color: '#15803D', fontFamily: 'monospace' }}>aktiv</span>
+                                            <button onClick={() => { setGewaehlteVerfuegung(v); setVerfuegungModal(true); }} style={{ fontSize: 11, padding: '2px 7px', cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 4, background: '#fff', fontFamily: 'inherit', color: '#1A1917' }}>Bearbeiten</button>
+                                        </div>
                                     </div>
-                                )}
-                                {v.bemerkung && <div style={{ fontSize: 11, color: '#6B6860', marginTop: 7, fontStyle: 'italic' }}>{v.bemerkung}</div>}
-                            </div>
-                        ))}
+                                    {(v.positionen || []).length > 0 && (
+                                        <div style={{ marginTop: 8, borderTop: '1px solid rgba(22,163,74,.15)', paddingTop: 7 }}>
+                                            {v.positionen.map((p, i) => (
+                                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '2px 0', borderBottom: i < v.positionen.length - 1 ? '1px solid rgba(0,0,0,.04)' : 'none' }}>
+                                                    <span style={{ color: '#374151' }}>{p.leistung_bezeichnung}</span>
+                                                    <span style={{ fontFamily: 'monospace', color: '#6B6860', flexShrink: 0, marginLeft: 8 }}>{Number(p.soll_stunden)} {p.einheit}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {v.bemerkung && <div style={{ fontSize: 11, color: '#6B6860', marginTop: 7, fontStyle: 'italic' }}>{v.bemerkung}</div>}
+                                </div>
+                            );
+                        })}
 
                         {/* Abgeschlossene (aufklappbar) */}
                         {verfuegungen.filter(v => v.status !== 'aktiv').length > 0 && (
@@ -924,28 +924,6 @@ export default function DossierDetail() {
                 }}
             />
 
-            <Modal open={agModal} onClose={() => setAgModal(false)} title="Arbeitgeber / Partnerfirma zuweisen" width={480}>
-                <div style={{ marginBottom: 14 }}>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>
-                        Arbeitgeber (Typ: Arbeitgeber)
-                    </label>
-                    <select value={agAuswahl} onChange={e => setAgAuswahl(e.target.value)} style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit' }}>
-                        <option value="">— Kein Arbeitgeber —</option>
-                        {agListe.map(p => (
-                            <option key={p.person_id} value={p.person_id}>
-                                {p.firma ? `${p.firma} (${p.vorname} ${p.nachname})` : `${p.vorname} ${p.nachname}`}
-                            </option>
-                        ))}
-                    </select>
-                    {agListe.length === 0 && (
-                        <div style={{ fontSize: 11.5, color: '#A09D97', marginTop: 6 }}>Keine externen Personen vom Typ "Arbeitgeber" vorhanden.</div>
-                    )}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button onClick={() => setAgModal(false)} style={{ padding: '7px 14px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}>Abbrechen</button>
-                    <button onClick={speichernArbeitgeber} style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit' }}>Speichern</button>
-                </div>
-            </Modal>
         </div>
     );
 }

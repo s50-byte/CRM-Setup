@@ -22,7 +22,7 @@ export default function ExterneZuweisungModal({ open, onClose, onSaved, dossierI
 
     useEffect(() => {
         if (!open) return;
-        client.get('/externe').then(r => setExterne(r.data)).catch(console.error);
+        client.get('/externe').then(r => setExterne([...(r.data.personen || []), ...(r.data.organisationen || [])])).catch(console.error);
         setSuche('');
         setAuswahl(null);
     }, [open]);

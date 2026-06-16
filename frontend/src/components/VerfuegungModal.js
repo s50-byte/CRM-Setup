@@ -16,6 +16,8 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
     const [datum, setDatum] = useState('');
     const [status, setStatus] = useState('aktiv');
     const [bemerkung, setBemerkung] = useState('');
+    const [verrechnungsart, setVerrechnungsart] = useState('');
+    const [betrag, setBetrag] = useState('');
     const [positionen, setPositionen] = useState([]);
     const [leistungen, setLeistungen] = useState([]);
     const [fehler, setFehler] = useState('');
@@ -28,6 +30,8 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
         setDatum(verfuegung?.datum ? verfuegung.datum.slice(0, 10) : '');
         setStatus(verfuegung?.status || 'aktiv');
         setBemerkung(verfuegung?.bemerkung || '');
+        setVerrechnungsart(verfuegung?.verrechnungsart || '');
+        setBetrag(verfuegung?.betrag != null ? String(verfuegung.betrag) : '');
         setFehler('');
         setAktTab('verfuegung');
         setPositionen(
@@ -61,30 +65,26 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
         setLaden(true);
         setFehler('');
         try {
+            const payload = {
+                dossier_id: dossierId,
+                nummer: nummer.trim(),
+                datum: datum || null,
+                bemerkung: bemerkung.trim() || null,
+                status,
+                verrechnungsart: verrechnungsart || null,
+                betrag: betrag ? parseFloat(betrag) : null,
+            };
             let verfuegungId;
             if (verfuegung) {
-                await client.put(`/verfuegungen/${verfuegung.verfuegung_id}`, {
-                    dossier_id: dossierId,
-                    nummer: nummer.trim(),
-                    datum: datum || null,
-                    bemerkung: bemerkung.trim() || null,
-                    status,
-                });
+                await client.put(`/verfuegungen/${verfuegung.verfuegung_id}`, payload);
                 verfuegungId = verfuegung.verfuegung_id;
-                // Delete all original positions, then re-create current ones
                 for (const p of (verfuegung.positionen || [])) {
                     if (p.position_id) {
                         await client.delete(`/verfuegungen/${verfuegungId}/positionen/${p.position_id}`);
                     }
                 }
             } else {
-                const r = await client.post('/verfuegungen', {
-                    dossier_id: dossierId,
-                    nummer: nummer.trim(),
-                    datum: datum || null,
-                    bemerkung: bemerkung.trim() || null,
-                    status,
-                });
+                const r = await client.post('/verfuegungen', payload);
                 verfuegungId = r.data.verfuegung_id;
             }
             for (let i = 0; i < positionen.length; i++) {
@@ -112,6 +112,8 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
         background: '#fff', fontFamily: 'inherit', outline: 'none',
         boxSizing: 'border-box', color: '#1A1917',
     };
+
+    const zeigtBetrag = verrechnungsart === 'monatspauschale' || verrechnungsart === 'fallpauschale';
 
     return (
         <Modal open={open} onClose={onClose} title={verfuegung ? 'Verfügung bearbeiten' : 'Neue Verfügung'} width={520}>
@@ -155,6 +157,28 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
                                 <option value="abgeschlossen">Abgeschlossen</option>
                             </select>
                         </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: zeigtBetrag ? '1fr 1fr' : '1fr', gap: 10 }}>
+                        <div>
+                            <FieldLabel>Verrechnungsart</FieldLabel>
+                            <select value={verrechnungsart} onChange={e => setVerrechnungsart(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                                <option value="">— Keine —</option>
+                                <option value="monatspauschale">Monatspauschale</option>
+                                <option value="fallpauschale">Fallpauschale</option>
+                                <option value="stundenpauschale">Stundenpauschale</option>
+                            </select>
+                        </div>
+                        {zeigtBetrag && (
+                            <div>
+                                <FieldLabel>Betrag (CHF)</FieldLabel>
+                                <input
+                                    type="number" min="0" step="0.01"
+                                    value={betrag} onChange={e => setBetrag(e.target.value)}
+                                    placeholder="0.00"
+                                    style={{ ...inputStyle, textAlign: 'right' }}
+                                />
+                            </div>
+                        )}
                     </div>
                     <div>
                         <FieldLabel>Bemerkung</FieldLabel>
