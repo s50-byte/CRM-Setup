@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import client from '../../api/client';
 
 const DIMENSIONEN = [
@@ -18,28 +18,27 @@ const SPALTEN_TYPEN = [
 ];
 
 const KENNZAHLEN_DEF = [
-    { key: 'einnahmen_soll',   label: 'Einnahmen SOLL',  short: 'E-SOLL',    fmt: 'chf' },
-    { key: 'einnahmen_ist',    label: 'Einnahmen IST',   short: 'E-IST',     fmt: 'chf' },
-    { key: 'stunden_soll',     label: 'Stunden SOLL',    short: 'h-SOLL',    fmt: 'h' },
-    { key: 'stunden_ist',      label: 'Stunden IST',     short: 'h-IST',     fmt: 'h' },
-    { key: 'anzahl_klienten',  label: 'Anzahl Klienten', short: 'Kl.',       fmt: 'n' },
-    { key: 'auslastung_pct',   label: 'Auslastung %',    short: 'Aust.',     fmt: 'pct' },
-    { key: 'avg_std_klient',   label: 'Ø Std/Klient',    short: 'Ø h/Kl.',  fmt: 'h' },
-    { key: 'freie_kapazitaet', label: 'Freie Kapazität', short: 'Frei h',   fmt: 'h' },
+    { key: 'einnahmen_soll',   label: 'Einnahmen SOLL',  short: 'E-SOLL',   fmt: 'chf' },
+    { key: 'einnahmen_ist',    label: 'Einnahmen IST',   short: 'E-IST',    fmt: 'chf' },
+    { key: 'stunden_soll',     label: 'Stunden SOLL',    short: 'h-SOLL',   fmt: 'h' },
+    { key: 'stunden_ist',      label: 'Stunden IST',     short: 'h-IST',    fmt: 'h' },
+    { key: 'anzahl_klienten',  label: 'Anzahl Klienten', short: 'Kl.',      fmt: 'n' },
+    { key: 'auslastung_pct',   label: 'Auslastung %',    short: 'Aust.',    fmt: 'pct' },
+    { key: 'avg_std_klient',   label: 'Ø Std/Klient',   short: 'Ø h/Kl.', fmt: 'h' },
+    { key: 'freie_kapazitaet', label: 'Freie Kapazität', short: 'Frei h',  fmt: 'h' },
 ];
 const KZ_MAP = Object.fromEntries(KENNZAHLEN_DEF.map(k => [k.key, k]));
 
-function ersterMonat(offsetMonate = 0) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() + offsetMonate);
-    return d.toISOString().slice(0, 10);
-}
-function letzterMonat(offsetMonate = 5) {
-    const d = new Date();
-    d.setMonth(d.getMonth() + offsetMonate + 1, 0);
-    return d.toISOString().slice(0, 10);
-}
+const FILTER_DEFAULT = {
+    von: `${new Date().getFullYear()}-01-01`,
+    bis: `${new Date().getFullYear()}-12-31`,
+    standort_ids: [],
+    programm_ids: [],
+    user_ids: [],
+    abteilungen: [],
+    klient_ids: [],
+    auftraggeber_typ: null,
+};
 
 function fmtWert(v, fmt) {
     if (v === null || v === undefined) return '—';
@@ -70,6 +69,83 @@ function istFarbe(kzKey, werte) {
     return { bg: '#FEE2E2', color: '#991B1B' };
 }
 
+// Dropdown mit Checkbox-Liste für Mehrfachauswahl
+function MultiSelectDropdown({ label, options, selected, onChange, getKey, getLabel }) {
+    const [offen, setOffen] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        if (!offen) return;
+        function handleOutside(e) {
+            if (ref.current && !ref.current.contains(e.target)) setOffen(false);
+        }
+        document.addEventListener('mousedown', handleOutside);
+        return () => document.removeEventListener('mousedown', handleOutside);
+    }, [offen]);
+
+    function toggle(key) {
+        onChange(selected.includes(key) ? selected.filter(k => k !== key) : [...selected, key]);
+    }
+
+    const btnLabel = selected.length === 0
+        ? `Alle ${label}`
+        : `${selected.length} ${label}${selected.length === 1 ? '' : ''}`;
+
+    return (
+        <div ref={ref} style={{ position: 'relative' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', marginBottom: 3 }}>{label}</label>
+            <button
+                onClick={() => setOffen(o => !o)}
+                style={{
+                    width: '100%', textAlign: 'left', padding: '5px 8px 5px 10px',
+                    fontSize: 12.5, border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
+                    background: offen ? '#F5F4F0' : '#fff', fontFamily: 'inherit', cursor: 'pointer',
+                    color: selected.length > 0 ? '#1D4ED8' : '#6B6860',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+                    boxSizing: 'border-box',
+                }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{btnLabel}</span>
+                <span style={{ fontSize: 8, opacity: .5, flexShrink: 0 }}>▼</span>
+            </button>
+            {offen && (
+                <div style={{
+                    position: 'absolute', top: 'calc(100% + 3px)', left: 0, right: 0,
+                    background: '#fff', border: '1px solid rgba(0,0,0,.12)',
+                    borderRadius: 7, boxShadow: '0 4px 16px rgba(0,0,0,.12)',
+                    zIndex: 200, maxHeight: 220, overflowY: 'auto',
+                }}>
+                    {options.length === 0 && (
+                        <div style={{ padding: '10px 12px', fontSize: 12, color: '#A09D97' }}>Keine Optionen</div>
+                    )}
+                    {options.map(opt => {
+                        const key = getKey(opt);
+                        const lbl = getLabel(opt);
+                        const checked = selected.includes(key);
+                        return (
+                            <label key={key} style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '7px 12px', cursor: 'pointer',
+                                background: checked ? '#EEF3FE' : 'transparent',
+                                fontSize: 12.5, color: checked ? '#1D4ED8' : '#1A1917',
+                                borderBottom: '1px solid rgba(0,0,0,.04)',
+                                userSelect: 'none',
+                            }}>
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggle(key)}
+                                    style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2563EB' }}
+                                />
+                                {lbl}
+                            </label>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
 const CARD = {
     background: '#fff',
     border: '1px solid rgba(0,0,0,.09)',
@@ -87,16 +163,7 @@ export default function Reporting() {
     const [zeilen, setZeilen] = useState(['kader']);
     const [spalten, setSpalten] = useState(['monate']);
     const [kennzahlen, setKennzahlen] = useState(['einnahmen_soll', 'einnahmen_ist']);
-    const [filter, setFilter] = useState({
-        von: ersterMonat(0),
-        bis: letzterMonat(5),
-        standort_ids: [],
-        programm_ids: [],
-        user_ids: [],
-        abteilungen: [],
-        klient_ids: [],
-        auftraggeber_typ: null,
-    });
+    const [filter, setFilter] = useState({ ...FILTER_DEFAULT });
     const [optionen, setOptionen] = useState(null);
     const [ansichten, setAnsichten] = useState([]);
     const [resultat, setResultat] = useState(null);
@@ -122,6 +189,13 @@ export default function Reporting() {
             setLaden(false);
         }
     }, [zeilen, spalten, kennzahlen, filter]);
+
+    // Automatische Aktualisierung mit 500ms Debounce
+    useEffect(() => {
+        if (zeilen.length === 0 || kennzahlen.length === 0) return;
+        const timer = setTimeout(ausfuehren, 500);
+        return () => clearTimeout(timer);
+    }, [ausfuehren]);
 
     async function speichern() {
         if (!ansichtName.trim()) return;
@@ -152,6 +226,10 @@ export default function Reporting() {
         setResultat(null);
     }
 
+    function filterZuruecksetzen() {
+        setFilter({ ...FILTER_DEFAULT });
+    }
+
     function toggleZeile(key) {
         setZeilen(prev => prev.includes(key) ? prev.filter(z => z !== key) : [key]);
     }
@@ -171,6 +249,10 @@ export default function Reporting() {
         background: '#fff', fontFamily: 'inherit', outline: 'none',
         color: '#1A1917', boxSizing: 'border-box',
     };
+
+    const filterAktiv = filter.standort_ids.length + filter.programm_ids.length +
+        filter.user_ids.length + filter.abteilungen.length +
+        filter.klient_ids.length + (filter.auftraggeber_typ ? 1 : 0) > 0;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -210,14 +292,12 @@ export default function Reporting() {
                     {ansichten.map(a => (
                         <span key={a.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <button onClick={() => ladeAnsicht(a)} style={{
-                                ...CHIP_BASE,
-                                background: '#EEF3FE', color: '#1D4ED8',
+                                ...CHIP_BASE, background: '#EEF3FE', color: '#1D4ED8',
                                 border: '1px solid rgba(29,78,216,.2)',
                             }}>{a.name}</button>
                             <button onClick={() => loescheAnsicht(a.id)} style={{
-                                ...CHIP_BASE, padding: '3px 6px',
-                                background: 'transparent', color: '#A09D97',
-                                border: '1px solid transparent', fontSize: 10,
+                                ...CHIP_BASE, padding: '3px 6px', background: 'transparent',
+                                color: '#A09D97', border: '1px solid transparent', fontSize: 10,
                             }}>✕</button>
                         </span>
                     ))}
@@ -233,15 +313,12 @@ export default function Reporting() {
                     {DIMENSIONEN.map(d => (
                         <div key={d.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                             <span style={{ fontSize: 12.5, color: zeilen.includes(d.key) ? '#2563EB' : '#1A1917' }}>{d.label}</span>
-                            <button
-                                onClick={() => toggleZeile(d.key)}
-                                title="Als Zeile wählen"
-                                style={{
-                                    ...CHIP_BASE, padding: '2px 8px', fontSize: 11,
-                                    background: zeilen.includes(d.key) ? '#2563EB' : '#F5F4F0',
-                                    color: zeilen.includes(d.key) ? '#fff' : '#6B6860',
-                                    border: 'none', cursor: 'pointer',
-                                }}>
+                            <button onClick={() => toggleZeile(d.key)} style={{
+                                ...CHIP_BASE, padding: '2px 8px', fontSize: 11,
+                                background: zeilen.includes(d.key) ? '#2563EB' : '#F5F4F0',
+                                color: zeilen.includes(d.key) ? '#fff' : '#6B6860',
+                                border: 'none', cursor: 'pointer',
+                            }}>
                                 {zeilen.includes(d.key) ? '✓ Z' : '+Z'}
                             </button>
                         </div>
@@ -252,15 +329,12 @@ export default function Reporting() {
                     {KENNZAHLEN_DEF.map(k => (
                         <div key={k.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                             <span style={{ fontSize: 12, color: kennzahlen.includes(k.key) ? '#2563EB' : '#1A1917' }}>{k.label}</span>
-                            <button
-                                onClick={() => toggleKennzahl(k.key)}
-                                title="Kennzahl hinzufügen"
-                                style={{
-                                    ...CHIP_BASE, padding: '2px 8px', fontSize: 11,
-                                    background: kennzahlen.includes(k.key) ? '#2563EB' : '#F5F4F0',
-                                    color: kennzahlen.includes(k.key) ? '#fff' : '#6B6860',
-                                    border: 'none', cursor: 'pointer',
-                                }}>
+                            <button onClick={() => toggleKennzahl(k.key)} style={{
+                                ...CHIP_BASE, padding: '2px 8px', fontSize: 11,
+                                background: kennzahlen.includes(k.key) ? '#2563EB' : '#F5F4F0',
+                                color: kennzahlen.includes(k.key) ? '#fff' : '#6B6860',
+                                border: 'none', cursor: 'pointer',
+                            }}>
                                 {kennzahlen.includes(k.key) ? '✓ K' : '+K'}
                             </button>
                         </div>
@@ -272,7 +346,6 @@ export default function Reporting() {
 
                     {/* Mini-Pools */}
                     <div style={{ ...CARD, padding: 14, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-                        {/* Zeilen */}
                         <div>
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Zeilen</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -289,25 +362,20 @@ export default function Reporting() {
                             </div>
                         </div>
 
-                        {/* Spalten */}
                         <div>
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Spalten</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                 {SPALTEN_TYPEN.map(s => (
-                                    <button
-                                        key={s.key}
-                                        onClick={() => toggleSpalte(s.key)}
-                                        style={{
-                                            ...CHIP_BASE, fontSize: 12,
-                                            background: spalten.includes(s.key) ? '#EEF3FE' : '#F5F4F0',
-                                            color: spalten.includes(s.key) ? '#1D4ED8' : '#6B6860',
-                                            border: spalten.includes(s.key) ? '1px solid rgba(29,78,216,.2)' : '1px solid transparent',
-                                        }}>{s.label}</button>
+                                    <button key={s.key} onClick={() => toggleSpalte(s.key)} style={{
+                                        ...CHIP_BASE, fontSize: 12,
+                                        background: spalten.includes(s.key) ? '#EEF3FE' : '#F5F4F0',
+                                        color: spalten.includes(s.key) ? '#1D4ED8' : '#6B6860',
+                                        border: spalten.includes(s.key) ? '1px solid rgba(29,78,216,.2)' : '1px solid transparent',
+                                    }}>{s.label}</button>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Kennzahlen */}
                         <div>
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Kennzahlen</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -325,10 +393,25 @@ export default function Reporting() {
                         </div>
                     </div>
 
-                    {/* Filter + Ausführen */}
+                    {/* Filter */}
                     <div style={{ ...CARD, padding: 14 }}>
-                        <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>Filter</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                                Filter
+                                {filterAktiv && (
+                                    <span style={{ marginLeft: 6, background: '#2563EB', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 9.5, fontWeight: 700 }}>Aktiv</span>
+                                )}
+                            </div>
+                            {filterAktiv && (
+                                <button onClick={filterZuruecksetzen} style={{
+                                    fontSize: 11.5, padding: '3px 10px', cursor: 'pointer',
+                                    border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
+                                    background: '#fff', fontFamily: 'inherit', color: '#6B6860',
+                                }}>Filter zurücksetzen</button>
+                            )}
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 10 }}>
 
                             <div>
                                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', marginBottom: 3 }}>Von</label>
@@ -340,51 +423,58 @@ export default function Reporting() {
                             </div>
 
                             {optionen?.standorte?.length > 0 && (
-                                <div>
-                                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', marginBottom: 3 }}>Standort</label>
-                                    <select multiple size={Math.min(optionen.standorte.length, 3)}
-                                        value={filter.standort_ids}
-                                        onChange={e => setFilterF('standort_ids', Array.from(e.target.selectedOptions, o => o.value))}
-                                        style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}>
-                                        {optionen.standorte.map(s => <option key={s.standort_id} value={s.standort_id}>{s.name}</option>)}
-                                    </select>
-                                </div>
+                                <MultiSelectDropdown
+                                    label="Standort"
+                                    options={optionen.standorte}
+                                    selected={filter.standort_ids}
+                                    onChange={v => setFilterF('standort_ids', v)}
+                                    getKey={s => s.standort_id}
+                                    getLabel={s => s.name}
+                                />
                             )}
 
                             {optionen?.kader?.length > 0 && (
-                                <div>
-                                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', marginBottom: 3 }}>Kader</label>
-                                    <select multiple size={Math.min(optionen.kader.length, 3)}
-                                        value={filter.user_ids}
-                                        onChange={e => setFilterF('user_ids', Array.from(e.target.selectedOptions, o => o.value))}
-                                        style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}>
-                                        {optionen.kader.map(u => <option key={u.user_id} value={u.user_id}>{u.full_name}</option>)}
-                                    </select>
-                                </div>
+                                <MultiSelectDropdown
+                                    label="Kader"
+                                    options={optionen.kader}
+                                    selected={filter.user_ids}
+                                    onChange={v => setFilterF('user_ids', v)}
+                                    getKey={u => u.user_id}
+                                    getLabel={u => u.full_name}
+                                />
                             )}
 
                             {optionen?.massnahmen?.length > 0 && (
-                                <div>
-                                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', marginBottom: 3 }}>Massnahme</label>
-                                    <select multiple size={Math.min(optionen.massnahmen.length, 3)}
-                                        value={filter.programm_ids}
-                                        onChange={e => setFilterF('programm_ids', Array.from(e.target.selectedOptions, o => o.value))}
-                                        style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}>
-                                        {optionen.massnahmen.map(p => <option key={p.programm_id} value={p.programm_id}>{p.name}</option>)}
-                                    </select>
-                                </div>
+                                <MultiSelectDropdown
+                                    label="Massnahme"
+                                    options={optionen.massnahmen}
+                                    selected={filter.programm_ids}
+                                    onChange={v => setFilterF('programm_ids', v)}
+                                    getKey={p => p.programm_id}
+                                    getLabel={p => p.name}
+                                />
                             )}
 
                             {optionen?.abteilungen?.length > 0 && (
-                                <div>
-                                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', marginBottom: 3 }}>Abteilung</label>
-                                    <select multiple size={Math.min(optionen.abteilungen.length, 3)}
-                                        value={filter.abteilungen}
-                                        onChange={e => setFilterF('abteilungen', Array.from(e.target.selectedOptions, o => o.value))}
-                                        style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}>
-                                        {optionen.abteilungen.map(a => <option key={a} value={a}>{a}</option>)}
-                                    </select>
-                                </div>
+                                <MultiSelectDropdown
+                                    label="Abteilung"
+                                    options={optionen.abteilungen.map(a => ({ key: a, label: a }))}
+                                    selected={filter.abteilungen}
+                                    onChange={v => setFilterF('abteilungen', v)}
+                                    getKey={a => a.key}
+                                    getLabel={a => a.label}
+                                />
+                            )}
+
+                            {optionen?.klienten?.length > 0 && (
+                                <MultiSelectDropdown
+                                    label="Klient"
+                                    options={optionen.klienten}
+                                    selected={filter.klient_ids}
+                                    onChange={v => setFilterF('klient_ids', v)}
+                                    getKey={k => k.klient_id}
+                                    getLabel={k => k.name}
+                                />
                             )}
 
                             <div>
@@ -407,12 +497,20 @@ export default function Reporting() {
                                 onClick={ausfuehren}
                                 disabled={laden || kennzahlen.length === 0}
                                 style={{
-                                    padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: laden ? 'default' : 'pointer',
+                                    padding: '7px 18px', fontSize: 13, fontWeight: 500,
+                                    cursor: laden || kennzahlen.length === 0 ? 'default' : 'pointer',
                                     border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff',
                                     fontFamily: 'inherit', opacity: laden || kennzahlen.length === 0 ? .6 : 1,
                                 }}>
-                                {laden ? 'Wird geladen…' : '▶ Ausführen'}
+                                {laden ? '⟳ Wird geladen…' : '▶ Ausführen'}
                             </button>
+                            {!filterAktiv && (
+                                <button onClick={filterZuruecksetzen} style={{
+                                    fontSize: 11.5, padding: '6px 12px', cursor: 'pointer',
+                                    border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
+                                    background: '#fff', fontFamily: 'inherit', color: '#6B6860',
+                                }}>Filter zurücksetzen</button>
+                            )}
                             {fehler && <span style={{ fontSize: 12, color: '#B91C1C' }}>{fehler}</span>}
                             {resultat && !laden && (
                                 <span style={{ fontSize: 12, color: '#6B6860' }}>
@@ -424,20 +522,25 @@ export default function Reporting() {
                 </div>
             </div>
 
+            {/* Loading-Indikator (Overlay-Stil wenn Tabelle bereits da) */}
+            {laden && resultat && (
+                <div style={{ textAlign: 'center', fontSize: 12, color: '#6B6860', padding: '8px 0' }}>
+                    Wird aktualisiert…
+                </div>
+            )}
+
             {/* Resultat-Tabelle */}
             {resultat && (
-                <div style={{ ...CARD, overflow: 'hidden' }}>
+                <div style={{ ...CARD, overflow: 'hidden', opacity: laden ? 0.6 : 1, transition: 'opacity .2s' }}>
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ borderCollapse: 'collapse', fontSize: 12.5, width: '100%', minWidth: 600 }}>
                             <thead>
-                                {/* Zeile 1: Perioden-Labels */}
                                 <tr style={{ background: '#F5F4F0' }}>
                                     <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 11.5, borderBottom: '1px solid rgba(0,0,0,.09)', minWidth: 140, position: 'sticky', left: 0, background: '#F5F4F0', zIndex: 1 }}>
                                         {DIMENSIONEN.find(d => d.key === zeilen[0])?.label || 'Zeile'}
                                     </th>
                                     {resultat.spalten.map(sp => (
-                                        <th key={sp}
-                                            colSpan={kennzahlen.length}
+                                        <th key={sp} colSpan={kennzahlen.length}
                                             style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, fontSize: 11, borderBottom: '1px solid rgba(0,0,0,.09)', borderLeft: '1px solid rgba(0,0,0,.06)', whiteSpace: 'nowrap', color: '#6B6860' }}>
                                             {sp}
                                         </th>
@@ -447,10 +550,9 @@ export default function Reporting() {
                                         Total
                                     </th>
                                 </tr>
-                                {/* Zeile 2: Kennzahl-Labels */}
                                 <tr style={{ background: '#FAFAFA' }}>
                                     <th style={{ padding: '4px 12px', position: 'sticky', left: 0, background: '#FAFAFA', zIndex: 1, borderBottom: '2px solid rgba(0,0,0,.09)' }} />
-                                    {[...resultat.spalten, '__total__'].map((sp, si) => (
+                                    {[...resultat.spalten, '__total__'].map((sp) =>
                                         kennzahlen.map((kk, ki) => {
                                             const kd = KZ_MAP[kk];
                                             return (
@@ -465,7 +567,7 @@ export default function Reporting() {
                                                 </th>
                                             );
                                         })
-                                    ))}
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
@@ -489,7 +591,7 @@ export default function Reporting() {
                                         }}>
                                             {zeile.label}
                                         </td>
-                                        {[...resultat.spalten.map(sp => ({ sp, werte: zeile.werte[sp] })), { sp: '__total__', werte: zeile.total }].map(({ sp, werte }, si) =>
+                                        {[...resultat.spalten.map(sp => ({ sp, werte: zeile.werte[sp] })), { sp: '__total__', werte: zeile.total }].map(({ sp, werte }) =>
                                             kennzahlen.map((kk, ki) => {
                                                 const kd = KZ_MAP[kk];
                                                 const farbe = istFarbe(kk, werte);
@@ -512,13 +614,13 @@ export default function Reporting() {
                                 ))}
                             </tbody>
                             <tfoot>
-                                <tr style={{ background: '#F5F4F0', fontWeight: 600 }}>
+                                <tr style={{ background: '#F5F4F0' }}>
                                     <td style={{
                                         padding: '7px 12px', fontSize: 12.5, fontWeight: 700,
                                         borderTop: '2px solid rgba(0,0,0,.12)',
                                         position: 'sticky', left: 0, background: '#F5F4F0', zIndex: 1,
                                     }}>Total</td>
-                                    {[...resultat.spalten.map(sp => ({ sp, werte: resultat.total[sp] })), { sp: '__total__', werte: resultat.total_gesamt }].map(({ sp, werte }, si) =>
+                                    {[...resultat.spalten.map(sp => ({ sp, werte: resultat.total[sp] })), { sp: '__total__', werte: resultat.total_gesamt }].map(({ sp, werte }) =>
                                         kennzahlen.map((kk, ki) => {
                                             const kd = KZ_MAP[kk];
                                             const farbe = istFarbe(kk, werte);
@@ -545,9 +647,15 @@ export default function Reporting() {
                 </div>
             )}
 
+            {!resultat && laden && (
+                <div style={{ ...CARD, padding: '2.5rem', textAlign: 'center', color: '#6B6860', fontSize: 13 }}>
+                    Wird geladen…
+                </div>
+            )}
+
             {!resultat && !laden && (
                 <div style={{ ...CARD, padding: '2.5rem', textAlign: 'center', color: '#A09D97', fontSize: 13 }}>
-                    Konfiguration auswählen und <strong>Ausführen</strong> klicken
+                    Konfiguration auswählen — der Report lädt automatisch
                 </div>
             )}
         </div>
