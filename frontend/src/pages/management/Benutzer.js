@@ -10,11 +10,14 @@ const ROLLEN_FARBEN = {
     'Management':      { bg: '#FDF4FF', color: '#7E22CE' },
 };
 
+const SYSTEM_ROLLEN = [
+    { value: 'kader',        label: 'Kader' },
+    { value: 'leitungsteam', label: 'Leitungsteam' },
+];
+
 const SYSTEM_ROLLEN_FARBEN = {
     'kader':         { bg: '#EFF6FF', color: '#1E40AF' },
     'leitungsteam':  { bg: '#FFF7ED', color: '#C2410C' },
-    'teamleitung':   { bg: '#FFF7ED', color: '#C2410C' },
-    'management':    { bg: '#FDF4FF', color: '#7E22CE' },
 };
 
 const TH = ({ children, right }) => (
@@ -76,14 +79,13 @@ export default function Benutzer() {
 
     useEffect(() => { laden_daten(); }, [laden_daten]);
 
-    const alleRollen = ['Alle', 'Klientenführung', 'Job Coach', 'Fachperson', 'Teamleitung', 'Management'];
-
     const gefiltert = benutzer.filter(b => {
         const aktiv_ok = filterAktiv === 'alle' ? true : (filterAktiv === 'aktiv' ? b.aktiv : !b.aktiv);
         const standort_ok = filterStandort === 'Alle' || (b.standorte || []).some(s => s.kuerzel === filterStandort);
-        const rolle_ok = filterRolle === 'Alle' || (b.rollen || []).some(r => r.rolle_name === filterRolle);
+        const rolle_ok = filterRolle === 'Alle' || b.system_rolle === filterRolle;
         return aktiv_ok && standort_ok && rolle_ok;
     });
+    console.log('gefilterte Benutzer:', gefiltert.length);
 
     const selectStyle = {
         fontSize: 12.5, padding: '4px 8px', border: '1px solid rgba(0,0,0,.12)',
@@ -117,9 +119,10 @@ export default function Benutzer() {
                     </select>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <label style={{ fontSize: 11.5, fontWeight: 500, color: '#6B6860' }}>Rolle</label>
+                    <label style={{ fontSize: 11.5, fontWeight: 500, color: '#6B6860' }}>System-Rolle</label>
                     <select value={filterRolle} onChange={e => setFilterRolle(e.target.value)} style={selectStyle}>
-                        {alleRollen.map(r => <option key={r} value={r}>{r}</option>)}
+                        <option value="Alle">Alle</option>
+                        {SYSTEM_ROLLEN.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                     </select>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
