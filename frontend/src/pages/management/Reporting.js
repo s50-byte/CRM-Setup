@@ -401,10 +401,10 @@ export default function Reporting() {
             </div>
 
             {/* OBERER BEREICH: 3 Spalten */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, alignItems: 'start' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
 
                 {/* Spalte 1: Dimensionen */}
-                <div style={{ ...CARD, padding: 14, maxHeight: 310, overflowY: 'auto' }}>
+                <div style={{ ...CARD, padding: 14, flex: 1 }}>
                     <div style={POOL_TITLE}>Dimensionen</div>
                     {ALLE_DIMENSIONEN.filter(d => !d.zeitDim).map(d => <DimRow key={d.key} d={d} />)}
                     <div style={{ height: 1, background: 'rgba(0,0,0,.07)', margin: '6px 0' }} />
@@ -412,7 +412,7 @@ export default function Reporting() {
                 </div>
 
                 {/* Spalte 2: Kennzahlen */}
-                <div style={{ ...CARD, padding: 14, maxHeight: 310, overflowY: 'auto' }}>
+                <div style={{ ...CARD, padding: 14, flex: 1 }}>
                     <div style={POOL_TITLE}>Kennzahlen</div>
                     {KENNZAHLEN_DEF.map(k => {
                         const aktiv = kennzahlen.includes(k.key);
@@ -428,7 +428,7 @@ export default function Reporting() {
                 </div>
 
                 {/* Spalte 3: Filter */}
-                <div style={{ ...CARD, padding: 14, maxHeight: 310, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ ...CARD, padding: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ ...POOL_TITLE, marginBottom: 0 }}>
                             Filter
