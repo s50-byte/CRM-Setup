@@ -216,6 +216,10 @@ router.post('/query', auth, async (req, res) => {
     const isTimeSpalte = TIME_SPALTEN.includes(spaltenTyp);
     const isTimeZeile  = TIME_SPALTEN.includes(zeileDim);
     const kaderIsDim = zeileDim === 'kader' || spaltenTyp === 'kader';
+    const standortIsDim = zeileDim === 'standort' || spaltenTyp === 'standort';
+    const massnahmeIsDim = zeileDim === 'massnahme' || spaltenTyp === 'massnahme';
+    const abteilungIsDim = zeileDim === 'abteilung' || spaltenTyp === 'abteilung';
+    const auftraggeberIsDim = zeileDim === 'auftraggeber_typ' || spaltenTyp === 'auftraggeber_typ';
 
     try {
         const params = [von, bis];
@@ -267,7 +271,7 @@ router.post('/query', auth, async (req, res) => {
         const kaderDossierOuterWhere = userIdsParamRef ? `WHERE kader_row.kader_id = ANY(${userIdsParamRef})` : '';
         const kaderJournalFilter = userIdsParamRef ? `AND kader_row.kader_id = ANY(${userIdsParamRef})` : '';
 
-        const [dossierResult, journalResult, alleKaderResult] = await Promise.all([
+        const [dossierResult, journalResult, alleKaderResult, standorteResult, massnahmenResult, abteilungenResult, auftraggeberResult] = await Promise.all([
             db.query(
                 `WITH agg AS (
                     SELECT
@@ -357,23 +361,79 @@ router.post('/query', auth, async (req, res) => {
             kaderIsDim
                 ? db.query(`SELECT user_id, full_name FROM benutzer WHERE aktiv = TRUE ORDER BY full_name`)
                 : Promise.resolve({ rows: [] }),
+            standortIsDim
+                ? db.query(`SELECT standort_id, name FROM standort ORDER BY name`)
+                : Promise.resolve({ rows: [] }),
+            massnahmeIsDim
+                ? db.query(`SELECT programm_id, name FROM programm WHERE aktiv = TRUE ORDER BY name`)
+                : Promise.resolve({ rows: [] }),
+            abteilungIsDim
+                ? db.query(`SELECT DISTINCT abteilung FROM dossier WHERE abteilung IS NOT NULL AND abteilung != '' ORDER BY abteilung`)
+                : Promise.resolve({ rows: [] }),
+            auftraggeberIsDim
+                ? db.query(`SELECT DISTINCT auftraggeber FROM dossier WHERE auftraggeber IS NOT NULL AND auftraggeber != '' ORDER BY auftraggeber`)
+                : Promise.resolve({ rows: [] }),
         ]);
 
         const dossiers = dossierResult.rows;
         const journalRows = journalResult.rows;
         const alleKader = alleKaderResult.rows;
+        const alleStandorte = standorteResult.rows;
+        const alleMassnahmen = massnahmenResult.rows;
+        const alleAbteilungen = abteilungenResult.rows.map(r => r.abteilung);
+        const alleAuftraggeber = auftraggeberResult.rows.map(r => r.auftraggeber);
 
-        const selectedUserIds = new Set(filter.user_ids || []);
+        const selectedUserIds = new Set((filter.user_ids || []).map(String));
+        const selectedStandortIds = new Set((filter.standort_ids || []).map(String));
+        const selectedProgrammIds = new Set((filter.programm_ids || []).map(String));
+        const selectedAbteilungen = new Set(filter.abteilungen || []);
 
         const totalPeriode = { von: new Date(von), bis: new Date(bis) };
+
+        function alleWerteForDim(dim) {
+            switch (dim) {
+                case 'kader':          return alleKader.map(k => ({ key: String(k.user_id), label: k.full_name }));
+                case 'standort':       return alleStandorte.map(s => ({ key: String(s.standort_id), label: s.name }));
+                case 'massnahme':      return alleMassnahmen.map(m => ({ key: String(m.programm_id), label: m.name }));
+                case 'abteilung':      return alleAbteilungen.map(a => ({ key: a, label: a }));
+                case 'auftraggeber_typ': return alleAuftraggeber.map(a => ({ key: a, label: a }));
+                default:               return [];
+            }
+        }
+
+        function dimFilterSkip(dim, key) {
+            if (dim === 'kader' && selectedUserIds.size > 0 && !selectedUserIds.has(key)) return true;
+            if (dim === 'standort' && selectedStandortIds.size > 0 && !selectedStandortIds.has(key)) return true;
+            if (dim === 'massnahme' && selectedProgrammIds.size > 0 && !selectedProgrammIds.has(key)) return true;
+            if (dim === 'abteilung' && selectedAbteilungen.size > 0 && !selectedAbteilungen.has(key)) return true;
+            if (dim === 'auftraggeber_typ' && filter.auftraggeber_typ) return true;
+            return false;
+        }
+
+        // Fill into a gruppenMap (isTimeSpalte branch): key → { id, label, dossiers: [] }
+        function fillInGruppen(dim, gruppenMap) {
+            for (const { key, label } of alleWerteForDim(dim)) {
+                if (gruppenMap.has(key) || dimFilterSkip(dim, key)) continue;
+                gruppenMap.set(key, { id: key, label, dossiers: [] });
+            }
+        }
+
+        // Fill into a metaMap (+ optional groupsMap for isTimeZeile/dim×dim)
+        function fillInMeta(dim, metaMap, groupsMap) {
+            for (const { key, label } of alleWerteForDim(dim)) {
+                if (metaMap.has(key) || dimFilterSkip(dim, key)) continue;
+                metaMap.set(key, { id: key, label });
+                if (groupsMap && !groupsMap.has(key)) groupsMap.set(key, { dossiers: [], journal: [] });
+            }
+        }
 
         // Suppress "(Kein X)" rows when the corresponding filter is active or dimension is active
         function shouldSuppress(key, dim) {
             if (key === '__kein_kader__' && (filter.user_ids?.length > 0 || kaderIsDim)) return true;
-            if (key === '__kein_standort__' && filter.standort_ids?.length > 0) return true;
-            if (key === '__kein_programm__' && filter.programm_ids?.length > 0) return true;
+            if (key === '__kein_standort__' && (filter.standort_ids?.length > 0 || standortIsDim)) return true;
+            if (key === '__kein_programm__' && (filter.programm_ids?.length > 0 || massnahmeIsDim)) return true;
             if (key === '__' && dim === 'klient' && filter.klient_ids?.length > 0) return true;
-            if (key === 'Keine Abteilung' && dim === 'abteilung' && filter.abteilungen?.length > 0) return true;
+            if (key === 'Keine Abteilung' && dim === 'abteilung' && (filter.abteilungen?.length > 0 || abteilungIsDim)) return true;
             return false;
         }
 
@@ -399,17 +459,7 @@ router.post('/query', auth, async (req, res) => {
                 if (!colMeta.has(ck)) colMeta.set(ck, { id: ck, label: getDimLabel(j, spaltenTyp) });
             }
 
-            // Fill in kader columns if spaltenTyp === 'kader'
-            if (spaltenTyp === 'kader') {
-                for (const k of alleKader) {
-                    const key = String(k.user_id);
-                    if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
-                    if (!colMeta.has(key)) {
-                        colMeta.set(key, { id: key, label: k.full_name });
-                        colGroups.set(key, { dossiers: [], journal: [] });
-                    }
-                }
-            }
+            fillInMeta(spaltenTyp, colMeta, colGroups);
 
             const sortedCols = [...colMeta.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'de'));
             const colLabels  = sortedCols.map(([, m]) => m.label);
@@ -464,14 +514,7 @@ router.post('/query', auth, async (req, res) => {
                 if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: getDimLabel(j, zeileDim), dossiers: [] });
             }
 
-            // Fill in kader: filter active → only selected; no filter → all active benutzer
-            if (zeileDim === 'kader') {
-                for (const k of alleKader) {
-                    const key = String(k.user_id);
-                    if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
-                    if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: k.full_name, dossiers: [] });
-                }
-            }
+            fillInGruppen(zeileDim, gruppenMap);
 
             const zeilen_result = [];
             for (const [key, gruppe] of gruppenMap) {
@@ -530,21 +573,8 @@ router.post('/query', auth, async (req, res) => {
             if (!colMeta.has(ck)) colMeta.set(ck, { id: ck, label: getDimLabel(j, spaltenTyp) });
         }
 
-        // Fill in kader: filter active → only selected; no filter → all active benutzer
-        if (zeileDim === 'kader') {
-            for (const k of alleKader) {
-                const key = String(k.user_id);
-                if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
-                if (!rowMeta.has(key)) rowMeta.set(key, { id: key, label: k.full_name });
-            }
-        }
-        if (spaltenTyp === 'kader') {
-            for (const k of alleKader) {
-                const key = String(k.user_id);
-                if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
-                if (!colMeta.has(key)) colMeta.set(key, { id: key, label: k.full_name });
-            }
-        }
+        fillInMeta(zeileDim, rowMeta);
+        fillInMeta(spaltenTyp, colMeta);
 
         const sortedCols = [...colMeta.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'de'));
         const sortedRows = [...rowMeta.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'de'));
