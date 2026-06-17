@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Dashboard from '../pages/Dashboard';
@@ -82,11 +83,20 @@ function MgmtToggle({ aktiv, onToggle }) {
     );
 }
 
+function istManagementPfad(pathname) {
+    return pathname.startsWith('/management') || pathname === '/gantt';
+}
+
 export default function Layout() {
-    const { benutzer, logout, managementModus, toggleManagementModus } = useAuth();
+    const { benutzer, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const istManagementUser = MANAGEMENT_ROLLEN.includes(benutzer?.system_rolle);
+    const [managementModus, setManagementModus] = useState(() => istManagementPfad(location.pathname));
+
+    useEffect(() => {
+        setManagementModus(istManagementPfad(location.pathname));
+    }, [location.pathname]);
 
     function handleLogout() {
         logout();
@@ -138,7 +148,6 @@ export default function Layout() {
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
                     {istManagementUser && (
                         <MgmtToggle aktiv={managementModus} onToggle={() => {
-                            toggleManagementModus();
                             navigate(managementModus ? '/' : '/management');
                         }} />
                     )}

@@ -6,7 +6,6 @@ export function AuthProvider({ children }) {
     const [benutzer, setBenutzer] = useState(
         JSON.parse(localStorage.getItem('benutzer') || 'null')
     );
-    const [managementModus, setManagementModus] = useState(false);
 
     function login(token, user) {
         localStorage.setItem('token', token);
@@ -18,15 +17,10 @@ export function AuthProvider({ children }) {
         localStorage.removeItem('token');
         localStorage.removeItem('benutzer');
         setBenutzer(null);
-        setManagementModus(false);
-    }
-
-    function toggleManagementModus() {
-        setManagementModus(m => !m);
     }
 
     return (
-        <AuthContext.Provider value={{ benutzer, login, logout, managementModus, toggleManagementModus }}>
+        <AuthContext.Provider value={{ benutzer, login, logout }}>
             {children}
         </AuthContext.Provider>
     );
