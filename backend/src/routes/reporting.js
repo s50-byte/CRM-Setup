@@ -233,10 +233,11 @@ router.post('/query', auth, async (req, res) => {
             dossierClauses.push(`pv.programm_id = ANY(${p})`);
             journalClauses.push(`d.programm_id = ANY(${p})`);
         }
+        let userIdsParamRef = null;
         if (filter.user_ids?.length > 0) {
             params.push(filter.user_ids);
-            const p = `$${params.length}::uuid[]`;
-            const c = `EXISTS (SELECT 1 FROM klient_user ku2 WHERE ku2.klient_id = k.klient_id AND ku2.user_id = ANY(${p}) AND ku2.aktiv = TRUE)`;
+            userIdsParamRef = `$${params.length}::uuid[]`;
+            const c = `EXISTS (SELECT 1 FROM klient_user ku2 WHERE ku2.klient_id = k.klient_id AND ku2.user_id = ANY(${userIdsParamRef}) AND ku2.aktiv = TRUE)`;
             dossierClauses.push(c);
             journalClauses.push(c);
         }
@@ -261,6 +262,9 @@ router.post('/query', auth, async (req, res) => {
 
         const dossierWhere = dossierClauses.length > 0 ? 'AND ' + dossierClauses.join(' AND ') : '';
         const journalWhere = journalClauses.length > 0 ? 'AND ' + journalClauses.join(' AND ') : '';
+        // When kader filter active: restrict LATERAL JOIN results to selected kaders
+        const kaderDossierOuterWhere = userIdsParamRef ? `WHERE kader_row.kader_id = ANY(${userIdsParamRef})` : '';
+        const kaderJournalFilter = userIdsParamRef ? `AND kader_row.kader_id = ANY(${userIdsParamRef})` : '';
 
         const [dossierResult, journalResult, alleKaderResult] = await Promise.all([
             db.query(
@@ -310,7 +314,8 @@ router.post('/query', auth, async (req, res) => {
                     FROM klient_user ku
                     JOIN benutzer b ON b.user_id = ku.user_id
                     WHERE ku.klient_id = agg.klient_id AND ku.aktiv = TRUE
-                ) kader_row ON TRUE`,
+                ) kader_row ON TRUE
+                ${kaderDossierOuterWhere}`,
                 params
             ),
             db.query(
@@ -344,7 +349,8 @@ router.post('/query', auth, async (req, res) => {
                  LEFT JOIN leistung l ON l.leistung_id = j.leistung_id
                  WHERE k.aktiv = TRUE
                    AND j.datum BETWEEN $1 AND $2
-                   ${journalWhere}`,
+                   ${journalWhere}
+                   ${kaderJournalFilter}`,
                 params
             ),
             kaderIsDim
@@ -355,6 +361,13 @@ router.post('/query', auth, async (req, res) => {
         const dossiers = dossierResult.rows;
         const journalRows = journalResult.rows;
         const alleKader = alleKaderResult.rows;
+
+        const selectedUserIds = new Set(filter.user_ids || []);
+        // Kaders who have at least one dossier or journal entry in the queried period
+        const kaderMitDaten = new Set([
+            ...dossiers.map(d => d.kader_id).filter(Boolean).map(String),
+            ...journalRows.map(j => j.kader_id).filter(Boolean).map(String),
+        ]);
 
         const totalPeriode = { von: new Date(von), bis: new Date(bis) };
 
@@ -389,10 +402,13 @@ router.post('/query', auth, async (req, res) => {
                 if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: getDimLabel(j, zeileDim), dossiers: [] });
             }
 
-            // Fill in all active kader, even those with no dossiers in range
+            // Fill in kader: when filter active → selected kaders (incl. zeros);
+            // when no filter → only kaders with actual data in period
             if (zeileDim === 'kader') {
                 for (const k of alleKader) {
                     const key = String(k.user_id);
+                    if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
+                    if (selectedUserIds.size === 0 && !kaderMitDaten.has(key)) continue;
                     if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: k.full_name, dossiers: [] });
                 }
             }
@@ -454,16 +470,21 @@ router.post('/query', auth, async (req, res) => {
             if (!colMeta.has(ck)) colMeta.set(ck, { id: ck, label: getDimLabel(j, spaltenTyp) });
         }
 
-        // Fill in all active kader even if no dossiers/journal in range
+        // Fill in kader: when filter active → selected kaders (incl. zeros);
+        // when no filter → only kaders with actual data in period
         if (zeileDim === 'kader') {
             for (const k of alleKader) {
                 const key = String(k.user_id);
+                if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
+                if (selectedUserIds.size === 0 && !kaderMitDaten.has(key)) continue;
                 if (!rowMeta.has(key)) rowMeta.set(key, { id: key, label: k.full_name });
             }
         }
         if (spaltenTyp === 'kader') {
             for (const k of alleKader) {
                 const key = String(k.user_id);
+                if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
+                if (selectedUserIds.size === 0 && !kaderMitDaten.has(key)) continue;
                 if (!colMeta.has(key)) colMeta.set(key, { id: key, label: k.full_name });
             }
         }
