@@ -155,7 +155,9 @@ export default function BenutzerModal({ open, onClose, onSaved, benutzer }) {
 
         try {
             if (istNeu) {
-                await client.post('/benutzer', payload);
+                const res = await client.post('/benutzer', payload);
+                const neuerUserId = res.data.user_id;
+                await client.put(`/benutzer/${neuerUserId}`, payload);
             } else {
                 await client.put(`/benutzer/${benutzer.user_id}`, payload);
             }
