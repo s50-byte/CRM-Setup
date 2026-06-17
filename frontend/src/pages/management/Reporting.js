@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Chart from 'chart.js/auto';
 import client from '../../api/client';
 
 const ALLE_DIMENSIONEN = [
@@ -39,6 +40,9 @@ const FILTER_DEFAULT = {
     klient_ids: [],
     auftraggeber_typ: null,
 };
+
+const CHART_FARBEN = ['#2563EB', '#16A34A', '#EA580C', '#7C3AED', '#0891B2', '#D97706', '#DC2626', '#059669'];
+const TIME_DIMS = new Set(['monate', 'quartale', 'wochen', 'jahr']);
 
 function fmtWert(v, fmt) {
     if (v === null || v === undefined) return '—';
@@ -172,10 +176,24 @@ export default function Reporting() {
     const [ansichtName, setAnsichtName] = useState('');
     const [zeigeSpeichern, setZeigeSpeichern] = useState(false);
 
+    // Diagramm-State
+    const [ansicht, setAnsicht] = useState('tabelle'); // 'tabelle' | 'diagramm'
+    const [diagrammTyp, setDiagrammTyp] = useState('auto');
+    const [diagrammKennzahl, setDiagrammKennzahl] = useState('');
+    const chartRef = useRef(null);
+    const chartInstance = useRef(null);
+
     useEffect(() => {
         client.get('/reporting/optionen').then(r => setOptionen(r.data)).catch(console.error);
         client.get('/reporting/ansichten').then(r => setAnsichten(r.data)).catch(console.error);
     }, []);
+
+    // Diagramm-Kennzahl auf erste gewählte Kennzahl setzen falls nicht mehr vorhanden
+    useEffect(() => {
+        if (!diagrammKennzahl || !kennzahlen.includes(diagrammKennzahl)) {
+            setDiagrammKennzahl(kennzahlen[0] || '');
+        }
+    }, [kennzahlen, diagrammKennzahl]);
 
     const ausfuehren = useCallback(async () => {
         setLaden(true);
@@ -196,6 +214,106 @@ export default function Reporting() {
         const timer = setTimeout(ausfuehren, 500);
         return () => clearTimeout(timer);
     }, [ausfuehren]);
+
+    // Chart-Instanz aufbauen und bei Änderungen neu erstellen
+    useEffect(() => {
+        if (!resultat || ansicht !== 'diagramm' || !chartRef.current) return;
+        if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
+
+        const kz = diagrammKennzahl || kennzahlen[0];
+        if (!kz || resultat.zeilen.length === 0) return;
+
+        const kzDef = KZ_MAP[kz];
+        const tooltipEinheit = kzDef?.fmt === 'chf' ? ' CHF' : kzDef?.fmt === 'h' ? ' h' : kzDef?.fmt === 'pct' ? '%' : '';
+
+        // Effektiver Diagrammtyp (Auto-Logik)
+        const effTyp = diagrammTyp !== 'auto' ? diagrammTyp
+            : TIME_DIMS.has(spalten[0]) ? 'linie'
+            : TIME_DIMS.has(zeilen[0]) ? 'balken_h'
+            : 'balken_v';
+
+        let chartType, data, options;
+
+        if (effTyp === 'torte') {
+            const labels = resultat.zeilen.map(z => z.label);
+            const vals = resultat.zeilen.map(z => {
+                const v = z.total?.[kz];
+                return (v !== null && v !== undefined) ? Number(v) : 0;
+            });
+            chartType = 'pie';
+            data = {
+                labels,
+                datasets: [{
+                    data: vals,
+                    backgroundColor: CHART_FARBEN.slice(0, labels.length),
+                }],
+            };
+            options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 300 },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.label}: ${fmtWert(ctx.raw, kzDef?.fmt)}${tooltipEinheit}`,
+                        },
+                    },
+                },
+            };
+        } else {
+            const labels = resultat.spalten;
+            const isHorizontal = effTyp === 'balken_h';
+            const isStacked = effTyp === 'gestapelt';
+            const isFill = effTyp === 'flaeche';
+            chartType = (effTyp === 'linie' || isFill) ? 'line' : 'bar';
+
+            const datasets = resultat.zeilen.map((zeile, i) => {
+                const farbe = CHART_FARBEN[i % CHART_FARBEN.length];
+                const vals = resultat.spalten.map(sp => {
+                    const v = zeile.werte[sp]?.[kz];
+                    return (v !== null && v !== undefined) ? Number(v) : 0;
+                });
+                const ds = {
+                    label: zeile.label,
+                    data: vals,
+                    borderColor: farbe,
+                    backgroundColor: chartType === 'line' ? farbe + '33' : farbe + 'CC',
+                    borderWidth: chartType === 'line' ? 2 : 1,
+                    pointRadius: chartType === 'line' ? 3 : undefined,
+                    fill: isFill ? true : undefined,
+                    tension: chartType === 'line' ? 0.3 : undefined,
+                };
+                return ds;
+            });
+
+            data = { labels, datasets };
+            options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 300 },
+                ...(isHorizontal ? { indexAxis: 'y' } : {}),
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.dataset.label}: ${fmtWert(ctx.raw, kzDef?.fmt)}${tooltipEinheit}`,
+                        },
+                    },
+                },
+                scales: {
+                    x: { stacked: isStacked, ticks: { font: { size: 11 } } },
+                    y: { stacked: isStacked, beginAtZero: true, ticks: { font: { size: 11 } } },
+                },
+            };
+        }
+
+        chartInstance.current = new Chart(chartRef.current, { type: chartType, data, options });
+
+        return () => {
+            if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
+        };
+    }, [resultat, ansicht, diagrammTyp, diagrammKennzahl, kennzahlen, zeilen, spalten]);
 
     async function speichern() {
         if (!ansichtName.trim()) return;
@@ -532,11 +650,6 @@ export default function Reporting() {
                                 }}>Filter zurücksetzen</button>
                             )}
                             {fehler && <span style={{ fontSize: 12, color: '#B91C1C' }}>{fehler}</span>}
-                            {resultat && !laden && (
-                                <span style={{ fontSize: 12, color: '#6B6860' }}>
-                                    {resultat.zeilen.length} {resultat.zeilen.length === 1 ? 'Zeile' : 'Zeilen'} · {resultat.spalten.length} {resultat.spalten.length === 1 ? 'Spalte' : 'Spalten'}
-                                </span>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -549,80 +662,157 @@ export default function Reporting() {
                 </div>
             )}
 
-            {/* Resultat-Tabelle */}
+            {/* Resultat */}
             {resultat && (
                 <div style={{ ...CARD, overflow: 'hidden', opacity: laden ? 0.6 : 1, transition: 'opacity .2s' }}>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ borderCollapse: 'collapse', fontSize: 12.5, width: '100%', minWidth: 600 }}>
-                            <thead>
-                                <tr style={{ background: '#F5F4F0' }}>
-                                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 11.5, borderBottom: '1px solid rgba(0,0,0,.09)', minWidth: 140, position: 'sticky', left: 0, background: '#F5F4F0', zIndex: 1 }}>
-                                        {dimLabel(zeilen[0]) || 'Zeile'}
-                                    </th>
-                                    {resultat.spalten.map(sp => (
-                                        <th key={sp} colSpan={kennzahlen.length}
-                                            style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, fontSize: 11, borderBottom: '1px solid rgba(0,0,0,.09)', borderLeft: '1px solid rgba(0,0,0,.06)', whiteSpace: 'nowrap', color: '#6B6860' }}>
-                                            {sp}
-                                        </th>
-                                    ))}
-                                    <th colSpan={kennzahlen.length}
-                                        style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, fontSize: 11, borderBottom: '1px solid rgba(0,0,0,.09)', borderLeft: '2px solid rgba(0,0,0,.12)', color: '#6B6860' }}>
-                                        Total
-                                    </th>
-                                </tr>
-                                <tr style={{ background: '#FAFAFA' }}>
-                                    <th style={{ padding: '4px 12px', position: 'sticky', left: 0, background: '#FAFAFA', zIndex: 1, borderBottom: '2px solid rgba(0,0,0,.09)' }} />
-                                    {[...resultat.spalten, '__total__'].map((sp) =>
-                                        kennzahlen.map((kk, ki) => {
-                                            const kd = KZ_MAP[kk];
-                                            return (
-                                                <th key={`${sp}-${kk}`}
-                                                    style={{
-                                                        padding: '3px 6px', fontWeight: 500, fontSize: 10.5, color: '#6B6860',
-                                                        textAlign: 'right', whiteSpace: 'nowrap',
-                                                        borderBottom: '2px solid rgba(0,0,0,.09)',
-                                                        borderLeft: ki === 0 ? (sp === '__total__' ? '2px solid rgba(0,0,0,.12)' : '1px solid rgba(0,0,0,.06)') : undefined,
-                                                    }}>
-                                                    {kd?.short || kk}
-                                                </th>
-                                            );
-                                        })
-                                    )}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {resultat.zeilen.length === 0 && (
-                                    <tr>
-                                        <td colSpan={1 + (resultat.spalten.length + 1) * kennzahlen.length}
-                                            style={{ padding: '24px 12px', textAlign: 'center', color: '#A09D97', fontSize: 13 }}>
-                                            Keine Daten im gewählten Zeitraum
-                                        </td>
-                                    </tr>
+
+                    {/* Toolbar */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,.07)' }}>
+                        <span style={{ fontSize: 12, color: '#6B6860', flex: 1 }}>
+                            {resultat.zeilen.length} {resultat.zeilen.length === 1 ? 'Zeile' : 'Zeilen'} · {resultat.spalten.length} {resultat.spalten.length === 1 ? 'Spalte' : 'Spalten'}
+                        </span>
+                        {ansicht === 'diagramm' && (
+                            <>
+                                <select
+                                    value={diagrammTyp}
+                                    onChange={e => setDiagrammTyp(e.target.value)}
+                                    style={{ ...inputStyle, fontSize: 12, cursor: 'pointer' }}>
+                                    <option value="auto">Auto</option>
+                                    <option value="linie">Linie</option>
+                                    <option value="balken_v">Balken (vertikal)</option>
+                                    <option value="balken_h">Balken (horizontal)</option>
+                                    <option value="gestapelt">Gestapelt</option>
+                                    <option value="flaeche">Fläche</option>
+                                    <option value="torte">Torte</option>
+                                </select>
+                                {kennzahlen.length > 1 && (
+                                    <select
+                                        value={diagrammKennzahl}
+                                        onChange={e => setDiagrammKennzahl(e.target.value)}
+                                        style={{ ...inputStyle, fontSize: 12, cursor: 'pointer' }}>
+                                        {kennzahlen.map(kk => (
+                                            <option key={kk} value={kk}>{KZ_MAP[kk]?.label || kk}</option>
+                                        ))}
+                                    </select>
                                 )}
-                                {resultat.zeilen.map((zeile, zi) => (
-                                    <tr key={zeile.id} style={{ background: zi % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                            </>
+                        )}
+                        <div style={{ display: 'flex', gap: 2 }}>
+                            {[{ key: 'tabelle', label: '▦ Tabelle' }, { key: 'diagramm', label: '▤ Diagramm' }].map(({ key, label }) => (
+                                <button key={key} onClick={() => setAnsicht(key)} style={{
+                                    padding: '4px 12px', fontSize: 12, cursor: 'pointer',
+                                    border: 'none', borderRadius: 6, fontFamily: 'inherit',
+                                    fontWeight: ansicht === key ? 600 : 400,
+                                    background: ansicht === key ? '#2563EB' : '#F5F4F0',
+                                    color: ansicht === key ? '#fff' : '#6B6860',
+                                }}>{label}</button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Tabellen-Ansicht */}
+                    {ansicht === 'tabelle' && (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ borderCollapse: 'collapse', fontSize: 12.5, width: '100%', minWidth: 600 }}>
+                                <thead>
+                                    <tr style={{ background: '#F5F4F0' }}>
+                                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 11.5, borderBottom: '1px solid rgba(0,0,0,.09)', minWidth: 140, position: 'sticky', left: 0, background: '#F5F4F0', zIndex: 1 }}>
+                                            {dimLabel(zeilen[0]) || 'Zeile'}
+                                        </th>
+                                        {resultat.spalten.map(sp => (
+                                            <th key={sp} colSpan={kennzahlen.length}
+                                                style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, fontSize: 11, borderBottom: '1px solid rgba(0,0,0,.09)', borderLeft: '1px solid rgba(0,0,0,.06)', whiteSpace: 'nowrap', color: '#6B6860' }}>
+                                                {sp}
+                                            </th>
+                                        ))}
+                                        <th colSpan={kennzahlen.length}
+                                            style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, fontSize: 11, borderBottom: '1px solid rgba(0,0,0,.09)', borderLeft: '2px solid rgba(0,0,0,.12)', color: '#6B6860' }}>
+                                            Total
+                                        </th>
+                                    </tr>
+                                    <tr style={{ background: '#FAFAFA' }}>
+                                        <th style={{ padding: '4px 12px', position: 'sticky', left: 0, background: '#FAFAFA', zIndex: 1, borderBottom: '2px solid rgba(0,0,0,.09)' }} />
+                                        {[...resultat.spalten, '__total__'].map((sp) =>
+                                            kennzahlen.map((kk, ki) => {
+                                                const kd = KZ_MAP[kk];
+                                                return (
+                                                    <th key={`${sp}-${kk}`}
+                                                        style={{
+                                                            padding: '3px 6px', fontWeight: 500, fontSize: 10.5, color: '#6B6860',
+                                                            textAlign: 'right', whiteSpace: 'nowrap',
+                                                            borderBottom: '2px solid rgba(0,0,0,.09)',
+                                                            borderLeft: ki === 0 ? (sp === '__total__' ? '2px solid rgba(0,0,0,.12)' : '1px solid rgba(0,0,0,.06)') : undefined,
+                                                        }}>
+                                                        {kd?.short || kk}
+                                                    </th>
+                                                );
+                                            })
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {resultat.zeilen.length === 0 && (
+                                        <tr>
+                                            <td colSpan={1 + (resultat.spalten.length + 1) * kennzahlen.length}
+                                                style={{ padding: '24px 12px', textAlign: 'center', color: '#A09D97', fontSize: 13 }}>
+                                                Keine Daten im gewählten Zeitraum
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {resultat.zeilen.map((zeile, zi) => (
+                                        <tr key={zeile.id} style={{ background: zi % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                                            <td style={{
+                                                padding: '6px 12px', fontWeight: 500, fontSize: 12.5,
+                                                borderBottom: '1px solid rgba(0,0,0,.05)',
+                                                position: 'sticky', left: 0,
+                                                background: zi % 2 === 0 ? '#fff' : '#FAFAFA',
+                                                zIndex: 1, maxWidth: 180, overflow: 'hidden',
+                                                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                            }}>
+                                                {zeile.label}
+                                            </td>
+                                            {[...resultat.spalten.map(sp => ({ sp, werte: zeile.werte[sp] })), { sp: '__total__', werte: zeile.total }].map(({ sp, werte }) =>
+                                                kennzahlen.map((kk, ki) => {
+                                                    const kd = KZ_MAP[kk];
+                                                    const farbe = istFarbe(kk, werte);
+                                                    return (
+                                                        <td key={`${sp}-${kk}`}
+                                                            style={{
+                                                                padding: '6px 6px', textAlign: 'right', fontSize: 12,
+                                                                borderBottom: '1px solid rgba(0,0,0,.05)',
+                                                                borderLeft: ki === 0 ? (sp === '__total__' ? '2px solid rgba(0,0,0,.12)' : '1px solid rgba(0,0,0,.06)') : undefined,
+                                                                background: farbe?.bg || 'transparent',
+                                                                color: farbe?.color || '#1A1917',
+                                                                fontVariantNumeric: 'tabular-nums',
+                                                            }}>
+                                                            {fmtWert(werte?.[kk], kd?.fmt)}
+                                                        </td>
+                                                    );
+                                                })
+                                            )}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ background: '#F5F4F0' }}>
                                         <td style={{
-                                            padding: '6px 12px', fontWeight: 500, fontSize: 12.5,
-                                            borderBottom: '1px solid rgba(0,0,0,.05)',
-                                            position: 'sticky', left: 0,
-                                            background: zi % 2 === 0 ? '#fff' : '#FAFAFA',
-                                            zIndex: 1, maxWidth: 180, overflow: 'hidden',
-                                            textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                        }}>
-                                            {zeile.label}
-                                        </td>
-                                        {[...resultat.spalten.map(sp => ({ sp, werte: zeile.werte[sp] })), { sp: '__total__', werte: zeile.total }].map(({ sp, werte }) =>
+                                            padding: '7px 12px', fontSize: 12.5, fontWeight: 700,
+                                            borderTop: '2px solid rgba(0,0,0,.12)',
+                                            position: 'sticky', left: 0, background: '#F5F4F0', zIndex: 1,
+                                        }}>Total</td>
+                                        {[...resultat.spalten.map(sp => ({ sp, werte: resultat.total[sp] })), { sp: '__total__', werte: resultat.total_gesamt }].map(({ sp, werte }) =>
                                             kennzahlen.map((kk, ki) => {
                                                 const kd = KZ_MAP[kk];
                                                 const farbe = istFarbe(kk, werte);
                                                 return (
-                                                    <td key={`${sp}-${kk}`}
+                                                    <td key={`total-${sp}-${kk}`}
                                                         style={{
-                                                            padding: '6px 6px', textAlign: 'right', fontSize: 12,
-                                                            borderBottom: '1px solid rgba(0,0,0,.05)',
+                                                            padding: '7px 6px', textAlign: 'right', fontSize: 12,
+                                                            borderTop: '2px solid rgba(0,0,0,.12)',
                                                             borderLeft: ki === 0 ? (sp === '__total__' ? '2px solid rgba(0,0,0,.12)' : '1px solid rgba(0,0,0,.06)') : undefined,
                                                             background: farbe?.bg || 'transparent',
                                                             color: farbe?.color || '#1A1917',
+                                                            fontWeight: 700,
                                                             fontVariantNumeric: 'tabular-nums',
                                                         }}>
                                                         {fmtWert(werte?.[kk], kd?.fmt)}
@@ -631,39 +821,23 @@ export default function Reporting() {
                                             })
                                         )}
                                     </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                                <tr style={{ background: '#F5F4F0' }}>
-                                    <td style={{
-                                        padding: '7px 12px', fontSize: 12.5, fontWeight: 700,
-                                        borderTop: '2px solid rgba(0,0,0,.12)',
-                                        position: 'sticky', left: 0, background: '#F5F4F0', zIndex: 1,
-                                    }}>Total</td>
-                                    {[...resultat.spalten.map(sp => ({ sp, werte: resultat.total[sp] })), { sp: '__total__', werte: resultat.total_gesamt }].map(({ sp, werte }) =>
-                                        kennzahlen.map((kk, ki) => {
-                                            const kd = KZ_MAP[kk];
-                                            const farbe = istFarbe(kk, werte);
-                                            return (
-                                                <td key={`total-${sp}-${kk}`}
-                                                    style={{
-                                                        padding: '7px 6px', textAlign: 'right', fontSize: 12,
-                                                        borderTop: '2px solid rgba(0,0,0,.12)',
-                                                        borderLeft: ki === 0 ? (sp === '__total__' ? '2px solid rgba(0,0,0,.12)' : '1px solid rgba(0,0,0,.06)') : undefined,
-                                                        background: farbe?.bg || 'transparent',
-                                                        color: farbe?.color || '#1A1917',
-                                                        fontWeight: 700,
-                                                        fontVariantNumeric: 'tabular-nums',
-                                                    }}>
-                                                    {fmtWert(werte?.[kk], kd?.fmt)}
-                                                </td>
-                                            );
-                                        })
-                                    )}
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
+                                </tfoot>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* Diagramm-Ansicht */}
+                    {ansicht === 'diagramm' && (
+                        <div style={{ padding: '16px 20px', height: 420, boxSizing: 'border-box' }}>
+                            {resultat.zeilen.length === 0 ? (
+                                <div style={{ textAlign: 'center', color: '#A09D97', fontSize: 13, paddingTop: 60 }}>
+                                    Keine Daten im gewählten Zeitraum
+                                </div>
+                            ) : (
+                                <canvas ref={chartRef} />
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
