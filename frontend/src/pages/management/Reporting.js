@@ -72,14 +72,15 @@ function fmtWert(v, fmt) {
 }
 
 function getFarbe(kennzahl, ist, soll) {
-    if (ist == null || !soll || soll === 0) return null;
+    if (!soll || soll === 0) return null;
     const ratio = ist / soll;
-    if (kennzahl.includes('stunden')) {
+    if (kennzahl.includes('stunden_ist')) {
         if (ratio > 1.0) return { bg: '#FEE2E2', color: '#991B1B' };
         if (ratio > 0.8) return { bg: '#FEF3C7', color: '#92400E' };
         return { bg: '#D1FAE5', color: '#065F46' };
     }
-    if (kennzahl.includes('einnahmen')) {
+    if (kennzahl.includes('einnahmen_ist')) {
+        if (ratio > 1.0) return { bg: '#D1FAE5', color: '#065F46' };
         if (ratio >= 0.9) return { bg: '#D1FAE5', color: '#065F46' };
         if (ratio >= 0.5) return { bg: '#FEF3C7', color: '#92400E' };
         return { bg: '#FEE2E2', color: '#991B1B' };
