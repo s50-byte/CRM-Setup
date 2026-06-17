@@ -135,7 +135,7 @@ router.get('/optionen', auth, async (req, res) => {
         const [kader, klienten, standorte, massnahmen, abteilungen] = await Promise.all([
             db.query(`SELECT DISTINCT u.user_id, u.full_name FROM benutzer u
                       JOIN klient_user ku ON ku.user_id = u.user_id
-                      WHERE ku.aktiv = TRUE AND ku.rolle_im_fall = 'kader'
+                      WHERE ku.aktiv = TRUE AND ku.rolle_im_fall = 'Klientenführung'
                       ORDER BY u.full_name`),
             db.query(`SELECT k.klient_id, k.vorname || ' ' || k.nachname AS name
                       FROM klient k WHERE k.aktiv = TRUE ORDER BY k.nachname, k.vorname`),
@@ -232,7 +232,7 @@ router.post('/query', auth, async (req, res) => {
         if (filter.user_ids?.length > 0) {
             params.push(filter.user_ids);
             const p = `$${params.length}::uuid[]`;
-            const c = `EXISTS (SELECT 1 FROM klient_user ku2 WHERE ku2.klient_id = k.klient_id AND ku2.user_id = ANY(${p}) AND ku2.aktiv = TRUE)`;
+            const c = `EXISTS (SELECT 1 FROM klient_user ku2 WHERE ku2.klient_id = k.klient_id AND ku2.user_id = ANY(${p}) AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung')`;
             dossierClauses.push(c);
             journalClauses.push(c);
         }
@@ -276,11 +276,11 @@ router.post('/query', auth, async (req, res) => {
                     COALESCE(SUM(vp.soll_stunden), 0) AS soll_stunden_total,
                     (SELECT u2.user_id FROM klient_user ku2
                      JOIN benutzer u2 ON u2.user_id = ku2.user_id
-                     WHERE ku2.klient_id = k.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'kader'
+                     WHERE ku2.klient_id = k.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung'
                      LIMIT 1) AS kader_id,
                     (SELECT u2.full_name FROM klient_user ku2
                      JOIN benutzer u2 ON u2.user_id = ku2.user_id
-                     WHERE ku2.klient_id = k.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'kader'
+                     WHERE ku2.klient_id = k.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung'
                      LIMIT 1) AS kader_name
                  FROM dossier d
                  JOIN klient k ON k.klient_id = d.klient_id
@@ -308,7 +308,7 @@ router.post('/query', auth, async (req, res) => {
                     j.klient_id, j.datum, j.dauer_minuten, j.verrechenbar,
                     COALESCE(l.tarif, 0) AS tarif,
                     (SELECT ku2.user_id FROM klient_user ku2
-                     WHERE ku2.klient_id = j.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'kader'
+                     WHERE ku2.klient_id = j.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung'
                      LIMIT 1) AS kader_id,
                     d.standort_id, d.abteilung, d.auftraggeber, d.programm_id
                  FROM journal_eintrag j
