@@ -1,12 +1,12 @@
 // ============================================================
 // Route: Management Dashboard
-// Nur zugänglich für system_rolle IN ('management', 'admin', 'teamleitung')
+// Nur zugänglich für system_rolle IN ('leitungsteam', 'admin')
 // ============================================================
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-const MANAGEMENT_ROLLEN = ['management', 'admin', 'teamleitung'];
+const MANAGEMENT_ROLLEN = ['leitungsteam', 'admin'];
 
 function requireManagement(req, res, next) {
     if (!MANAGEMENT_ROLLEN.includes(req.user.system_rolle)) {

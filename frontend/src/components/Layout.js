@@ -23,7 +23,7 @@ import Auslastung from '../pages/management/Auslastung';
 import Benutzer from '../pages/management/Benutzer';
 import Reporting from '../pages/management/Reporting';
 
-const MANAGEMENT_ROLLEN = ['management', 'teamleitung', 'kader', 'leitungsteam'];
+const MANAGEMENT_ROLLEN = ['leitungsteam', 'admin'];
 
 const NAV = [
     { section: 'Mein Bereich' },
