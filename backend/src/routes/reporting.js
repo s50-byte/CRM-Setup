@@ -133,14 +133,14 @@ router.get('/optionen', auth, async (req, res) => {
     if (!ERLAUBTE_ROLLEN.includes(req.user.system_rolle)) return res.status(403).json({ error: 'Keine Berechtigung' });
     try {
         const [kader, klienten, standorte, massnahmen, abteilungen] = await Promise.all([
-            db.query(`SELECT DISTINCT u.user_id, u.full_name FROM benutzer u
-                      JOIN klient_user ku ON ku.user_id = u.user_id
-                      WHERE ku.aktiv = TRUE AND ku.rolle_im_fall = 'Klientenführung'
-                      ORDER BY u.full_name`),
+            db.query(`SELECT user_id, full_name FROM benutzer WHERE aktiv = TRUE ORDER BY full_name`),
             db.query(`SELECT k.klient_id, k.vorname || ' ' || k.nachname AS name
-                      FROM klient k WHERE k.aktiv = TRUE ORDER BY k.nachname, k.vorname`),
+                      FROM klient k
+                      WHERE k.aktiv = TRUE
+                        AND EXISTS (SELECT 1 FROM dossier d JOIN programm_verlauf pv ON pv.dossier_id = d.dossier_id WHERE d.klient_id = k.klient_id AND pv.status = 'Laufend')
+                      ORDER BY k.nachname, k.vorname`),
             db.query(`SELECT standort_id, name FROM standort ORDER BY name`),
-            db.query(`SELECT programm_id, name FROM programm ORDER BY name`),
+            db.query(`SELECT programm_id, name FROM programm WHERE aktiv = TRUE ORDER BY name`),
             db.query(`SELECT DISTINCT abteilung FROM dossier WHERE abteilung IS NOT NULL AND abteilung != '' ORDER BY abteilung`),
         ]);
         res.json({
