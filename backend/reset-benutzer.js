@@ -13,9 +13,7 @@ const pool = new Pool({
 const PASSWORT     = 'Test2025!';
 const EMAIL_DOMAIN = 'kft-prototyp.ch';
 
-// NOTE: system_rolle 'leitungsteam' erfordert Migration add-enum-updates.sql.
-// Solange die Migration nicht eingespielt ist, wird 'teamleitung' verwendet.
-const ROLLE_TL = 'teamleitung'; // → 'leitungsteam' nach Migration
+const ROLLE_TL = 'leitungsteam';
 
 // 7 Benutzer pro Standort: 5 kader, 1 leitungsteam, 1 leitungsteam (management-Ebene)
 const BENUTZER_PRO_STANDORT = {
@@ -258,10 +256,6 @@ async function main() {
         console.log(`  Zuweisungen RI:    ${zuweisungenProStandort.RI}`);
         console.log(`  Passwort:          ${PASSWORT}`);
         console.log('════════════════════════════════════════');
-        console.log('');
-        console.log('HINWEIS: system_rolle "leitungsteam" benötigt Migration:');
-        console.log('  psql -U postgres -d iv_crm -f backend/add-enum-updates.sql');
-        console.log('  → Danach ROLLE_TL in reset-benutzer.js auf "leitungsteam" setzen');
 
     } catch (err) {
         await db.query('ROLLBACK');
