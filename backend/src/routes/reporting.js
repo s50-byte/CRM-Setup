@@ -214,6 +214,7 @@ router.post('/query', auth, async (req, res) => {
     const zeileDim = zeilen[0] || 'kader';
     const spaltenTyp = spalten[0] || 'monate';
     const isTimeSpalte = TIME_SPALTEN.includes(spaltenTyp);
+    const kaderIsDim = zeileDim === 'kader' || spaltenTyp === 'kader';
 
     try {
         const params = [von, bis];
@@ -261,7 +262,7 @@ router.post('/query', auth, async (req, res) => {
         const dossierWhere = dossierClauses.length > 0 ? 'AND ' + dossierClauses.join(' AND ') : '';
         const journalWhere = journalClauses.length > 0 ? 'AND ' + journalClauses.join(' AND ') : '';
 
-        const [dossierResult, journalResult] = await Promise.all([
+        const [dossierResult, journalResult, alleKaderResult] = await Promise.all([
             db.query(
                 `WITH agg AS (
                     SELECT
@@ -346,15 +347,19 @@ router.post('/query', auth, async (req, res) => {
                    ${journalWhere}`,
                 params
             ),
+            kaderIsDim
+                ? db.query(`SELECT user_id, full_name FROM benutzer WHERE aktiv = TRUE ORDER BY full_name`)
+                : Promise.resolve({ rows: [] }),
         ]);
 
         const dossiers = dossierResult.rows;
         const journalRows = journalResult.rows;
+        const alleKader = alleKaderResult.rows;
+
         const totalPeriode = { von: new Date(von), bis: new Date(bis) };
 
         // Suppress "(Kein X)" rows when the corresponding filter is active or dimension is active
         function shouldSuppress(key, dim) {
-            const kaderIsDim = zeileDim === 'kader' || spaltenTyp === 'kader';
             if (key === '__kein_kader__' && (filter.user_ids?.length > 0 || kaderIsDim)) return true;
             if (key === '__kein_standort__' && filter.standort_ids?.length > 0) return true;
             if (key === '__kein_programm__' && filter.programm_ids?.length > 0) return true;
@@ -382,6 +387,14 @@ router.post('/query', auth, async (req, res) => {
                 if (!journalByDim.has(key)) journalByDim.set(key, []);
                 journalByDim.get(key).push(j);
                 if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: getDimLabel(j, zeileDim), dossiers: [] });
+            }
+
+            // Fill in all active kader, even those with no dossiers in range
+            if (zeileDim === 'kader') {
+                for (const k of alleKader) {
+                    const key = String(k.user_id);
+                    if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: k.full_name, dossiers: [] });
+                }
             }
 
             const zeilen_result = [];
@@ -439,6 +452,20 @@ router.post('/query', auth, async (req, res) => {
             getCell(rk, ck).journal.push(j);
             if (!rowMeta.has(rk)) rowMeta.set(rk, { id: rk, label: getDimLabel(j, zeileDim) });
             if (!colMeta.has(ck)) colMeta.set(ck, { id: ck, label: getDimLabel(j, spaltenTyp) });
+        }
+
+        // Fill in all active kader even if no dossiers/journal in range
+        if (zeileDim === 'kader') {
+            for (const k of alleKader) {
+                const key = String(k.user_id);
+                if (!rowMeta.has(key)) rowMeta.set(key, { id: key, label: k.full_name });
+            }
+        }
+        if (spaltenTyp === 'kader') {
+            for (const k of alleKader) {
+                const key = String(k.user_id);
+                if (!colMeta.has(key)) colMeta.set(key, { id: key, label: k.full_name });
+            }
         }
 
         const sortedCols = [...colMeta.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'de'));
