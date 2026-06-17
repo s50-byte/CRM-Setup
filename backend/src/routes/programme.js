@@ -22,77 +22,106 @@ db.query(`
     )
 `).catch(err => console.error('phase_rolle table init:', err));
 
-// GET /api/programme — Alle Programme mit Phasen, Kriterien und Rollen
-router.get('/', auth, async (req, res) => {
-    try {
-        const programme = await db.query(
-            `SELECT * FROM programm WHERE aktiv = TRUE ORDER BY name`
-        );
+const GRUPPEN_META = {
+    'BM': 'Berufliche Massnahmen',
+    'IM': 'Integrationsmassnahmen',
+    'BC': 'Beratung & Coaching',
+    'GM': 'Gemeinde',
+};
 
-        for (const prog of programme.rows) {
-            // Phasen + Kriterien
-            const phasen = await db.query(
-                `SELECT
-                    ph.phase_id, ph.label, ph.reihenfolge, ph.avg_dauer_tage,
-                    COALESCE(
-                        JSON_AGG(
-                            JSONB_BUILD_OBJECT(
-                                'kriterium_id', k.kriterium_id,
-                                'text', k.text,
-                                'typ', k.typ,
-                                'pflicht', k.pflicht
-                            ) ORDER BY k.reihenfolge
-                        ) FILTER (WHERE k.kriterium_id IS NOT NULL),
-                        '[]'
-                    ) AS kriterien,
-                    COALESCE(
-                        JSON_AGG(
-                            DISTINCT JSONB_BUILD_OBJECT(
-                                'vorlage_id', ptv.vorlage_id,
-                                'task_text', ptv.task_text,
-                                'reihenfolge', ptv.reihenfolge
-                            )
-                        ) FILTER (WHERE ptv.vorlage_id IS NOT NULL),
-                        '[]'
-                    ) AS task_vorlagen
-                 FROM phase ph
-                 LEFT JOIN kriterium k ON k.phase_id = ph.phase_id
-                 LEFT JOIN phase_task_vorlage ptv ON ptv.phase_id = ph.phase_id
-                 WHERE ph.programm_id = $1
-                 GROUP BY ph.phase_id
-                 ORDER BY ph.reihenfolge`,
+async function ladePhasenUndRollen(progRows) {
+    for (const prog of progRows) {
+        const phasen = await db.query(
+            `SELECT
+                ph.phase_id, ph.label, ph.reihenfolge, ph.avg_dauer_tage,
+                COALESCE(
+                    JSON_AGG(
+                        JSONB_BUILD_OBJECT(
+                            'kriterium_id', k.kriterium_id,
+                            'text', k.text,
+                            'typ', k.typ,
+                            'pflicht', k.pflicht
+                        ) ORDER BY k.reihenfolge
+                    ) FILTER (WHERE k.kriterium_id IS NOT NULL),
+                    '[]'
+                ) AS kriterien,
+                COALESCE(
+                    JSON_AGG(
+                        DISTINCT JSONB_BUILD_OBJECT(
+                            'vorlage_id', ptv.vorlage_id,
+                            'task_text', ptv.task_text,
+                            'reihenfolge', ptv.reihenfolge
+                        )
+                    ) FILTER (WHERE ptv.vorlage_id IS NOT NULL),
+                    '[]'
+                ) AS task_vorlagen
+             FROM phase ph
+             LEFT JOIN kriterium k ON k.phase_id = ph.phase_id
+             LEFT JOIN phase_task_vorlage ptv ON ptv.phase_id = ph.phase_id
+             WHERE ph.programm_id = $1
+             GROUP BY ph.phase_id
+             ORDER BY ph.reihenfolge`,
+            [prog.programm_id]
+        );
+        prog.phasen = phasen.rows;
+
+        try {
+            const progRollenRes = await db.query(
+                `SELECT rolle_name FROM programm_rolle WHERE programm_id = $1`,
                 [prog.programm_id]
             );
-            prog.phasen = phasen.rows;
+            prog.rollen = progRollenRes.rows.map(r => r.rolle_name);
+        } catch { prog.rollen = []; }
 
-            // Programm-Rollen
-            try {
-                const progRollenRes = await db.query(
-                    `SELECT rolle_name FROM programm_rolle WHERE programm_id = $1`,
-                    [prog.programm_id]
-                );
-                prog.rollen = progRollenRes.rows.map(r => r.rolle_name);
-            } catch { prog.rollen = []; }
+        try {
+            const phaseRollenRes = await db.query(
+                `SELECT pr.phase_id, pr.rolle_name
+                 FROM phase_rolle pr
+                 JOIN phase ph ON ph.phase_id = pr.phase_id
+                 WHERE ph.programm_id = $1`,
+                [prog.programm_id]
+            );
+            const map = {};
+            for (const r of phaseRollenRes.rows) {
+                if (!map[r.phase_id]) map[r.phase_id] = [];
+                map[r.phase_id].push(r.rolle_name);
+            }
+            prog.phasen.forEach(ph => { ph.rollen = map[ph.phase_id] || []; });
+        } catch { prog.phasen.forEach(ph => { ph.rollen = []; }); }
+    }
+}
 
-            // Phase-Rollen (batch für alle Phasen dieses Programms)
-            try {
-                const phaseRollenRes = await db.query(
-                    `SELECT pr.phase_id, pr.rolle_name
-                     FROM phase_rolle pr
-                     JOIN phase ph ON ph.phase_id = pr.phase_id
-                     WHERE ph.programm_id = $1`,
-                    [prog.programm_id]
-                );
-                const map = {};
-                for (const r of phaseRollenRes.rows) {
-                    if (!map[r.phase_id]) map[r.phase_id] = [];
-                    map[r.phase_id].push(r.rolle_name);
-                }
-                prog.phasen.forEach(ph => { ph.rollen = map[ph.phase_id] || []; });
-            } catch { prog.phasen.forEach(ph => { ph.rollen = []; }); }
+// GET /api/programme — Alle Programme (flach oder gruppiert via ?grouped=true)
+router.get('/', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT p.*,
+                l.tarifziffer, l.tarif, l.entschaedigungsart
+             FROM programm p
+             LEFT JOIN leistung l ON l.leistung_id = p.leistung_id
+             WHERE p.aktiv = TRUE
+             ORDER BY p.gruppe NULLS LAST, p.name`
+        );
+
+        await ladePhasenUndRollen(result.rows);
+
+        if (req.query.grouped === 'true') {
+            const gruppenMap = {};
+            for (const prog of result.rows) {
+                const g = prog.gruppe || 'Weitere';
+                if (!gruppenMap[g]) gruppenMap[g] = [];
+                gruppenMap[g].push(prog);
+            }
+            const gruppen = Object.entries(GRUPPEN_META)
+                .filter(([g]) => gruppenMap[g])
+                .map(([g, label]) => ({ gruppe: g, label, programme: gruppenMap[g] }));
+            if (gruppenMap['Weitere']?.length) {
+                gruppen.push({ gruppe: 'Weitere', label: 'Weitere Programme', programme: gruppenMap['Weitere'] });
+            }
+            return res.json({ gruppen });
         }
 
-        res.json(programme.rows);
+        res.json(result.rows);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden der Programme' });
