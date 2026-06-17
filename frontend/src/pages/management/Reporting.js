@@ -1,22 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import client from '../../api/client';
 
-const DIMENSIONEN = [
+const ALLE_DIMENSIONEN = [
     { key: 'kader',           label: 'Kader' },
     { key: 'klient',          label: 'Klient' },
     { key: 'standort',        label: 'Standort' },
     { key: 'massnahme',       label: 'Massnahme' },
     { key: 'abteilung',       label: 'Abteilung' },
     { key: 'auftraggeber_typ',label: 'Auftraggeber-Typ' },
+    { key: 'monate',          label: 'Monate',   zeitDim: true },
+    { key: 'quartale',        label: 'Quartale', zeitDim: true },
+    { key: 'wochen',          label: 'Wochen',   zeitDim: true },
+    { key: 'jahr',            label: 'Jahre',    zeitDim: true },
 ];
-
-const SPALTEN_TYPEN = [
-    { key: 'monate',   label: 'Monate' },
-    { key: 'quartale', label: 'Quartale' },
-    { key: 'wochen',   label: 'Wochen' },
-    { key: 'jahr',     label: 'Jahr' },
-];
-const TIME_SPALTEN_KEYS = new Set(SPALTEN_TYPEN.map(s => s.key));
+function dimLabel(key) {
+    return ALLE_DIMENSIONEN.find(d => d.key === key)?.label || key;
+}
 
 const KENNZAHLEN_DEF = [
     { key: 'einnahmen_soll',   label: 'Einnahmen SOLL',  short: 'E-SOLL',   fmt: 'chf' },
@@ -311,34 +310,40 @@ export default function Reporting() {
                 {/* Linker Pool */}
                 <div style={{ ...CARD, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em' }}>Dimensionen</div>
-                    {DIMENSIONEN.map(d => {
+                    {ALLE_DIMENSIONEN.map((d, i) => {
                         const inZ = zeilen.includes(d.key);
                         const inS = spalten.includes(d.key);
+                        const prevIsTime = i > 0 && !ALLE_DIMENSIONEN[i - 1].zeitDim && d.zeitDim;
                         return (
-                            <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <span style={{ fontSize: 12.5, color: (inZ || inS) ? '#2563EB' : '#1A1917', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
-                                <button onClick={() => {
-                                    if (inZ) { setZeilen([]); }
-                                    else { if (inS) setSpalten(['monate']); setZeilen([d.key]); }
-                                }} style={{
-                                    ...CHIP_BASE, padding: '2px 7px', fontSize: 10, flexShrink: 0,
-                                    background: inZ ? '#2563EB' : '#F5F4F0',
-                                    color: inZ ? '#fff' : '#6B6860',
-                                    border: 'none', cursor: 'pointer',
-                                }}>
-                                    {inZ ? '✓ Z' : '+Z'}
-                                </button>
-                                <button onClick={() => {
-                                    if (inS) { setSpalten(['monate']); }
-                                    else { if (inZ) setZeilen([]); setSpalten([d.key]); }
-                                }} style={{
-                                    ...CHIP_BASE, padding: '2px 7px', fontSize: 10, flexShrink: 0,
-                                    background: inS ? '#7C3AED' : '#F5F4F0',
-                                    color: inS ? '#fff' : '#6B6860',
-                                    border: 'none', cursor: 'pointer',
-                                }}>
-                                    {inS ? '✓ S' : '+S'}
-                                </button>
+                            <div key={d.key}>
+                                {prevIsTime && <div style={{ height: 1, background: 'rgba(0,0,0,.07)', margin: '4px 0' }} />}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <span style={{ fontSize: 12.5, color: (inZ || inS) ? '#2563EB' : '#1A1917', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
+                                    <button onClick={() => {
+                                        if (inZ) { setZeilen([]); }
+                                        else if (inS) { setZeilen([d.key]); setSpalten(zeilen[0] ? [zeilen[0]] : []); }
+                                        else { setZeilen([d.key]); }
+                                    }} style={{
+                                        ...CHIP_BASE, padding: '2px 7px', fontSize: 10, flexShrink: 0,
+                                        background: inZ ? '#2563EB' : '#F5F4F0',
+                                        color: inZ ? '#fff' : '#6B6860',
+                                        border: 'none', cursor: 'pointer',
+                                    }}>
+                                        {inZ ? '✓ Z' : '+Z'}
+                                    </button>
+                                    <button onClick={() => {
+                                        if (inS) { setSpalten([]); }
+                                        else if (inZ) { setSpalten([d.key]); setZeilen(spalten[0] ? [spalten[0]] : []); }
+                                        else { setSpalten([d.key]); }
+                                    }} style={{
+                                        ...CHIP_BASE, padding: '2px 7px', fontSize: 10, flexShrink: 0,
+                                        background: inS ? '#7C3AED' : '#F5F4F0',
+                                        color: inS ? '#fff' : '#6B6860',
+                                        border: 'none', cursor: 'pointer',
+                                    }}>
+                                        {inS ? '✓ S' : '+S'}
+                                    </button>
+                                </div>
                             </div>
                         );
                     })}
@@ -369,38 +374,25 @@ export default function Reporting() {
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Zeilen</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                 {zeilen.length === 0 && <span style={{ fontSize: 12, color: '#A09D97' }}>Keine</span>}
-                                {zeilen.map(z => {
-                                    const d = DIMENSIONEN.find(d => d.key === z);
-                                    return (
-                                        <span key={z} style={{ ...CHIP_BASE, background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(29,78,216,.2)', fontSize: 12 }}>
-                                            {d?.label}
-                                            <span onClick={() => toggleZeile(z)} style={{ cursor: 'pointer', opacity: .6, fontSize: 10 }}>✕</span>
-                                        </span>
-                                    );
-                                })}
+                                {zeilen.map(z => (
+                                    <span key={z} style={{ ...CHIP_BASE, background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(29,78,216,.2)', fontSize: 12 }}>
+                                        {dimLabel(z)}
+                                        <span onClick={() => toggleZeile(z)} style={{ cursor: 'pointer', opacity: .6, fontSize: 10 }}>✕</span>
+                                    </span>
+                                ))}
                             </div>
                         </div>
 
                         <div>
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Spalten</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                {SPALTEN_TYPEN.map(s => (
-                                    <button key={s.key} onClick={() => setSpalten([s.key])} style={{
-                                        ...CHIP_BASE, fontSize: 12,
-                                        background: spalten.includes(s.key) ? '#EEF3FE' : '#F5F4F0',
-                                        color: spalten.includes(s.key) ? '#1D4ED8' : '#6B6860',
-                                        border: spalten.includes(s.key) ? '1px solid rgba(29,78,216,.2)' : '1px solid transparent',
-                                    }}>{s.label}</button>
+                                {spalten.length === 0 && <span style={{ fontSize: 12, color: '#A09D97' }}>Keine</span>}
+                                {spalten.map(s => (
+                                    <span key={s} style={{ ...CHIP_BASE, background: '#F3E8FF', color: '#7C3AED', border: '1px solid rgba(124,58,237,.2)', fontSize: 12 }}>
+                                        {dimLabel(s)}
+                                        <span onClick={() => toggleSpalte(s)} style={{ cursor: 'pointer', opacity: .6, fontSize: 10 }}>✕</span>
+                                    </span>
                                 ))}
-                                {spalten.length > 0 && !TIME_SPALTEN_KEYS.has(spalten[0]) && (() => {
-                                    const dim = DIMENSIONEN.find(d => d.key === spalten[0]);
-                                    return dim ? (
-                                        <span style={{ ...CHIP_BASE, background: '#F3E8FF', color: '#7C3AED', border: '1px solid rgba(124,58,237,.2)', fontSize: 12 }}>
-                                            {dim.label}
-                                            <span onClick={() => setSpalten(['monate'])} style={{ cursor: 'pointer', opacity: .6, fontSize: 10 }}>✕</span>
-                                        </span>
-                                    ) : null;
-                                })()}
                             </div>
                         </div>
 
@@ -565,7 +557,7 @@ export default function Reporting() {
                             <thead>
                                 <tr style={{ background: '#F5F4F0' }}>
                                     <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 11.5, borderBottom: '1px solid rgba(0,0,0,.09)', minWidth: 140, position: 'sticky', left: 0, background: '#F5F4F0', zIndex: 1 }}>
-                                        {DIMENSIONEN.find(d => d.key === zeilen[0])?.label || 'Zeile'}
+                                        {dimLabel(zeilen[0]) || 'Zeile'}
                                     </th>
                                     {resultat.spalten.map(sp => (
                                         <th key={sp} colSpan={kennzahlen.length}

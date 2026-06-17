@@ -214,6 +214,7 @@ router.post('/query', auth, async (req, res) => {
     const zeileDim = zeilen[0] || 'kader';
     const spaltenTyp = spalten[0] || 'monate';
     const isTimeSpalte = TIME_SPALTEN.includes(spaltenTyp);
+    const isTimeZeile  = TIME_SPALTEN.includes(zeileDim);
     const kaderIsDim = zeileDim === 'kader' || spaltenTyp === 'kader';
 
     try {
@@ -376,8 +377,74 @@ router.post('/query', auth, async (req, res) => {
             return false;
         }
 
+        if (isTimeZeile) {
+            // --- Zeit als Zeilen, Dimension als Spalten ---
+            const perioden = generierePeriodenListe(zeileDim, von, bis);
+
+            const colGroups = new Map(); // ck → { dossiers: [], journal: [] }
+            const colMeta   = new Map(); // ck → { id, label }
+
+            for (const dos of dossiers) {
+                const ck = getDimKey(dos, spaltenTyp);
+                if (shouldSuppress(ck, spaltenTyp)) continue;
+                if (!colGroups.has(ck)) colGroups.set(ck, { dossiers: [], journal: [] });
+                colGroups.get(ck).dossiers.push(dos);
+                if (!colMeta.has(ck)) colMeta.set(ck, { id: ck, label: getDimLabel(dos, spaltenTyp) });
+            }
+            for (const j of journalRows) {
+                const ck = getDimKey(j, spaltenTyp);
+                if (shouldSuppress(ck, spaltenTyp)) continue;
+                if (!colGroups.has(ck)) colGroups.set(ck, { dossiers: [], journal: [] });
+                colGroups.get(ck).journal.push(j);
+                if (!colMeta.has(ck)) colMeta.set(ck, { id: ck, label: getDimLabel(j, spaltenTyp) });
+            }
+
+            // Fill in kader columns if spaltenTyp === 'kader'
+            if (spaltenTyp === 'kader') {
+                for (const k of alleKader) {
+                    const key = String(k.user_id);
+                    if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
+                    if (!colMeta.has(key)) {
+                        colMeta.set(key, { id: key, label: k.full_name });
+                        colGroups.set(key, { dossiers: [], journal: [] });
+                    }
+                }
+            }
+
+            const sortedCols = [...colMeta.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'de'));
+            const colLabels  = sortedCols.map(([, m]) => m.label);
+            const effDoss = dossiers.filter(d => !shouldSuppress(getDimKey(d, spaltenTyp), spaltenTyp));
+            const effJ    = journalRows.filter(j => !shouldSuppress(getDimKey(j, spaltenTyp), spaltenTyp));
+
+            const zeilen_result = [];
+            for (const periode of perioden) {
+                const werte = {};
+                for (const [ck, colInfo] of sortedCols) {
+                    const grp = colGroups.get(ck) || { dossiers: [], journal: [] };
+                    werte[colInfo.label] = berechneWerte(grp.dossiers, grp.journal, periode, kennzahlen);
+                }
+                zeilen_result.push({
+                    label: periode.key, id: periode.key, werte,
+                    total: berechneWerte(effDoss, effJ, periode, kennzahlen),
+                });
+            }
+
+            const globalTotal = {};
+            for (const [ck, colInfo] of sortedCols) {
+                const grp = colGroups.get(ck) || { dossiers: [], journal: [] };
+                globalTotal[colInfo.label] = berechneWerte(grp.dossiers, grp.journal, totalPeriode, kennzahlen);
+            }
+
+            return res.json({
+                spalten: colLabels,
+                zeilen: zeilen_result,
+                total: globalTotal,
+                total_gesamt: berechneWerte(effDoss, effJ, totalPeriode, kennzahlen),
+            });
+        }
+
         if (isTimeSpalte) {
-            // --- Time-based columns ---
+            // --- Dimension als Zeilen, Zeit als Spalten ---
             const perioden = generierePeriodenListe(spaltenTyp, von, bis);
             const gruppenMap = new Map();
 
