@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-const MANAGEMENT_ROLLEN = ['management', 'admin', 'teamleitung'];
+const MANAGEMENT_ROLLEN = ['leitungsteam', 'admin'];
 
 const DEFAULT_MAX_KLIENTEN = {
     'Klientenführung': 15,
@@ -81,12 +81,12 @@ router.get('/', auth, async (req, res) => {
 
 // POST /api/benutzer — Neuer Benutzer (nur Management)
 router.post('/', auth, async (req, res) => {
-    if (req.user.system_rolle !== 'management') {
+    if (!MANAGEMENT_ROLLEN.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
 
     const { full_name, email, passwort, system_rolle, pensum_pct, avatar_initials } = req.body;
-    const GUELTIGE_ROLLEN = ['admin', 'mitarbeitende', 'teamleitung', 'management', 'kader'];
+    const GUELTIGE_ROLLEN = ['kader', 'leitungsteam'];
 
     if (!full_name || !email || !passwort) {
         return res.status(400).json({ error: 'Name, E-Mail und Passwort erforderlich' });
@@ -103,7 +103,7 @@ router.post('/', auth, async (req, res) => {
                 (full_name, email, password_hash, system_rolle, pensum_pct, avatar_initials)
              VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING user_id, full_name, email, system_rolle, pensum_pct, avatar_initials`,
-            [full_name, email, hash, system_rolle || 'mitarbeitende',
+            [full_name, email, hash, system_rolle || 'kader',
              pensum_pct || 100,
              avatar_initials || full_name.split(' ').map(n => n[0]).join('').slice(0, 3)]
         );
@@ -302,7 +302,7 @@ router.get('/:id', auth, requireManagement, async (req, res) => {
 // PUT /api/benutzer/:id — Benutzer aktualisieren (Management/Teamleitung)
 router.put('/:id', auth, requireManagement, async (req, res) => {
     const { full_name, email, system_rolle, pensum_pct, avatar_initials, standorte, rollen, programme } = req.body;
-    const GUELTIGE_ROLLEN = ['admin', 'mitarbeitende', 'teamleitung', 'management', 'kader'];
+    const GUELTIGE_ROLLEN = ['kader', 'leitungsteam'];
 
     if (!full_name || !email) {
         return res.status(400).json({ error: 'Name und E-Mail erforderlich' });
@@ -318,7 +318,7 @@ router.put('/:id', auth, requireManagement, async (req, res) => {
         await client.query(
             `UPDATE benutzer SET full_name=$1, email=$2, system_rolle=$3, pensum_pct=$4, avatar_initials=$5, updated_at=NOW()
              WHERE user_id=$6`,
-            [full_name, email, system_rolle || 'mitarbeitende', pensum_pct || 100,
+            [full_name, email, system_rolle || 'kader', pensum_pct || 100,
              avatar_initials || full_name.split(' ').map(n => n[0]).join('').slice(0, 3),
              req.params.id]
         );
