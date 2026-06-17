@@ -363,11 +363,6 @@ router.post('/query', auth, async (req, res) => {
         const alleKader = alleKaderResult.rows;
 
         const selectedUserIds = new Set(filter.user_ids || []);
-        // Kaders who have at least one dossier or journal entry in the queried period
-        const kaderMitDaten = new Set([
-            ...dossiers.map(d => d.kader_id).filter(Boolean).map(String),
-            ...journalRows.map(j => j.kader_id).filter(Boolean).map(String),
-        ]);
 
         const totalPeriode = { von: new Date(von), bis: new Date(bis) };
 
@@ -402,13 +397,11 @@ router.post('/query', auth, async (req, res) => {
                 if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: getDimLabel(j, zeileDim), dossiers: [] });
             }
 
-            // Fill in kader: when filter active → selected kaders (incl. zeros);
-            // when no filter → only kaders with actual data in period
+            // Fill in kader: filter active → only selected; no filter → all active benutzer
             if (zeileDim === 'kader') {
                 for (const k of alleKader) {
                     const key = String(k.user_id);
                     if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
-                    if (selectedUserIds.size === 0 && !kaderMitDaten.has(key)) continue;
                     if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: k.full_name, dossiers: [] });
                 }
             }
@@ -470,13 +463,11 @@ router.post('/query', auth, async (req, res) => {
             if (!colMeta.has(ck)) colMeta.set(ck, { id: ck, label: getDimLabel(j, spaltenTyp) });
         }
 
-        // Fill in kader: when filter active → selected kaders (incl. zeros);
-        // when no filter → only kaders with actual data in period
+        // Fill in kader: filter active → only selected; no filter → all active benutzer
         if (zeileDim === 'kader') {
             for (const k of alleKader) {
                 const key = String(k.user_id);
                 if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
-                if (selectedUserIds.size === 0 && !kaderMitDaten.has(key)) continue;
                 if (!rowMeta.has(key)) rowMeta.set(key, { id: key, label: k.full_name });
             }
         }
@@ -484,7 +475,6 @@ router.post('/query', auth, async (req, res) => {
             for (const k of alleKader) {
                 const key = String(k.user_id);
                 if (selectedUserIds.size > 0 && !selectedUserIds.has(key)) continue;
-                if (selectedUserIds.size === 0 && !kaderMitDaten.has(key)) continue;
                 if (!colMeta.has(key)) colMeta.set(key, { id: key, label: k.full_name });
             }
         }
