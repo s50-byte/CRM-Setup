@@ -179,7 +179,6 @@ export default function Reporting() {
     // Diagramm-State
     const [ansicht, setAnsicht] = useState('tabelle'); // 'tabelle' | 'diagramm'
     const [diagrammTyp, setDiagrammTyp] = useState('auto');
-    const [diagrammKennzahl, setDiagrammKennzahl] = useState('');
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
 
@@ -187,13 +186,6 @@ export default function Reporting() {
         client.get('/reporting/optionen').then(r => setOptionen(r.data)).catch(console.error);
         client.get('/reporting/ansichten').then(r => setAnsichten(r.data)).catch(console.error);
     }, []);
-
-    // Diagramm-Kennzahl auf erste gewählte Kennzahl setzen falls nicht mehr vorhanden
-    useEffect(() => {
-        if (!diagrammKennzahl || !kennzahlen.includes(diagrammKennzahl)) {
-            setDiagrammKennzahl(kennzahlen[0] || '');
-        }
-    }, [kennzahlen, diagrammKennzahl]);
 
     const ausfuehren = useCallback(async () => {
         setLaden(true);
@@ -219,14 +211,8 @@ export default function Reporting() {
     useEffect(() => {
         if (!resultat || ansicht !== 'diagramm' || !chartRef.current) return;
         if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
+        if (resultat.zeilen.length === 0 || kennzahlen.length === 0) return;
 
-        const kz = diagrammKennzahl || kennzahlen[0];
-        if (!kz || resultat.zeilen.length === 0) return;
-
-        const kzDef = KZ_MAP[kz];
-        const tooltipEinheit = kzDef?.fmt === 'chf' ? ' CHF' : kzDef?.fmt === 'h' ? ' h' : kzDef?.fmt === 'pct' ? '%' : '';
-
-        // Effektiver Diagrammtyp (Auto-Logik)
         const effTyp = diagrammTyp !== 'auto' ? diagrammTyp
             : TIME_DIMS.has(spalten[0]) ? 'linie'
             : TIME_DIMS.has(zeilen[0]) ? 'balken_h'
@@ -235,73 +221,103 @@ export default function Reporting() {
         let chartType, data, options;
 
         if (effTyp === 'torte') {
+            const kz = kennzahlen[0];
+            const kzDef = KZ_MAP[kz];
             const labels = resultat.zeilen.map(z => z.label);
             const vals = resultat.zeilen.map(z => {
                 const v = z.total?.[kz];
-                return (v !== null && v !== undefined) ? Number(v) : 0;
+                return v != null ? Number(v) : 0;
             });
             chartType = 'pie';
             data = {
                 labels,
-                datasets: [{
-                    data: vals,
-                    backgroundColor: CHART_FARBEN.slice(0, labels.length),
-                }],
+                datasets: [{ data: vals, backgroundColor: CHART_FARBEN.slice(0, labels.length) }],
             };
             options = {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: { duration: 300 },
+                responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
                 plugins: {
                     legend: { position: 'top' },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => ` ${ctx.label}: ${fmtWert(ctx.raw, kzDef?.fmt)}${tooltipEinheit}`,
-                        },
-                    },
+                    tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmtWert(ctx.raw, kzDef?.fmt)}` } },
                 },
             };
         } else {
-            const labels = resultat.spalten;
             const isHorizontal = effTyp === 'balken_h';
             const isStacked = effTyp === 'gestapelt';
             const isFill = effTyp === 'flaeche';
             chartType = (effTyp === 'linie' || isFill) ? 'line' : 'bar';
 
-            const datasets = resultat.zeilen.map((zeile, i) => {
-                const farbe = CHART_FARBEN[i % CHART_FARBEN.length];
-                const vals = resultat.spalten.map(sp => {
-                    const v = zeile.werte[sp]?.[kz];
-                    return (v !== null && v !== undefined) ? Number(v) : 0;
-                });
-                const ds = {
-                    label: zeile.label,
-                    data: vals,
+            // Duale Y-Achse wenn CHF- und Stunden-Kennzahlen gemischt (nicht bei Stapel)
+            const fmtSet = new Set(kennzahlen.map(kz => KZ_MAP[kz]?.fmt));
+            const hasDualAxis = !isStacked && fmtSet.has('chf') && fmtSet.has('h');
+
+            let colorIdx = 0;
+            const buildDs = (zeile, kz, label) => {
+                const kzDef = KZ_MAP[kz];
+                const farbe = CHART_FARBEN[colorIdx++ % CHART_FARBEN.length];
+                return {
+                    label,
+                    data: resultat.spalten.map(sp => {
+                        const v = zeile.werte[sp]?.[kz];
+                        return v != null ? Number(v) : 0;
+                    }),
                     borderColor: farbe,
                     backgroundColor: chartType === 'line' ? farbe + '33' : farbe + 'CC',
                     borderWidth: chartType === 'line' ? 2 : 1,
                     pointRadius: chartType === 'line' ? 3 : undefined,
-                    fill: isFill ? true : undefined,
+                    fill: isFill || undefined,
                     tension: chartType === 'line' ? 0.3 : undefined,
+                    yAxisID: hasDualAxis ? (kzDef?.fmt === 'h' ? 'y1' : 'y') : 'y',
+                    _kzFmt: kzDef?.fmt,
                 };
-                return ds;
-            });
+            };
 
-            data = { labels, datasets };
+            let datasets;
+            if (resultat.zeilen.length === 1) {
+                // 1 Zeile → Dataset pro Kennzahl
+                datasets = kennzahlen.map(kz => buildDs(resultat.zeilen[0], kz, KZ_MAP[kz]?.label || kz));
+            } else if (kennzahlen.length === 1) {
+                // N Zeilen, 1 Kennzahl → Dataset pro Zeile
+                datasets = resultat.zeilen.map(zeile => buildDs(zeile, kennzahlen[0], zeile.label));
+            } else {
+                // N Zeilen × N Kennzahlen → Dataset pro Zeile×Kennzahl
+                datasets = resultat.zeilen.flatMap(zeile =>
+                    kennzahlen.map(kz => buildDs(zeile, kz, `${zeile.label} — ${KZ_MAP[kz]?.short || kz}`))
+                );
+            }
+
+            const vieleDatensaetze = datasets.length > 8;
+            data = { labels: resultat.spalten, datasets };
+
+            const tickCb = (fmt) => v => {
+                if (fmt === 'chf') return v.toLocaleString('de-CH');
+                if (fmt === 'h') return v.toFixed(1) + ' h';
+                if (fmt === 'pct') return v + '%';
+                return v;
+            };
+
             options = {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: { duration: 300 },
+                responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
                 ...(isHorizontal ? { indexAxis: 'y' } : {}),
                 plugins: {
-                    legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+                    legend: {
+                        position: vieleDatensaetze ? 'bottom' : 'top',
+                        labels: {
+                            boxWidth: vieleDatensaetze ? 10 : 12,
+                            font: { size: vieleDatensaetze ? 10 : 11 },
+                            padding: vieleDatensaetze ? 6 : 10,
+                        },
+                    },
                     tooltip: {
                         callbacks: {
-                            label: ctx => ` ${ctx.dataset.label}: ${fmtWert(ctx.raw, kzDef?.fmt)}${tooltipEinheit}`,
+                            label: ctx => ` ${ctx.dataset.label}: ${fmtWert(ctx.raw, ctx.dataset._kzFmt)}`,
                         },
                     },
                 },
-                scales: {
+                scales: hasDualAxis ? {
+                    x: { ticks: { font: { size: 11 } } },
+                    y: { beginAtZero: true, position: 'left', ticks: { font: { size: 11 }, callback: tickCb('chf') } },
+                    y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { font: { size: 11 }, callback: tickCb('h') } },
+                } : {
                     x: { stacked: isStacked, ticks: { font: { size: 11 } } },
                     y: { stacked: isStacked, beginAtZero: true, ticks: { font: { size: 11 } } },
                 },
@@ -313,7 +329,7 @@ export default function Reporting() {
         return () => {
             if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
         };
-    }, [resultat, ansicht, diagrammTyp, diagrammKennzahl, kennzahlen, zeilen, spalten]);
+    }, [resultat, ansicht, diagrammTyp, kennzahlen, zeilen, spalten]);
 
     async function speichern() {
         if (!ansichtName.trim()) return;
@@ -685,16 +701,6 @@ export default function Reporting() {
                                     <option value="flaeche">Fläche</option>
                                     <option value="torte">Torte</option>
                                 </select>
-                                {kennzahlen.length > 1 && (
-                                    <select
-                                        value={diagrammKennzahl}
-                                        onChange={e => setDiagrammKennzahl(e.target.value)}
-                                        style={{ ...inputStyle, fontSize: 12, cursor: 'pointer' }}>
-                                        {kennzahlen.map(kk => (
-                                            <option key={kk} value={kk}>{KZ_MAP[kk]?.label || kk}</option>
-                                        ))}
-                                    </select>
-                                )}
                             </>
                         )}
                         <div style={{ display: 'flex', gap: 2 }}>
