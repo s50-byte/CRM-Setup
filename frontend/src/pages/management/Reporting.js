@@ -71,22 +71,20 @@ function fmtWert(v, fmt) {
     }
 }
 
-function istFarbe(kzKey, werte) {
-    if (!kzKey.endsWith('_ist') && kzKey !== 'auslastung_pct') return null;
-    if (kzKey === 'auslastung_pct') {
-        const v = werte?.[kzKey];
-        if (v == null) return null;
-        if (v >= 90) return { bg: '#D1FAE5', color: '#065F46' };
-        if (v >= 50) return { bg: '#FEF3C7', color: '#92400E' };
+function getFarbe(kennzahl, ist, soll) {
+    if (ist == null || !soll || soll === 0) return null;
+    const ratio = ist / soll;
+    if (kennzahl.includes('stunden')) {
+        if (ratio > 1.0) return { bg: '#FEE2E2', color: '#991B1B' };
+        if (ratio > 0.8) return { bg: '#FEF3C7', color: '#92400E' };
+        return { bg: '#D1FAE5', color: '#065F46' };
+    }
+    if (kennzahl.includes('einnahmen')) {
+        if (ratio >= 0.9) return { bg: '#D1FAE5', color: '#065F46' };
+        if (ratio >= 0.5) return { bg: '#FEF3C7', color: '#92400E' };
         return { bg: '#FEE2E2', color: '#991B1B' };
     }
-    const soll = werte?.[kzKey.replace('_ist', '_soll')];
-    const ist = werte?.[kzKey];
-    if (!soll || soll === 0) return null;
-    const ratio = ist / soll;
-    if (ratio >= 0.9) return { bg: '#D1FAE5', color: '#065F46' };
-    if (ratio >= 0.5) return { bg: '#FEF3C7', color: '#92400E' };
-    return { bg: '#FEE2E2', color: '#991B1B' };
+    return null;
 }
 
 function MultiSelectDropdown({ label, options, selected, onChange, getKey, getLabel }) {
@@ -671,7 +669,8 @@ export default function Reporting() {
                                             {[...resultat.spalten.map(sp => ({ sp, werte: zeile.werte[sp] })), { sp: '__total__', werte: zeile.total }].map(({ sp, werte }) =>
                                                 kennzahlen.map((kk, ki) => {
                                                     const kd = KZ_MAP[kk];
-                                                    const farbe = istFarbe(kk, werte);
+                                                    const isIst = kk.endsWith('_ist');
+                                                    const farbe = isIst ? getFarbe(kk, werte?.[kk], werte?.[kk.replace('_ist', '_soll')]) : null;
                                                     return (
                                                         <td key={`${sp}-${kk}`} style={{
                                                             padding: '6px 6px', textAlign: 'right', fontSize: 12,
@@ -699,7 +698,8 @@ export default function Reporting() {
                                         {[...resultat.spalten.map(sp => ({ sp, werte: resultat.total[sp] })), { sp: '__total__', werte: resultat.total_gesamt }].map(({ sp, werte }) =>
                                             kennzahlen.map((kk, ki) => {
                                                 const kd = KZ_MAP[kk];
-                                                const farbe = istFarbe(kk, werte);
+                                                const isIst = kk.endsWith('_ist');
+                                                const farbe = isIst ? getFarbe(kk, werte?.[kk], werte?.[kk.replace('_ist', '_soll')]) : null;
                                                 return (
                                                     <td key={`total-${sp}-${kk}`} style={{
                                                         padding: '7px 6px', textAlign: 'right', fontSize: 12,
