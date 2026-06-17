@@ -16,6 +16,7 @@ const SPALTEN_TYPEN = [
     { key: 'wochen',   label: 'Wochen' },
     { key: 'jahr',     label: 'Jahr' },
 ];
+const TIME_SPALTEN_KEYS = new Set(SPALTEN_TYPEN.map(s => s.key));
 
 const KENNZAHLEN_DEF = [
     { key: 'einnahmen_soll',   label: 'Einnahmen SOLL',  short: 'E-SOLL',   fmt: 'chf' },
@@ -308,21 +309,39 @@ export default function Reporting() {
             <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12 }}>
 
                 {/* Linker Pool */}
-                <div style={{ ...CARD, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ ...CARD, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em' }}>Dimensionen</div>
-                    {DIMENSIONEN.map(d => (
-                        <div key={d.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                            <span style={{ fontSize: 12.5, color: zeilen.includes(d.key) ? '#2563EB' : '#1A1917' }}>{d.label}</span>
-                            <button onClick={() => toggleZeile(d.key)} style={{
-                                ...CHIP_BASE, padding: '2px 8px', fontSize: 11,
-                                background: zeilen.includes(d.key) ? '#2563EB' : '#F5F4F0',
-                                color: zeilen.includes(d.key) ? '#fff' : '#6B6860',
-                                border: 'none', cursor: 'pointer',
-                            }}>
-                                {zeilen.includes(d.key) ? '✓ Z' : '+Z'}
-                            </button>
-                        </div>
-                    ))}
+                    {DIMENSIONEN.map(d => {
+                        const inZ = zeilen.includes(d.key);
+                        const inS = spalten.includes(d.key);
+                        return (
+                            <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ fontSize: 12.5, color: (inZ || inS) ? '#2563EB' : '#1A1917', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
+                                <button onClick={() => {
+                                    if (inZ) { setZeilen([]); }
+                                    else { if (inS) setSpalten(['monate']); setZeilen([d.key]); }
+                                }} style={{
+                                    ...CHIP_BASE, padding: '2px 7px', fontSize: 10, flexShrink: 0,
+                                    background: inZ ? '#2563EB' : '#F5F4F0',
+                                    color: inZ ? '#fff' : '#6B6860',
+                                    border: 'none', cursor: 'pointer',
+                                }}>
+                                    {inZ ? '✓ Z' : '+Z'}
+                                </button>
+                                <button onClick={() => {
+                                    if (inS) { setSpalten(['monate']); }
+                                    else { if (inZ) setZeilen([]); setSpalten([d.key]); }
+                                }} style={{
+                                    ...CHIP_BASE, padding: '2px 7px', fontSize: 10, flexShrink: 0,
+                                    background: inS ? '#7C3AED' : '#F5F4F0',
+                                    color: inS ? '#fff' : '#6B6860',
+                                    border: 'none', cursor: 'pointer',
+                                }}>
+                                    {inS ? '✓ S' : '+S'}
+                                </button>
+                            </div>
+                        );
+                    })}
 
                     <div style={{ height: 1, background: 'rgba(0,0,0,.07)', margin: '4px 0' }} />
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em' }}>Kennzahlen</div>
@@ -366,13 +385,22 @@ export default function Reporting() {
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Spalten</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                 {SPALTEN_TYPEN.map(s => (
-                                    <button key={s.key} onClick={() => toggleSpalte(s.key)} style={{
+                                    <button key={s.key} onClick={() => setSpalten([s.key])} style={{
                                         ...CHIP_BASE, fontSize: 12,
                                         background: spalten.includes(s.key) ? '#EEF3FE' : '#F5F4F0',
                                         color: spalten.includes(s.key) ? '#1D4ED8' : '#6B6860',
                                         border: spalten.includes(s.key) ? '1px solid rgba(29,78,216,.2)' : '1px solid transparent',
                                     }}>{s.label}</button>
                                 ))}
+                                {spalten.length > 0 && !TIME_SPALTEN_KEYS.has(spalten[0]) && (() => {
+                                    const dim = DIMENSIONEN.find(d => d.key === spalten[0]);
+                                    return dim ? (
+                                        <span style={{ ...CHIP_BASE, background: '#F3E8FF', color: '#7C3AED', border: '1px solid rgba(124,58,237,.2)', fontSize: 12 }}>
+                                            {dim.label}
+                                            <span onClick={() => setSpalten(['monate'])} style={{ cursor: 'pointer', opacity: .6, fontSize: 10 }}>✕</span>
+                                        </span>
+                                    ) : null;
+                                })()}
                             </div>
                         </div>
 

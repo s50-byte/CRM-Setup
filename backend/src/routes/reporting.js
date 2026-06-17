@@ -3,6 +3,7 @@ const db = require('../db');
 const auth = require('../middleware/auth');
 
 const ERLAUBTE_ROLLEN = ['management', 'teamleitung', 'kader', 'leitungsteam'];
+const TIME_SPALTEN = ['monate', 'quartale', 'wochen', 'jahr'];
 
 function generierePeriodenListe(typ, von, bis) {
     const result = [];
@@ -210,7 +211,7 @@ router.post('/query', auth, async (req, res) => {
     const bis = filter.bis || new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString().slice(0, 10);
     const zeileDim = zeilen[0] || 'kader';
     const spaltenTyp = spalten[0] || 'monate';
-    const perioden = generierePeriodenListe(spaltenTyp, von, bis);
+    const isTimeSpalte = TIME_SPALTEN.includes(spaltenTyp);
 
     try {
         const params = [von, bis];
@@ -232,7 +233,7 @@ router.post('/query', auth, async (req, res) => {
         if (filter.user_ids?.length > 0) {
             params.push(filter.user_ids);
             const p = `$${params.length}::uuid[]`;
-            const c = `EXISTS (SELECT 1 FROM klient_user ku2 WHERE ku2.klient_id = k.klient_id AND ku2.user_id = ANY(${p}) AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung')`;
+            const c = `EXISTS (SELECT 1 FROM klient_user ku2 WHERE ku2.klient_id = k.klient_id AND ku2.user_id = ANY(${p}) AND ku2.aktiv = TRUE)`;
             dossierClauses.push(c);
             journalClauses.push(c);
         }
@@ -307,10 +308,19 @@ router.post('/query', auth, async (req, res) => {
                 `SELECT
                     j.klient_id, j.datum, j.dauer_minuten, j.verrechenbar,
                     COALESCE(l.tarif, 0) AS tarif,
+                    k.vorname || ' ' || k.nachname AS klient_name,
                     (SELECT ku2.user_id FROM klient_user ku2
                      WHERE ku2.klient_id = j.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung'
                      LIMIT 1) AS kader_id,
-                    d.standort_id, d.abteilung, d.auftraggeber, d.programm_id
+                    (SELECT u2.full_name FROM klient_user ku2
+                     JOIN benutzer u2 ON u2.user_id = ku2.user_id
+                     WHERE ku2.klient_id = j.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung'
+                     LIMIT 1) AS kader_name,
+                    d.standort_id,
+                    (SELECT st.name FROM standort st WHERE st.standort_id = d.standort_id) AS standort_name,
+                    d.abteilung, d.auftraggeber,
+                    d.programm_id,
+                    (SELECT prog.name FROM programm prog WHERE prog.programm_id = d.programm_id) AS programm_name
                  FROM journal_eintrag j
                  JOIN klient k ON k.klient_id = j.klient_id
                  LEFT JOIN LATERAL (
@@ -330,59 +340,139 @@ router.post('/query', auth, async (req, res) => {
 
         const dossiers = dossierResult.rows;
         const journalRows = journalResult.rows;
-
-        // Build dimension groups
-        const gruppenMap = new Map();
-        for (const dos of dossiers) {
-            const key = getDimKey(dos, zeileDim);
-            if (!gruppenMap.has(key)) {
-                gruppenMap.set(key, { id: key, label: getDimLabel(dos, zeileDim), dossiers: [] });
-            }
-            gruppenMap.get(key).dossiers.push(dos);
-        }
-
-        const journalByDim = new Map();
-        for (const j of journalRows) {
-            const key = getDimKey(j, zeileDim);
-            if (!journalByDim.has(key)) journalByDim.set(key, []);
-            journalByDim.get(key).push(j);
-            if (!gruppenMap.has(key)) {
-                gruppenMap.set(key, { id: key, label: getDimLabel(j, zeileDim), dossiers: [] });
-            }
-        }
-
-        // Compute result
         const totalPeriode = { von: new Date(von), bis: new Date(bis) };
-        const zeilen_result = [];
 
-        for (const [key, gruppe] of gruppenMap) {
-            const jList = journalByDim.get(key) || [];
-            const werte = {};
-            for (const p of perioden) {
-                werte[p.key] = berechneWerte(gruppe.dossiers, jList, p, kennzahlen);
+        // Suppress "(Kein X)" rows when the corresponding filter is active
+        function shouldSuppress(key, dim) {
+            if (key === '__kein_kader__' && filter.user_ids?.length > 0) return true;
+            if (key === '__kein_standort__' && filter.standort_ids?.length > 0) return true;
+            if (key === '__kein_programm__' && filter.programm_ids?.length > 0) return true;
+            if (key === '__' && dim === 'klient' && filter.klient_ids?.length > 0) return true;
+            if (key === 'Keine Abteilung' && dim === 'abteilung' && filter.abteilungen?.length > 0) return true;
+            return false;
+        }
+
+        if (isTimeSpalte) {
+            // --- Time-based columns ---
+            const perioden = generierePeriodenListe(spaltenTyp, von, bis);
+            const gruppenMap = new Map();
+
+            for (const dos of dossiers) {
+                const key = getDimKey(dos, zeileDim);
+                if (shouldSuppress(key, zeileDim)) continue;
+                if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: getDimLabel(dos, zeileDim), dossiers: [] });
+                gruppenMap.get(key).dossiers.push(dos);
             }
-            zeilen_result.push({
-                label: gruppe.label,
-                id: gruppe.id,
-                werte,
-                total: berechneWerte(gruppe.dossiers, jList, totalPeriode, kennzahlen),
+
+            const journalByDim = new Map();
+            for (const j of journalRows) {
+                const key = getDimKey(j, zeileDim);
+                if (shouldSuppress(key, zeileDim)) continue;
+                if (!journalByDim.has(key)) journalByDim.set(key, []);
+                journalByDim.get(key).push(j);
+                if (!gruppenMap.has(key)) gruppenMap.set(key, { id: key, label: getDimLabel(j, zeileDim), dossiers: [] });
+            }
+
+            const zeilen_result = [];
+            for (const [key, gruppe] of gruppenMap) {
+                const jList = journalByDim.get(key) || [];
+                const werte = {};
+                for (const p of perioden) {
+                    werte[p.key] = berechneWerte(gruppe.dossiers, jList, p, kennzahlen);
+                }
+                zeilen_result.push({
+                    label: gruppe.label, id: gruppe.id, werte,
+                    total: berechneWerte(gruppe.dossiers, jList, totalPeriode, kennzahlen),
+                });
+            }
+            zeilen_result.sort((a, b) => a.label.localeCompare(b.label, 'de'));
+
+            const effDoss = dossiers.filter(d => !shouldSuppress(getDimKey(d, zeileDim), zeileDim));
+            const effJ = journalRows.filter(j => !shouldSuppress(getDimKey(j, zeileDim), zeileDim));
+            const globalTotal = {};
+            for (const p of perioden) globalTotal[p.key] = berechneWerte(effDoss, effJ, p, kennzahlen);
+
+            return res.json({
+                spalten: perioden.map(p => p.key),
+                zeilen: zeilen_result,
+                total: globalTotal,
+                total_gesamt: berechneWerte(effDoss, effJ, totalPeriode, kennzahlen),
             });
         }
 
-        zeilen_result.sort((a, b) => a.label.localeCompare(b.label, 'de'));
+        // --- Dimension-based columns ---
+        const cellMap = new Map();
+        const rowMeta = new Map();
+        const colMeta = new Map();
 
-        // Global totals per period
-        const globalTotal = {};
-        for (const p of perioden) {
-            globalTotal[p.key] = berechneWerte(dossiers, journalRows, p, kennzahlen);
+        function cellKey(rk, ck) { return `${rk}|||${ck}`; }
+        function getCell(rk, ck) {
+            const k = cellKey(rk, ck);
+            if (!cellMap.has(k)) cellMap.set(k, { dossiers: [], journal: [] });
+            return cellMap.get(k);
         }
 
+        for (const dos of dossiers) {
+            const rk = getDimKey(dos, zeileDim);
+            const ck = getDimKey(dos, spaltenTyp);
+            if (shouldSuppress(rk, zeileDim) || shouldSuppress(ck, spaltenTyp)) continue;
+            getCell(rk, ck).dossiers.push(dos);
+            if (!rowMeta.has(rk)) rowMeta.set(rk, { id: rk, label: getDimLabel(dos, zeileDim) });
+            if (!colMeta.has(ck)) colMeta.set(ck, { id: ck, label: getDimLabel(dos, spaltenTyp) });
+        }
+
+        for (const j of journalRows) {
+            const rk = getDimKey(j, zeileDim);
+            const ck = getDimKey(j, spaltenTyp);
+            if (shouldSuppress(rk, zeileDim) || shouldSuppress(ck, spaltenTyp)) continue;
+            getCell(rk, ck).journal.push(j);
+            if (!rowMeta.has(rk)) rowMeta.set(rk, { id: rk, label: getDimLabel(j, zeileDim) });
+            if (!colMeta.has(ck)) colMeta.set(ck, { id: ck, label: getDimLabel(j, spaltenTyp) });
+        }
+
+        const sortedCols = [...colMeta.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'de'));
+        const sortedRows = [...rowMeta.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'de'));
+        const colLabels = sortedCols.map(([, m]) => m.label);
+
+        const zeilen_result = [];
+        for (const [rk, rowInfo] of sortedRows) {
+            const werte = {};
+            const allDos = [];
+            const allJ = [];
+            for (const [ck, colInfo] of sortedCols) {
+                const cell = cellMap.get(cellKey(rk, ck)) || { dossiers: [], journal: [] };
+                allDos.push(...cell.dossiers);
+                allJ.push(...cell.journal);
+                werte[colInfo.label] = berechneWerte(cell.dossiers, cell.journal, totalPeriode, kennzahlen);
+            }
+            zeilen_result.push({
+                label: rowInfo.label, id: rk, werte,
+                total: berechneWerte(allDos, allJ, totalPeriode, kennzahlen),
+            });
+        }
+
+        const globalTotal = {};
+        for (const [ck, colInfo] of sortedCols) {
+            const allDos = [];
+            const allJ = [];
+            for (const [rk] of sortedRows) {
+                const cell = cellMap.get(cellKey(rk, ck)) || { dossiers: [], journal: [] };
+                allDos.push(...cell.dossiers);
+                allJ.push(...cell.journal);
+            }
+            globalTotal[colInfo.label] = berechneWerte(allDos, allJ, totalPeriode, kennzahlen);
+        }
+
+        const grandDos = [...cellMap.values()].flatMap(c => c.dossiers);
+        const grandJ = [...cellMap.values()].flatMap(c => c.journal);
+
         res.json({
-            spalten: perioden.map(p => p.key),
+            spalten: colLabels,
             zeilen: zeilen_result,
             total: globalTotal,
-            total_gesamt: berechneWerte(dossiers, journalRows, totalPeriode, kennzahlen),
+            total_gesamt: berechneWerte(grandDos, grandJ, totalPeriode, kennzahlen),
         });
+
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Ausführen der Abfrage' });
