@@ -94,13 +94,14 @@ function berechneWerte(dossierList, journalList, periode, kennzahlen) {
         const dauerMonate = Math.max(1, parseInt(dos.dauer_monate) || 1);
         const sollLeistungTotal = parseFloat(dos.soll_leistung_total) || 0;
         const sollStundenTotal = parseFloat(dos.soll_stunden_total) || 0;
+        const kaderCount = Math.max(1, parseInt(dos.kader_count) || 1);
 
         switch (dos.verrechnungsart) {
-            case 'monatspauschale': einnahmen_soll += betrag; break;
-            case 'fallpauschale':   einnahmen_soll += betrag / dauerMonate; break;
-            case 'stundenpauschale': einnahmen_soll += sollLeistungTotal / dauerMonate; break;
+            case 'monatspauschale': einnahmen_soll += betrag / kaderCount; break;
+            case 'fallpauschale':   einnahmen_soll += betrag / dauerMonate / kaderCount; break;
+            case 'stundenpauschale': einnahmen_soll += sollLeistungTotal / dauerMonate / kaderCount; break;
         }
-        stunden_soll += sollStundenTotal / dauerMonate;
+        stunden_soll += sollStundenTotal / dauerMonate / kaderCount;
         klientenSet.add(String(dos.klient_id));
     }
 
@@ -111,8 +112,9 @@ function berechneWerte(dossierList, journalList, periode, kennzahlen) {
         if (jDate < vonDate || jDate > bisDate) continue;
         const minuten = parseFloat(j.dauer_minuten) || 0;
         const stunden = minuten / 60;
-        stunden_ist += stunden;
-        if (j.verrechenbar) einnahmen_ist += stunden * (parseFloat(j.tarif) || 0);
+        const kaderCount = Math.max(1, parseInt(j.kader_count) || 1);
+        stunden_ist += stunden / kaderCount;
+        if (j.verrechenbar) einnahmen_ist += stunden * (parseFloat(j.tarif) || 0) / kaderCount;
         klientenSet.add(String(j.klient_id));
     }
 
@@ -261,47 +263,53 @@ router.post('/query', auth, async (req, res) => {
 
         const [dossierResult, journalResult] = await Promise.all([
             db.query(
-                `SELECT
-                    d.dossier_id, k.klient_id,
-                    k.vorname || ' ' || k.nachname AS klient_name,
-                    d.standort_id, st.name AS standort_name,
-                    d.abteilung, d.auftraggeber,
-                    pv.programm_id, prog.name AS programm_name,
-                    pv.start_datum, pv.geplantes_enddatum,
-                    GREATEST(1, COALESCE(
-                        (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
-                       + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int, 1
-                    )) AS dauer_monate,
-                    v.betrag, v.verrechnungsart,
-                    COALESCE(SUM(vp.soll_stunden * COALESCE(l.tarif, 0)), 0) AS soll_leistung_total,
-                    COALESCE(SUM(vp.soll_stunden), 0) AS soll_stunden_total,
-                    (SELECT u2.user_id FROM klient_user ku2
-                     JOIN benutzer u2 ON u2.user_id = ku2.user_id
-                     WHERE ku2.klient_id = k.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung'
-                     LIMIT 1) AS kader_id,
-                    (SELECT u2.full_name FROM klient_user ku2
-                     JOIN benutzer u2 ON u2.user_id = ku2.user_id
-                     WHERE ku2.klient_id = k.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung'
-                     LIMIT 1) AS kader_name
-                 FROM dossier d
-                 JOIN klient k ON k.klient_id = d.klient_id
-                 JOIN programm_verlauf pv ON pv.dossier_id = d.dossier_id AND pv.status = 'Laufend'
-                 LEFT JOIN standort st ON st.standort_id = d.standort_id
-                 LEFT JOIN programm prog ON prog.programm_id = pv.programm_id
-                 LEFT JOIN LATERAL (
-                     SELECT v2.verfuegung_id, v2.betrag, v2.verrechnungsart
-                     FROM verfuegung v2
-                     WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv'
-                     LIMIT 1
-                 ) v ON true
-                 LEFT JOIN verfuegung_position vp ON vp.verfuegung_id = v.verfuegung_id
-                 LEFT JOIN leistung l ON l.leistung_id = vp.leistung_id
-                 WHERE k.aktiv = TRUE
-                   AND pv.geplantes_enddatum >= $1 AND pv.start_datum <= $2
-                   ${dossierWhere}
-                 GROUP BY d.dossier_id, k.klient_id, k.vorname, k.nachname, d.standort_id, st.name,
-                          d.abteilung, d.auftraggeber, pv.programm_id, prog.name,
-                          pv.start_datum, pv.geplantes_enddatum, v.betrag, v.verrechnungsart`,
+                `WITH agg AS (
+                    SELECT
+                        d.dossier_id, k.klient_id,
+                        k.vorname || ' ' || k.nachname AS klient_name,
+                        d.standort_id, st.name AS standort_name,
+                        d.abteilung, d.auftraggeber,
+                        pv.programm_id, prog.name AS programm_name,
+                        pv.start_datum, pv.geplantes_enddatum,
+                        GREATEST(1, COALESCE(
+                            (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
+                           + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int, 1
+                        )) AS dauer_monate,
+                        v.betrag, v.verrechnungsart,
+                        COALESCE(SUM(vp.soll_stunden * COALESCE(l.tarif, 0)), 0) AS soll_leistung_total,
+                        COALESCE(SUM(vp.soll_stunden), 0) AS soll_stunden_total
+                    FROM dossier d
+                    JOIN klient k ON k.klient_id = d.klient_id
+                    JOIN programm_verlauf pv ON pv.dossier_id = d.dossier_id AND pv.status = 'Laufend'
+                    LEFT JOIN standort st ON st.standort_id = d.standort_id
+                    LEFT JOIN programm prog ON prog.programm_id = pv.programm_id
+                    LEFT JOIN LATERAL (
+                        SELECT v2.verfuegung_id, v2.betrag, v2.verrechnungsart
+                        FROM verfuegung v2
+                        WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv'
+                        LIMIT 1
+                    ) v ON true
+                    LEFT JOIN verfuegung_position vp ON vp.verfuegung_id = v.verfuegung_id
+                    LEFT JOIN leistung l ON l.leistung_id = vp.leistung_id
+                    WHERE k.aktiv = TRUE
+                      AND pv.geplantes_enddatum >= $1 AND pv.start_datum <= $2
+                      ${dossierWhere}
+                    GROUP BY d.dossier_id, k.klient_id, k.vorname, k.nachname, d.standort_id, st.name,
+                             d.abteilung, d.auftraggeber, pv.programm_id, prog.name,
+                             pv.start_datum, pv.geplantes_enddatum, v.betrag, v.verrechnungsart
+                )
+                SELECT
+                    agg.*,
+                    kader_row.kader_id,
+                    kader_row.kader_name,
+                    GREATEST(1, (SELECT COUNT(*)::int FROM klient_user ku WHERE ku.klient_id = agg.klient_id AND ku.aktiv = TRUE)) AS kader_count
+                FROM agg
+                LEFT JOIN LATERAL (
+                    SELECT ku.user_id AS kader_id, b.full_name AS kader_name
+                    FROM klient_user ku
+                    JOIN benutzer b ON b.user_id = ku.user_id
+                    WHERE ku.klient_id = agg.klient_id AND ku.aktiv = TRUE
+                ) kader_row ON TRUE`,
                 params
             ),
             db.query(
@@ -309,18 +317,14 @@ router.post('/query', auth, async (req, res) => {
                     j.klient_id, j.datum, j.dauer_minuten, j.verrechenbar,
                     COALESCE(l.tarif, 0) AS tarif,
                     k.vorname || ' ' || k.nachname AS klient_name,
-                    (SELECT ku2.user_id FROM klient_user ku2
-                     WHERE ku2.klient_id = j.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung'
-                     LIMIT 1) AS kader_id,
-                    (SELECT u2.full_name FROM klient_user ku2
-                     JOIN benutzer u2 ON u2.user_id = ku2.user_id
-                     WHERE ku2.klient_id = j.klient_id AND ku2.aktiv = TRUE AND ku2.rolle_im_fall = 'Klientenführung'
-                     LIMIT 1) AS kader_name,
+                    kader_row.kader_id,
+                    kader_row.kader_name,
                     d.standort_id,
                     (SELECT st.name FROM standort st WHERE st.standort_id = d.standort_id) AS standort_name,
                     d.abteilung, d.auftraggeber,
                     d.programm_id,
-                    (SELECT prog.name FROM programm prog WHERE prog.programm_id = d.programm_id) AS programm_name
+                    (SELECT prog.name FROM programm prog WHERE prog.programm_id = d.programm_id) AS programm_name,
+                    GREATEST(1, (SELECT COUNT(*)::int FROM klient_user ku WHERE ku.klient_id = j.klient_id AND ku.aktiv = TRUE)) AS kader_count
                  FROM journal_eintrag j
                  JOIN klient k ON k.klient_id = j.klient_id
                  LEFT JOIN LATERAL (
@@ -330,6 +334,12 @@ router.post('/query', auth, async (req, res) => {
                      WHERE dos.klient_id = j.klient_id
                      LIMIT 1
                  ) d ON true
+                 LEFT JOIN LATERAL (
+                     SELECT ku.user_id AS kader_id, b.full_name AS kader_name
+                     FROM klient_user ku
+                     JOIN benutzer b ON b.user_id = ku.user_id
+                     WHERE ku.klient_id = j.klient_id AND ku.aktiv = TRUE
+                 ) kader_row ON TRUE
                  LEFT JOIN leistung l ON l.leistung_id = j.leistung_id
                  WHERE k.aktiv = TRUE
                    AND j.datum BETWEEN $1 AND $2
@@ -342,9 +352,10 @@ router.post('/query', auth, async (req, res) => {
         const journalRows = journalResult.rows;
         const totalPeriode = { von: new Date(von), bis: new Date(bis) };
 
-        // Suppress "(Kein X)" rows when the corresponding filter is active
+        // Suppress "(Kein X)" rows when the corresponding filter is active or dimension is active
         function shouldSuppress(key, dim) {
-            if (key === '__kein_kader__' && filter.user_ids?.length > 0) return true;
+            const kaderIsDim = zeileDim === 'kader' || spaltenTyp === 'kader';
+            if (key === '__kein_kader__' && (filter.user_ids?.length > 0 || kaderIsDim)) return true;
             if (key === '__kein_standort__' && filter.standort_ids?.length > 0) return true;
             if (key === '__kein_programm__' && filter.programm_ids?.length > 0) return true;
             if (key === '__' && dim === 'klient' && filter.klient_ids?.length > 0) return true;
