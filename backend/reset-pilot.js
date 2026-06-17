@@ -49,7 +49,6 @@ async function main() {
         await db.query('DELETE FROM klient');
 
         // ── Externe Kontakte ─────────────────────────────────────────────
-        await db.query('DELETE FROM organisation_stundenpreis');
         await db.query('DELETE FROM externe_person');
 
         // ── Benutzer (ausser simon@iv-crm.ch) ───────────────────────────
