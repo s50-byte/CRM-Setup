@@ -30,6 +30,7 @@ export default function ExterneZuweisungModal({ open, onClose, onSaved, dossierI
     });
 
     async function hinzufuegen(p) {
+        console.log('person beim Zuweisen:', p);
         const rolle = p.funktion || p.typ || 'Sonstiges';
         setBusy(true);
         try {

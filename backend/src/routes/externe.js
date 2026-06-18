@@ -39,6 +39,7 @@ router.get('/', auth, async (req, res) => {
                             'vorname', m.vorname,
                             'nachname', m.nachname,
                             'funktion', m.funktion,
+                            'typ', m.typ,
                             'telefon', m.telefon,
                             'email', m.email
                         ) ORDER BY m.nachname, m.vorname)
