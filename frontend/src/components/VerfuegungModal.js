@@ -10,7 +10,7 @@ function FieldLabel({ children, required }) {
     );
 }
 
-export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, onSaved }) {
+export default function VerfuegungModal({ open, onClose, dossierId, dossier, verfuegung, onSaved }) {
     const [aktTab, setAktTab] = useState('verfuegung');
     const [nummer, setNummer] = useState('');
     const [datum, setDatum] = useState('');
@@ -20,18 +20,26 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
     const [betrag, setBetrag] = useState('');
     const [positionen, setPositionen] = useState([]);
     const [leistungen, setLeistungen] = useState([]);
+    const [programme, setProgramme] = useState([]);
+    const [programmId, setProgrammId] = useState('');
     const [fehler, setFehler] = useState('');
     const [laden, setLaden] = useState(false);
+
+    const zeigtProgrammWahl = !verfuegung && !dossier?.akt_programm_id;
 
     useEffect(() => {
         if (!open) return;
         client.get('/leistungen').then(r => setLeistungen(r.data)).catch(console.error);
+        if (zeigtProgrammWahl) {
+            client.get('/programme').then(r => setProgramme(r.data)).catch(console.error);
+        }
         setNummer(verfuegung?.nummer || '');
         setDatum(verfuegung?.datum ? verfuegung.datum.slice(0, 10) : '');
         setStatus(verfuegung?.status || 'aktiv');
         setBemerkung(verfuegung?.bemerkung || '');
         setVerrechnungsart(verfuegung?.verrechnungsart || '');
         setBetrag(verfuegung?.betrag != null ? String(verfuegung.betrag) : '');
+        setProgrammId('');
         setFehler('');
         setAktTab('verfuegung');
         setPositionen(
@@ -42,6 +50,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
                 soll_stunden: p.soll_stunden,
             }))
         );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, verfuegung]);
 
     function addPosition() {
@@ -62,6 +71,11 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
             setAktTab('verfuegung');
             return;
         }
+        if (zeigtProgrammWahl && !programmId) {
+            setFehler('Programm ist erforderlich, um den Start zu erfassen.');
+            setAktTab('verfuegung');
+            return;
+        }
         setLaden(true);
         setFehler('');
         try {
@@ -73,6 +87,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
                 status,
                 verrechnungsart: verrechnungsart || null,
                 betrag: betrag ? parseFloat(betrag) : null,
+                ...(zeigtProgrammWahl ? { programm_id: programmId } : {}),
             };
             let verfuegungId;
             if (verfuegung) {
@@ -145,6 +160,20 @@ export default function VerfuegungModal({ open, onClose, dossierId, verfuegung, 
                             placeholder="z.B. VFG-2026-001" style={inputStyle}
                         />
                     </div>
+                    {zeigtProgrammWahl && (
+                        <div>
+                            <FieldLabel required>Programm</FieldLabel>
+                            <select value={programmId} onChange={e => setProgrammId(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                                <option value="">— Programm wählen —</option>
+                                {programme.map(p => (
+                                    <option key={p.programm_id} value={p.programm_id}>{p.name}</option>
+                                ))}
+                            </select>
+                            <div style={{ fontSize: 11, color: '#6B6860', marginTop: 4 }}>
+                                Erste Verfügung des Dossiers — startet das Programm.
+                            </div>
+                        </div>
+                    )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                         <div>
                             <FieldLabel>Datum</FieldLabel>

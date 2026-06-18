@@ -92,7 +92,7 @@ router.get('/:dossier_id', auth, async (req, res) => {
 
 // POST /api/verfuegungen
 router.post('/', auth, async (req, res) => {
-    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag } = req.body;
+    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag, programm_id } = req.body;
     if (!dossier_id || !nummer) {
         return res.status(400).json({ error: 'dossier_id und Nummer sind erforderlich' });
     }
@@ -117,9 +117,23 @@ router.post('/', auth, async (req, res) => {
 
         // Intake automatisch abschliessen, wenn Verfügung im Bucket "Programmstart" eingetragen wird
         const dosRes = await pgClient.query(
-            `SELECT klient_id, pipeline_status FROM dossier WHERE dossier_id = $1`,
+            `SELECT klient_id, pipeline_status, akt_programm_id FROM dossier WHERE dossier_id = $1`,
             [dossier_id]
         );
+
+        // Erste Verfügung eines Dossiers startet das Programm (akt_programm_id + laufender programm_verlauf)
+        if (programm_id && !dosRes.rows[0]?.akt_programm_id) {
+            await pgClient.query(
+                `UPDATE dossier SET akt_programm_id = $1, updated_at = NOW() WHERE dossier_id = $2`,
+                [programm_id, dossier_id]
+            );
+            await pgClient.query(
+                `INSERT INTO programm_verlauf (dossier_id, programm_id, status, start_datum)
+                 VALUES ($1, $2, 'Laufend', COALESCE($3, CURRENT_DATE))`,
+                [dossier_id, programm_id, datum || null]
+            );
+        }
+
         if (dosRes.rows[0]?.pipeline_status === 'programmstart') {
             await pgClient.query(
                 `UPDATE dossier SET intake_abgeschlossen = TRUE, absage_grund = 'Verfügung eingetragen', status = 'aktiv', updated_at = NOW()

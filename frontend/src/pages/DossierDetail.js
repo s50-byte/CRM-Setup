@@ -953,8 +953,9 @@ export default function DossierDetail() {
                 open={verfuegungModal}
                 onClose={() => setVerfuegungModal(false)}
                 dossierId={id}
+                dossier={dossier}
                 verfuegung={gewaehlteVerfuegung}
-                onSaved={reloadVerfuegungen}
+                onSaved={() => { reloadVerfuegungen(); reloadDossier(); }}
             />
 
             <JournalModal
