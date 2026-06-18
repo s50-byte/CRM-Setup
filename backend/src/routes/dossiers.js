@@ -224,8 +224,8 @@ router.get('/:id', auth, async (req, res) => {
 router.post('/', auth, async (req, res) => {
     const { klient_id, auftraggeber, kanal, programm_id, standort_id, klient_label } = req.body;
 
-    if (!klient_id || !auftraggeber) {
-        return res.status(400).json({ error: 'Klient und Auftraggeber erforderlich' });
+    if (!klient_id) {
+        return res.status(400).json({ error: 'Klient erforderlich' });
     }
 
     try {
@@ -233,7 +233,7 @@ router.post('/', auth, async (req, res) => {
             `INSERT INTO dossier (klient_id, auftraggeber, kanal, akt_programm_id, standort_id, pipeline_status)
              VALUES ($1, $2, $3, $4, $5, 'vorabklaerung')
              RETURNING *`,
-            [klient_id, auftraggeber, kanal || null, programm_id || null, standort_id || null]
+            [klient_id, auftraggeber || '', kanal || null, programm_id || null, standort_id || null]
         );
 
         if (programm_id) {
