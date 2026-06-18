@@ -16,6 +16,14 @@ const LABEL_FARBEN = {
     'MA': { bg: '#F5F3FF', color: '#5B21B6' },
 };
 
+const INTAKE_BUCKETS = [
+    { key: 'vorabklaerung',          label: 'Vorabklärung' },
+    { key: 'berufsmassnahmen',       label: 'Berufsmassnahmen' },
+    { key: 'integrationsmassnahmen', label: 'Integrationsmassnahmen' },
+    { key: 'beratung_coaching',      label: 'Beratung & Coaching' },
+    { key: 'programmstart',          label: 'Programmstart' },
+];
+
 const JKAT = {
     'Standortgespräch':                 { bg: '#E0F2FE', color: '#0369A1' },
     'Job Coaching':                      { bg: '#F0FDF4', color: '#166534' },
@@ -258,6 +266,8 @@ export default function DossierDetail() {
     const verlauf = dossier.programm_verlauf || [];
     const zugewiesen = dossier.zugewiesen || [];
     const phasen = dossier.phasen || [];
+    const hatAktiveVerfuegung = verfuegungen.some(v => v.status === 'aktiv');
+    const zeigeIntakeStepper = !dossier.intake_abgeschlossen && !hatAktiveVerfuegung;
 
     const tageVerbleibend = (() => {
         if (!dossier.geplantes_enddatum) return null;
@@ -470,8 +480,48 @@ export default function DossierDetail() {
                 )}
             </div>
 
+            {/* ── INTAKE-STEPPER ─────────────────────────── */}
+            {zeigeIntakeStepper && (
+                <div style={{ ...CARD, padding: '.875rem 1.25rem', marginBottom: '.875rem' }}>
+                    <div style={{ ...SECTION_HDR, marginBottom: '.625rem' }}>Intake-Status</div>
+                    <div style={{ display: 'flex', overflowX: 'auto', paddingBottom: 4 }}>
+                        {INTAKE_BUCKETS.map((b, i, arr) => {
+                            const currentIdx = arr.findIndex(x => x.key === dossier.pipeline_status);
+                            const done = i < currentIdx;
+                            const active = i === currentIdx;
+                            return (
+                                <div
+                                    key={b.key}
+                                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 68, position: 'relative' }}
+                                >
+                                    {i < arr.length - 1 && (
+                                        <div style={{ position: 'absolute', top: 12, left: '50%', width: '100%', height: 2, background: done ? '#16A34A' : '#E3E1DA', zIndex: 0 }} />
+                                    )}
+                                    <div style={{
+                                        width: 24, height: 24, borderRadius: '50%', zIndex: 1,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: 10, fontWeight: 600, fontFamily: 'monospace',
+                                        background: done ? '#16A34A' : active ? '#2563EB' : '#fff',
+                                        border: `2px solid ${done ? '#16A34A' : active ? '#2563EB' : '#E3E1DA'}`,
+                                        color: done || active ? '#fff' : '#A09D97',
+                                        boxShadow: active ? '0 0 0 4px rgba(37,99,235,.15)' : 'none',
+                                    }}>
+                                        {done ? '✓' : i + 1}
+                                    </div>
+                                    <div style={{
+                                        fontSize: 9, fontWeight: active ? 600 : 500, marginTop: 5,
+                                        textAlign: 'center', lineHeight: 1.3, maxWidth: 64,
+                                        color: done ? '#15803D' : active ? '#2563EB' : '#A09D97',
+                                    }}>{b.label}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* ── PHASEN-STEPPER ──────────────────────────── */}
-            {phasen.length > 0 && (
+            {phasen.length > 0 && hatAktiveVerfuegung && (
                 <div style={{ ...CARD, padding: '.875rem 1.25rem', marginBottom: '.875rem' }}>
                     <div style={{ ...SECTION_HDR, marginBottom: '.625rem' }}>Aktuelle Phase</div>
                     <div style={{ display: 'flex', overflowX: 'auto', paddingBottom: 4 }}>
