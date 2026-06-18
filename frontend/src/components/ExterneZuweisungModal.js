@@ -2,12 +2,9 @@ import { useState, useEffect } from 'react';
 import client from '../api/client';
 import Modal from './Modal';
 
-const ROLLEN = ['IV-Stelle', 'RAV', 'Sozialdienst', 'Arbeitgeber', 'Arzt / Therapeut', 'Gesetzl. Vertreter', 'Sonstiges'];
-
 export default function ExterneZuweisungModal({ open, onClose, onSaved, dossierId, zugewieseneExterne }) {
     const [personen, setPersonen] = useState([]);
     const [suche, setSuche] = useState('');
-    const [auswahl, setAuswahl] = useState(null);
     const [busy, setBusy] = useState(false);
 
     useEffect(() => {
@@ -23,7 +20,6 @@ export default function ExterneZuweisungModal({ open, onClose, onSaved, dossierI
             setPersonen([...standalone, ...orgMitglieder]);
         }).catch(console.error);
         setSuche('');
-        setAuswahl(null);
     }, [open]);
 
     const zugewieseneIds = new Set((zugewieseneExterne || []).map(p => p.person_id));
@@ -33,10 +29,11 @@ export default function ExterneZuweisungModal({ open, onClose, onSaved, dossierI
         return (!suche || text.includes(suche.toLowerCase())) && !zugewieseneIds.has(p.person_id);
     });
 
-    async function hinzufuegen(person_id, rolle) {
+    async function hinzufuegen(p) {
+        const rolle = p.funktion || p.typ || 'Sonstiges';
         setBusy(true);
         try {
-            await client.post(`/externe/${person_id}/dossier`, { dossier_id: dossierId, rolle });
+            await client.post(`/externe/${p.person_id}/dossier`, { dossier_id: dossierId, rolle });
             onSaved();
         } catch (err) { console.error(err); }
         finally { setBusy(false); }
@@ -94,44 +91,28 @@ export default function ExterneZuweisungModal({ open, onClose, onSaved, dossierI
                         {suche ? 'Keine Personen gefunden' : 'Alle externen Personen sind bereits zugewiesen'}
                     </div>
                 ) : gefiltert.map((p, i) => {
-                    const isSelected = auswahl?.person_id === p.person_id;
+                    const rolleLabel = p.funktion || p.typ || 'Sonstiges';
                     return (
                         <div
                             key={i}
-                            onClick={() => setAuswahl(isSelected ? null : { person_id: p.person_id, rolle: 'Sonstiges' })}
+                            onClick={() => !busy && hinzufuegen(p)}
                             style={{
-                                padding: '8px 10px', borderRadius: 7, cursor: 'pointer',
-                                border: `1px solid ${isSelected ? '#2563EB' : 'rgba(0,0,0,.07)'}`,
-                                background: isSelected ? '#EEF3FE' : '#fff',
+                                padding: '8px 10px', borderRadius: 7, cursor: busy ? 'not-allowed' : 'pointer',
+                                border: '1px solid rgba(0,0,0,.07)',
+                                background: '#fff',
+                                display: 'flex', alignItems: 'center', gap: 9,
+                                transition: 'background .1s',
                             }}
+                            onMouseEnter={e => { if (!busy) e.currentTarget.style.background = '#F5F4F0'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
                         >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{p.nachname} {p.vorname}</div>
-                                    {(p.funktion || p.organisation_name) && (
-                                        <div style={{ fontSize: 11, color: '#6B6860' }}>
-                                            {p.funktion}{p.organisation_name ? ` (${p.organisation_name})` : ''}
-                                        </div>
-                                    )}
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 12.5, fontWeight: 500 }}>{p.nachname} {p.vorname}</div>
+                                <div style={{ fontSize: 11, color: '#6B6860' }}>
+                                    {rolleLabel}{p.organisation_name ? ` (${p.organisation_name})` : ''}
                                 </div>
                             </div>
-                            {isSelected && (
-                                <div style={{ marginTop: 9, display: 'flex', gap: 8, alignItems: 'center' }}>
-                                    <select
-                                        value={auswahl.rolle}
-                                        onClick={e => e.stopPropagation()}
-                                        onChange={e => { e.stopPropagation(); setAuswahl(a => ({ ...a, rolle: e.target.value })); }}
-                                        style={{ flex: 1, fontSize: 12, padding: '5px 8px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5, background: '#fff', fontFamily: 'inherit' }}
-                                    >
-                                        {ROLLEN.map(r => <option key={r}>{r}</option>)}
-                                    </select>
-                                    <button
-                                        onClick={e => { e.stopPropagation(); hinzufuegen(p.person_id, auswahl.rolle); }}
-                                        disabled={busy}
-                                        style={{ padding: '5px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 5, background: '#2563EB', color: '#fff', fontFamily: 'inherit' }}
-                                    >Zuweisen</button>
-                                </div>
-                            )}
+                            <span style={{ fontSize: 11, color: '#2563EB', opacity: .6 }}>+ Zuweisen</span>
                         </div>
                     );
                 })}
