@@ -60,13 +60,18 @@ router.get('/', auth, async (req, res) => {
                         )
                     ) FILTER (WHERE p.programm_id IS NOT NULL),
                     '[]'
-                ) AS programme
+                ) AS programme,
+                COALESCE(
+                    JSON_AGG(DISTINCT bib.bereich) FILTER (WHERE bib.bereich IS NOT NULL),
+                    '[]'
+                ) AS intake_bereiche
              FROM benutzer u
              LEFT JOIN benutzer_aufgabe r ON r.user_id = u.user_id
              LEFT JOIN benutzer_standort bs ON bs.user_id = u.user_id
              LEFT JOIN standort st2 ON st2.standort_id = bs.standort_id
              LEFT JOIN benutzer_berechtigung bb ON bb.user_id = u.user_id
              LEFT JOIN programm p ON p.programm_id = bb.programm_id
+             LEFT JOIN benutzer_intake_bereich bib ON bib.user_id = u.user_id
              WHERE ($1 OR u.aktiv = TRUE)
              GROUP BY u.user_id
              ORDER BY u.full_name`,
@@ -152,7 +157,15 @@ router.get('/mein-profil', auth, async (req, res) => {
         );
         const abteilungen = abteilungenEinst.rows[0]?.wert ? JSON.parse(abteilungenEinst.rows[0].wert) : [];
 
-        res.json({ ...user.rows[0], rollen: rollen.rows, programme: programme.rows, standorte: standorte.rows, abteilungen });
+        const intakeBereiche = await db.query(
+            `SELECT bereich FROM benutzer_intake_bereich WHERE user_id = $1`,
+            [req.user.user_id]
+        );
+
+        res.json({
+            ...user.rows[0], rollen: rollen.rows, programme: programme.rows, standorte: standorte.rows, abteilungen,
+            intake_bereiche: intakeBereiche.rows.map(r => r.bereich),
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden des Profils' });
@@ -192,6 +205,24 @@ router.put('/programme', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Aktualisieren der Programme' });
+    }
+});
+
+// PUT /api/benutzer/intake-bereiche — Eigene Intake-Bereiche setzen
+router.put('/intake-bereiche', auth, async (req, res) => {
+    const { bereiche } = req.body;
+    try {
+        await db.query(`DELETE FROM benutzer_intake_bereich WHERE user_id = $1`, [req.user.user_id]);
+        for (const bereich of (bereiche || [])) {
+            await db.query(
+                `INSERT INTO benutzer_intake_bereich (user_id, bereich) VALUES ($1, $2)`,
+                [req.user.user_id, bereich]
+            );
+        }
+        res.json({ message: 'Intake-Bereiche aktualisiert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren der Intake-Bereiche' });
     }
 });
 

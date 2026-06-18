@@ -33,8 +33,13 @@ function Toggle({ label, checked, onChange }) {
     );
 }
 
-const ROLLEN_LISTE = ['Klientenführung', 'Job Coach', 'Fachperson'];
+const ROLLEN_LISTE = ['Klientenführung', 'Job Coach', 'Fachperson', 'Intake'];
 const ABTEILUNGEN_LISTE = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert'];
+const BEREICH_LISTE = [
+    { value: 'BM', label: 'Berufsmassnahmen' },
+    { value: 'IM', label: 'Integrationsmassnahmen' },
+    { value: 'BC', label: 'Beratung & Coaching' },
+];
 
 export default function Profil() {
     const { benutzer } = useAuth();
@@ -44,6 +49,7 @@ export default function Profil() {
     const [pwMsg, setPwMsg] = useState('');
 
     const [rollen, setRollen] = useState(new Set());
+    const [intakeBereiche, setIntakeBereiche] = useState(new Set());
     const [programme, setProgramme] = useState(new Set());
     const [standorte, setStandorte] = useState(new Set());
     const [abteilungen, setAbteilungen] = useState(new Set());
@@ -60,6 +66,7 @@ export default function Profil() {
     useEffect(() => {
         client.get('/benutzer/mein-profil').then(r => {
             setRollen(new Set(r.data.rollen.map(ro => ro.rolle_name)));
+            setIntakeBereiche(new Set(r.data.intake_bereiche || []));
             setProgramme(new Set(r.data.programme.map(p => p.programm_id)));
             setStandorte(new Set((r.data.standorte || []).map(s => s.standort_id)));
             setAbteilungen(new Set(r.data.abteilungen || []));
@@ -70,6 +77,9 @@ export default function Profil() {
 
     const toggleRolle = (rolle) =>
         setRollen(prev => { const s = new Set(prev); s.has(rolle) ? s.delete(rolle) : s.add(rolle); return s; });
+
+    const toggleBereich = (bereich) =>
+        setIntakeBereiche(prev => { const s = new Set(prev); s.has(bereich) ? s.delete(bereich) : s.add(bereich); return s; });
 
     const toggleProgramm = (id) =>
         setProgramme(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -83,6 +93,9 @@ export default function Profil() {
     const speichernRollen = async () => {
         try {
             await client.put('/benutzer/rollen', { rollen: [...rollen] });
+            await client.put('/benutzer/intake-bereiche', {
+                bereiche: rollen.has('Intake') ? [...intakeBereiche] : [],
+            });
             setRollenMsg('Gespeichert ✓');
             setTimeout(() => setRollenMsg(''), 2500);
         } catch (err) { console.error(err); }
@@ -203,6 +216,13 @@ export default function Profil() {
                     {ROLLEN_LISTE.map(rolle => (
                         <Toggle key={rolle} label={rolle} checked={rollen.has(rolle)} onChange={() => toggleRolle(rolle)} />
                     ))}
+                    {rollen.has('Intake') && (
+                        <div style={{ marginLeft: 18, marginTop: 4 }}>
+                            {BEREICH_LISTE.map(b => (
+                                <Toggle key={b.value} label={b.label} checked={intakeBereiche.has(b.value)} onChange={() => toggleBereich(b.value)} />
+                            ))}
+                        </div>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: '.875rem' }}>
                         <button onClick={speichernRollen} style={{
                             padding: '7px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer',

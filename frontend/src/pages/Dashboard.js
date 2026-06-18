@@ -130,6 +130,13 @@ export default function Dashboard() {
                                         </span>
                                     </div>
                                     {(m.aenderungen || []).map((a, i) => {
+                                        if (a.alter_status === 'Vorabklärung') {
+                                            return (
+                                                <div key={i} style={{ fontSize: 12, color: '#6B6860', marginTop: 3 }}>
+                                                    Neue Intake-Zuweisung: <strong style={{ color: '#1A1917' }}>{a.klient_name}</strong> → <strong>{a.neuer_status}</strong>
+                                                </div>
+                                            );
+                                        }
                                         const sl = s => STATUS_LABELS[s] || s || '—';
                                         const art = a.art || (a.alter_status === null ? 'ersterfassung' : a.alter_status === a.neuer_status ? 'kommentar' : 'status');
                                         return (

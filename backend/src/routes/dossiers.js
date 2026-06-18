@@ -266,22 +266,72 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
+const INTAKE_BEREICH_MAP = {
+    berufsmassnahmen: 'BM',
+    integrationsmassnahmen: 'IM',
+    beratung_coaching: 'BC',
+};
+
+const INTAKE_BUCKET_LABEL = {
+    vorabklaerung: 'Vorabklärung',
+    berufsmassnahmen: 'Berufsmassnahmen',
+    integrationsmassnahmen: 'Integrationsmassnahmen',
+    beratung_coaching: 'Beratung & Coaching',
+    programmstart: 'Programmstart',
+};
+
 // PUT /api/dossiers/:id/intake — Intake-Bucket wechseln oder abschliessen
 router.put('/:id/intake', auth, async (req, res) => {
     const { pipeline_status, intake_abgeschlossen, absage_grund, absage_notiz } = req.body;
 
     try {
+        const vorher = await db.query(
+            `SELECT d.pipeline_status, k.vorname, k.nachname
+             FROM dossier d JOIN klient k ON k.klient_id = d.klient_id
+             WHERE d.dossier_id = $1`,
+            [req.params.id]
+        );
+        if (vorher.rows.length === 0) return res.status(404).json({ error: 'Dossier nicht gefunden' });
+        const alterPipelineStatus = vorher.rows[0].pipeline_status;
+
+        // Absage macht das Dossier inaktiv. Start erfolgt (Verfügung eingetragen) bleibt aktiv.
+        const neuerStatus = (intake_abgeschlossen && absage_grund) ? 'inaktiv' : 'aktiv';
+
         const result = await db.query(
             `UPDATE dossier SET
                 pipeline_status = $1, intake_abgeschlossen = $2,
                 absage_grund = $3, absage_notiz = $4,
-                status = CASE WHEN $2::boolean THEN 'inaktiv' ELSE status END,
+                status = $5,
                 updated_at = NOW()
-             WHERE dossier_id = $5
+             WHERE dossier_id = $6
              RETURNING *`,
-            [pipeline_status, intake_abgeschlossen || false, absage_grund || null, absage_notiz || null, req.params.id]
+            [pipeline_status, intake_abgeschlossen || false, absage_grund || null, absage_notiz || null, neuerStatus, req.params.id]
         );
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Dossier nicht gefunden' });
+
+        // Bereichs-Zuständige benachrichtigen, wenn aus Vorabklärung in einen Bereich verschoben wird
+        const bereich = INTAKE_BEREICH_MAP[pipeline_status];
+        if (alterPipelineStatus === 'vorabklaerung' && bereich) {
+            const empfaenger = await db.query(
+                `SELECT user_id FROM benutzer_intake_bereich WHERE bereich = $1`,
+                [bereich]
+            );
+            if (empfaenger.rows.length > 0) {
+                const klientName = `${vorher.rows[0].vorname} ${vorher.rows[0].nachname}`;
+                const aenderung = JSON.stringify([{
+                    klient_name: klientName,
+                    alter_status: INTAKE_BUCKET_LABEL.vorabklaerung,
+                    neuer_status: INTAKE_BUCKET_LABEL[pipeline_status],
+                }]);
+                for (const row of empfaenger.rows) {
+                    await db.query(
+                        `INSERT INTO dashboard_meldung (empfaenger_id, datum, aenderungen, erstellt_von)
+                         VALUES ($1, CURRENT_DATE, $2::jsonb, $3)`,
+                        [row.user_id, aenderung, req.user.user_id]
+                    );
+                }
+            }
+        }
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
