@@ -461,10 +461,10 @@ export default function DossierPhase() {
                                 const farbe = TYP_FARBEN[p.typ] || '#6B6860';
                                 return (
                                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 7px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5 }}>
-                                        <span style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 10, background: farbe + '22', color: farbe, border: `1px solid ${farbe}33`, fontFamily: 'monospace', flexShrink: 0 }}>{p.typ}</span>
+                                        <span style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 10, background: farbe + '22', color: farbe, border: `1px solid ${farbe}33`, fontFamily: 'monospace', flexShrink: 0 }}>{p.rolle}</span>
                                         <div style={{ minWidth: 0 }}>
                                             <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nachname} {p.vorname}</div>
-                                            <div style={{ fontSize: 10.5, color: '#6B6860' }}>{p.rolle}{p.firma ? ` · ${p.firma}` : ''}</div>
+                                            <div style={{ fontSize: 10.5, color: '#6B6860' }}>{p.firma || ''}</div>
                                         </div>
                                     </div>
                                 );

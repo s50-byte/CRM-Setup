@@ -276,6 +276,7 @@ router.delete('/:id/dossier/:dossier_id', auth, async (req, res) => {
 
 // POST /api/externe/:id/dossier — Person einem Dossier zuweisen
 router.post('/:id/dossier', auth, async (req, res) => {
+    console.log('POST /externe/:id/dossier body:', req.body);
     const { dossier_id, rolle } = req.body;
 
     try {

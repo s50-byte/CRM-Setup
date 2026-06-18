@@ -32,6 +32,7 @@ export default function ExterneZuweisungModal({ open, onClose, onSaved, dossierI
     async function hinzufuegen(p) {
         console.log('person beim Zuweisen:', p);
         const rolle = p.funktion || p.typ || 'Sonstiges';
+        console.log('POST body:', { dossier_id: dossierId, rolle });
         setBusy(true);
         try {
             await client.post(`/externe/${p.person_id}/dossier`, { dossier_id: dossierId, rolle });
