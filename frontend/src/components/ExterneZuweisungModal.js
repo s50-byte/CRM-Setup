@@ -61,7 +61,7 @@ export default function ExterneZuweisungModal({ open, onClose, onSaved, dossierI
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', background: '#F5F4F0', borderRadius: 7, marginBottom: 5, border: '1px solid rgba(0,0,0,.06)' }}>
                             <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: '#2563EB22', color: '#2563EB', border: '1px solid #2563EB33', fontFamily: 'monospace', flexShrink: 0 }}>{p.rolle}</span>
                             <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 12.5, fontWeight: 500 }}>{p.nachname} {p.vorname}</div>
+                                <div style={{ fontSize: 12.5, fontWeight: 500 }}>{p.vorname} {p.nachname}</div>
                                 {(p.funktion || p.firma) && (
                                     <div style={{ fontSize: 11, color: '#6B6860' }}>
                                         {p.funktion}{p.firma ? ` (${p.firma})` : ''}
@@ -109,7 +109,7 @@ export default function ExterneZuweisungModal({ open, onClose, onSaved, dossierI
                             onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
                         >
                             <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 12.5, fontWeight: 500 }}>{p.nachname} {p.vorname}</div>
+                                <div style={{ fontSize: 12.5, fontWeight: 500 }}>{p.vorname} {p.nachname}</div>
                                 <div style={{ fontSize: 11, color: '#6B6860' }}>
                                     {rolleLabel}{p.organisation_name ? ` (${p.organisation_name})` : ''}
                                 </div>

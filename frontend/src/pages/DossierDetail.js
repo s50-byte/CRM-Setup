@@ -16,16 +16,6 @@ const LABEL_FARBEN = {
     'MA': { bg: '#F5F3FF', color: '#5B21B6' },
 };
 
-const TYP_FARBEN = {
-    'IV-Stelle':        '#2563EB',
-    'RAV':              '#7C3AED',
-    'Sozialdienst':     '#D97706',
-    'Arbeitgeber':      '#16A34A',
-    'Arzt / Therapeut': '#0891B2',
-    'Schule':           '#EA580C',
-    'Sonstiges':        '#6B6860',
-};
-
 const JKAT = {
     'Standortgespräch':                 { bg: '#E0F2FE', color: '#0369A1' },
     'Job Coaching':                      { bg: '#F0FDF4', color: '#166534' },
@@ -702,13 +692,17 @@ export default function DossierDetail() {
                         {(dossier.externe_personen || []).length === 0 ? (
                             <div style={{ fontSize: 12, color: '#6B6860' }}>Keine externen Personen</div>
                         ) : (dossier.externe_personen || []).map((p, i) => {
-                            const farbe = TYP_FARBEN[p.typ] || '#6B6860';
                             return (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 7px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5 }}>
-                                    <span style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 10, background: farbe + '22', color: farbe, border: `1px solid ${farbe}33`, fontFamily: 'monospace', flexShrink: 0 }}>{p.rolle}</span>
+                                <div
+                                    key={i}
+                                    onClick={() => navigate(`/externe/${p.person_id}`)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 7px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5, cursor: 'pointer' }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = '#EEF3FE'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = '#F5F4F0'; }}
+                                >
                                     <div style={{ minWidth: 0 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nachname} {p.vorname}</div>
-                                        <div style={{ fontSize: 10.5, color: '#6B6860' }}>{p.firma || ''}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.vorname} {p.nachname}</div>
+                                        <div style={{ fontSize: 11, color: '#6B6860' }}>{p.rolle}{p.firma ? ` · ${p.firma}` : ''}</div>
                                     </div>
                                 </div>
                             );
