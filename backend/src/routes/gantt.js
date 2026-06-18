@@ -117,7 +117,8 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN klient_user ku ON ku.klient_id = k.klient_id AND ku.aktiv = TRUE
              LEFT JOIN benutzer u ON u.user_id = ku.user_id
              WHERE k.aktiv = TRUE
-               AND d.pipeline_status != 'Erstkontakt'
+               AND d.status != 'inaktiv'
+               AND NOT (d.pipeline_status IN ('Erstkontakt','vorabklaerung','berufsmassnahmen','integrationsmassnahmen','beratung_coaching','programmstart') AND d.intake_abgeschlossen = FALSE)
                AND (pv.start_datum IS NULL OR pv.start_datum <= $2::date)
                AND (pv.geplantes_enddatum IS NULL OR pv.geplantes_enddatum >= $1::date)
                AND ($3::uuid[] IS NULL OR d.standort_id = ANY($3::uuid[]))

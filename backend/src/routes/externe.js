@@ -84,25 +84,6 @@ router.get('/organisationen', auth, async (req, res) => {
     }
 });
 
-// GET /api/externe/:id/stundenpreise — Stundenpreise einer Organisation
-router.get('/:id/stundenpreise', auth, async (req, res) => {
-    try {
-        const result = await db.query(
-            `SELECT sp.id, sp.organisation_id, sp.leistung_id, sp.stundenpreis,
-                    l.tarifnr, l.bezeichnung, l.einheit
-             FROM organisation_stundenpreis sp
-             JOIN leistung l ON l.leistung_id = sp.leistung_id
-             WHERE sp.organisation_id = $1
-             ORDER BY l.tarifnr`,
-            [req.params.id]
-        );
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Fehler beim Laden der Stundenpreise' });
-    }
-});
-
 // GET /api/externe/:id — Einzelne externe Person
 router.get('/:id', auth, async (req, res) => {
     try {
@@ -186,27 +167,6 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
-// POST /api/externe/:id/stundenpreise — Stundenpreis upsert
-router.post('/:id/stundenpreise', auth, async (req, res) => {
-    const { leistung_id, stundenpreis } = req.body;
-    if (!leistung_id || stundenpreis == null) {
-        return res.status(400).json({ error: 'leistung_id und stundenpreis erforderlich' });
-    }
-    try {
-        const result = await db.query(
-            `INSERT INTO organisation_stundenpreis (organisation_id, leistung_id, stundenpreis)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (organisation_id, leistung_id) DO UPDATE SET stundenpreis = $3
-             RETURNING *`,
-            [req.params.id, leistung_id, stundenpreis]
-        );
-        res.status(201).json(result.rows[0]);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Fehler beim Speichern des Stundenpreises' });
-    }
-});
-
 // PUT /api/externe/:id — Person / Organisation aktualisieren
 router.put('/:id', auth, async (req, res) => {
     console.log('PUT /externe/:id body:', req.body);
@@ -240,23 +200,6 @@ router.put('/:id', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Aktualisieren' });
-    }
-});
-
-// DELETE /api/externe/:id/stundenpreise/:leistung_id — Stundenpreis löschen
-router.delete('/:id/stundenpreise/:leistung_id', auth, async (req, res) => {
-    try {
-        const result = await db.query(
-            `DELETE FROM organisation_stundenpreis
-             WHERE organisation_id = $1 AND leistung_id = $2
-             RETURNING id`,
-            [req.params.id, req.params.leistung_id]
-        );
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
-        res.json({ ok: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Fehler beim Löschen' });
     }
 });
 

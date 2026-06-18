@@ -53,73 +53,20 @@ export default function ExterneDetail() {
     const [person, setPerson] = useState(null);
     const [laden, setLaden] = useState(true);
     const [modal, setModal] = useState(false);
-    const [aktTab, setAktTab] = useState('uebersicht');
-
-    const [stundenpreise, setStundenpreise] = useState([]);
-    const [leistungen, setLeistungen] = useState([]);
-    const [neueLeistungId, setNeueLeistungId] = useState('');
-    const [neuerPreis, setNeuerPreis] = useState('');
-    const [spBusy, setSpBusy] = useState(false);
-    const [spFehler, setSpFehler] = useState('');
-
-    function ladeStundenpreise() {
-        client.get(`/externe/${id}/stundenpreise`)
-            .then(r => setStundenpreise(r.data))
-            .catch(console.error);
-    }
 
     const ladeData = useCallback(() => {
         setLaden(true);
-        setStundenpreise([]);
         client.get(`/externe/${id}`)
-            .then(r => {
-                setPerson(r.data);
-                if (r.data.ist_organisation) {
-                    client.get('/leistungen').then(lr => setLeistungen(lr.data)).catch(console.error);
-                    client.get(`/externe/${id}/stundenpreise`).then(sr => setStundenpreise(sr.data)).catch(console.error);
-                }
-            })
+            .then(r => setPerson(r.data))
             .catch(console.error)
             .finally(() => setLaden(false));
     }, [id]);
 
     useEffect(() => {
-        setAktTab('uebersicht');
         ladeData();
     }, [ladeData]);
 
     function handleGespeichert() { setModal(false); ladeData(); }
-
-    async function stundenpreisHinzufuegen() {
-        if (!neueLeistungId || !neuerPreis) return;
-        setSpBusy(true);
-        setSpFehler('');
-        try {
-            await client.post(`/externe/${id}/stundenpreise`, {
-                leistung_id: neueLeistungId,
-                stundenpreis: parseFloat(neuerPreis),
-            });
-            setNeueLeistungId('');
-            setNeuerPreis('');
-            ladeStundenpreise();
-        } catch (err) {
-            setSpFehler(err.response?.data?.error || 'Fehler beim Speichern');
-        } finally {
-            setSpBusy(false);
-        }
-    }
-
-    async function stundenpreisLoeschen(leistung_id) {
-        setSpBusy(true);
-        try {
-            await client.delete(`/externe/${id}/stundenpreise/${leistung_id}`);
-            ladeStundenpreise();
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setSpBusy(false);
-        }
-    }
 
     if (laden) return <div style={{ padding: '2rem', color: '#6B6860', fontSize: 13 }}>Laden…</div>;
     if (!person) return <div style={{ padding: '2rem', color: '#B91C1C', fontSize: 13 }}>Kontakt nicht gefunden</div>;
@@ -129,11 +76,6 @@ export default function ExterneDetail() {
     const initials = istOrg
         ? (person.firma || person.nachname || '?')[0]
         : ((person.vorname?.[0] || '') + (person.nachname?.[0] || ''));
-
-    const tabs = istOrg ? [
-        { key: 'uebersicht', label: 'Übersicht' },
-        { key: 'stundenpreise', label: `Stundenpreise${stundenpreise.length > 0 ? ` (${stundenpreise.length})` : ''}` },
-    ] : null;
 
     return (
         <div>
@@ -187,25 +129,7 @@ export default function ExterneDetail() {
                 </div>
             </div>
 
-            {/* Tabs (nur für Organisationen) */}
-            {tabs && (
-                <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,.09)', marginBottom: '.875rem', background: '#fff', borderRadius: '10px 10px 0 0', border: '1px solid rgba(0,0,0,.09)', padding: '0 1rem' }}>
-                    {tabs.map(tab => (
-                        <button key={tab.key} onClick={() => setAktTab(tab.key)} style={{
-                            padding: '10px 16px', fontSize: 12.5, fontWeight: aktTab === tab.key ? 600 : 400,
-                            cursor: 'pointer', border: 'none', background: 'transparent',
-                            color: aktTab === tab.key ? '#2563EB' : '#6B6860',
-                            borderBottom: aktTab === tab.key ? '2px solid #2563EB' : '2px solid transparent',
-                            fontFamily: 'inherit', textTransform: 'uppercase', letterSpacing: '.04em',
-                            marginBottom: -1,
-                        }}>{tab.label}</button>
-                    ))}
-                </div>
-            )}
-
-            {/* Tab: Übersicht */}
-            {aktTab === 'uebersicht' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div style={CARD}>
                         <div style={LABEL}>Kontaktdaten</div>
                         {istOrg ? (
@@ -280,83 +204,6 @@ export default function ExterneDetail() {
                         ))}
                     </div>
                 </div>
-            )}
-
-            {/* Tab: Stundenpreise */}
-            {aktTab === 'stundenpreise' && (
-                <div style={CARD}>
-                    <div style={LABEL}>Stundenpreise pro Leistung</div>
-
-                    {spFehler && (
-                        <div style={{ background: '#FEF2F2', border: '1px solid rgba(220,38,38,.2)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#B91C1C', marginBottom: 12 }}>
-                            {spFehler}
-                        </div>
-                    )}
-
-                    {stundenpreise.length === 0 ? (
-                        <div style={{ fontSize: 12.5, color: '#9CA3AF', marginBottom: 16 }}>Noch keine Stundenpreise erfasst</div>
-                    ) : (
-                        <div style={{ marginBottom: 16 }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 40px', gap: 8, padding: '4px 0', borderBottom: '1px solid rgba(0,0,0,.09)', marginBottom: 4 }}>
-                                {['Tarifnr.', 'Leistung', 'CHF/Std.', ''].map((h, i) => (
-                                    <span key={i} style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em' }}>{h}</span>
-                                ))}
-                            </div>
-                            {stundenpreise.map(sp => (
-                                <div key={sp.id} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 40px', gap: 8, alignItems: 'center', padding: '7px 0', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
-                                    <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#6B6860' }}>{sp.tarifnr}</span>
-                                    <span style={{ fontSize: 13, color: '#1A1917' }}>{sp.bezeichnung}</span>
-                                    <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, textAlign: 'right', color: '#1A1917' }}>
-                                        {parseFloat(sp.stundenpreis).toFixed(2)}
-                                    </span>
-                                    <button
-                                        onClick={() => stundenpreisLoeschen(sp.leistung_id)}
-                                        disabled={spBusy}
-                                        style={{ width: 32, height: 32, border: '1px solid rgba(220,38,38,.2)', borderRadius: 6, background: '#FEF2F2', color: '#B91C1C', cursor: spBusy ? 'default' : 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
-                                    >×</button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    <div style={{ borderTop: stundenpreise.length > 0 ? '1px solid rgba(0,0,0,.07)' : 'none', paddingTop: stundenpreise.length > 0 ? 14 : 0 }}>
-                        <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 9 }}>
-                            Stundenpreis hinzufügen / aktualisieren
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px auto', gap: 10, alignItems: 'center' }}>
-                            <select
-                                value={neueLeistungId}
-                                onChange={e => setNeueLeistungId(e.target.value)}
-                                style={{ fontSize: 13, padding: '7px 10px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
-                            >
-                                <option value="">— Leistung wählen —</option>
-                                {leistungen.map(l => (
-                                    <option key={l.leistung_id} value={l.leistung_id}>
-                                        {l.tarifnr} · {l.bezeichnung}
-                                    </option>
-                                ))}
-                            </select>
-                            <input
-                                type="number" min="0" step="0.01"
-                                value={neuerPreis}
-                                onChange={e => setNeuerPreis(e.target.value)}
-                                placeholder="CHF / Stunde"
-                                style={{ fontSize: 13, padding: '7px 10px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
-                            />
-                            <button
-                                onClick={stundenpreisHinzufuegen}
-                                disabled={spBusy || !neueLeistungId || !neuerPreis}
-                                style={{
-                                    padding: '7px 18px', fontSize: 13, cursor: (!neueLeistungId || !neuerPreis || spBusy) ? 'default' : 'pointer',
-                                    border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff',
-                                    fontFamily: 'inherit', fontWeight: 500,
-                                    opacity: (!neueLeistungId || !neuerPreis || spBusy) ? .5 : 1, whiteSpace: 'nowrap'
-                                }}
-                            >Speichern</button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Modal: je nach Typ */}
             {istOrg

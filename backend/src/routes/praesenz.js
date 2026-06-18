@@ -5,6 +5,10 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
+// Dossiers, die das Intake noch nicht abgeschlossen haben (alte oder neue Buckets) oder
+// abgesagt wurden (status = 'inaktiv'), erscheinen nicht in der Präsenzkontrolle.
+const INTAKE_PENDING_FILTER = `d.status != 'inaktiv' AND NOT (d.pipeline_status IN ('Erstkontakt','vorabklaerung','berufsmassnahmen','integrationsmassnahmen','beratung_coaching','programmstart') AND d.intake_abgeschlossen = FALSE)`;
+
 // GET /api/praesenz/ferien?datum= — alle Klienten mit Ferien an einem Datum
 // (MUSS vor /:datum stehen, da /ferien sonst als Datum gematcht wird)
 router.get('/ferien', auth, async (req, res) => {
@@ -41,7 +45,7 @@ router.get('/historie', auth, async (req, res) => {
     const peWhere = peBedingungen.length ? 'WHERE ' + peBedingungen.join(' AND ') : '';
 
     // Äussere WHERE-Bedingungen (immer aktive Klienten, kein Erstkontakt)
-    const outerBedingungen = ["k.aktiv = TRUE", "d.pipeline_status != 'Erstkontakt'"];
+    const outerBedingungen = ["k.aktiv = TRUE", INTAKE_PENDING_FILTER];
     if (klient_id) { outerBedingungen.push(`k.klient_id = $${p++}`); params.push(klient_id); }
     if (abteilung) { outerBedingungen.push(`d.abteilung = $${p++}`); params.push(abteilung); }
     // Kein Eintrag im Zeitraum → "Nicht erfasst"
@@ -136,7 +140,7 @@ router.get('/:datum', auth, async (req, res) => {
                 LIMIT 1
              ) fp_lat ON TRUE
              WHERE k.aktiv = TRUE
-               AND d.pipeline_status != 'Erstkontakt'
+               AND ${INTAKE_PENDING_FILTER}
              GROUP BY k.klient_id, k.nachname, k.vorname,
                       p.name, p.farbe_hex,
                       d.dossier_id, d.abteilung, d.standort_id,
