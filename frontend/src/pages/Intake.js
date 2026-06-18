@@ -95,7 +95,7 @@ function Karte({ d, abgeschlossen, onNavigate, onDragStart, onAbsage }) {
             <div style={{ fontSize: 10, color: '#A09D97', marginTop: 1 }}>Eingang: {fmtDatum(d.eingang_datum)}</div>
 
             {abgeschlossen ? (
-                d.absage_grund && (
+                d.absage_grund != null && (
                     <div style={{ fontSize: 10, color: '#B91C1C', marginTop: 5, fontStyle: 'italic' }}>
                         {d.absage_grund}
                     </div>
@@ -219,8 +219,8 @@ export default function Intake() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 9 }}>
                     {BUCKETS.map(bucket => {
                         const alle = gefiltert.filter(d => d.pipeline_status === bucket.key);
-                        const aktive = alle.filter(d => !d.intake_abgeschlossen);
-                        const abgeschlossen = alle.filter(d => d.intake_abgeschlossen);
+                        const aktive = alle.filter(d => d.intake_abgeschlossen !== true);
+                        const abgeschlossen = alle.filter(d => d.intake_abgeschlossen === true);
                         const offen = !!aufgeklappt[bucket.key];
                         const abschlussLabel = bucket.key === 'programmstart' ? 'Start erfolgt' : 'Abgeschlossen';
 
