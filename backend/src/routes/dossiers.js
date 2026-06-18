@@ -12,6 +12,7 @@ router.get('/', auth, async (req, res) => {
             `SELECT
                 d.dossier_id, d.auftraggeber, d.kanal,
                 d.eingang_datum, d.pipeline_status, d.abbruch_grund,
+                d.intake_abgeschlossen, d.absage_grund, d.absage_notiz,
                 k.klient_id, k.nachname, k.vorname,
                 p.name AS programm_name, p.farbe_hex, p.avg_dauer_tage,
                 ph.label AS phase_label,
@@ -229,8 +230,8 @@ router.post('/', auth, async (req, res) => {
 
     try {
         const result = await db.query(
-            `INSERT INTO dossier (klient_id, auftraggeber, kanal, akt_programm_id, standort_id)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO dossier (klient_id, auftraggeber, kanal, akt_programm_id, standort_id, pipeline_status)
+             VALUES ($1, $2, $3, $4, $5, 'vorabklaerung')
              RETURNING *`,
             [klient_id, auftraggeber, kanal || null, programm_id || null, standort_id || null]
         );
@@ -254,6 +255,27 @@ router.post('/', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Erstellen des Dossiers' });
+    }
+});
+
+// PUT /api/dossiers/:id/intake — Intake-Bucket wechseln oder abschliessen
+router.put('/:id/intake', auth, async (req, res) => {
+    const { pipeline_status, intake_abgeschlossen, absage_grund, absage_notiz } = req.body;
+
+    try {
+        const result = await db.query(
+            `UPDATE dossier SET
+                pipeline_status = $1, intake_abgeschlossen = $2,
+                absage_grund = $3, absage_notiz = $4, updated_at = NOW()
+             WHERE dossier_id = $5
+             RETURNING *`,
+            [pipeline_status, intake_abgeschlossen || false, absage_grund || null, absage_notiz || null, req.params.id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Dossier nicht gefunden' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren des Intake-Status' });
     }
 });
 

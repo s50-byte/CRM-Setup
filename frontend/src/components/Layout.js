@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Dashboard from '../pages/Dashboard';
 import Klienten from '../pages/Klienten';
 import Externe from '../pages/Externe';
-import Pipeline from '../pages/Pipeline';
+import Intake from '../pages/Intake';
 import Dossiers from '../pages/Dossiers';
 import Termine from '../pages/Termine';
 import Praesenz from '../pages/Praesenz';
@@ -31,7 +31,7 @@ const NAV = [
     { path: '/meine',     label: 'Meine Klienten',    icon: '♥' },
     { path: '/aufgaben',  label: 'Aufgaben',           icon: '☑' },
     { section: 'Operativ' },
-    { path: '/pipeline',  label: 'Pipeline',           icon: '⋮' },
+    { path: '/intake',    label: 'Intake',             icon: '⋮' },
     { path: '/dossiers',  label: 'Klientendossiers',   icon: '📁' },
     { path: '/termine',   label: 'Termine',            icon: '📅' },
     { path: '/praesenz',  label: 'Präsenzkontrolle',   icon: '✓' },
@@ -218,7 +218,7 @@ export default function Layout() {
                     <Route path="/"          element={<Dashboard />} />
                     <Route path="/meine"     element={<Klienten meine />} />
                     <Route path="/aufgaben"  element={<Aufgaben />} />
-                    <Route path="/pipeline"  element={<Pipeline />} />
+                    <Route path="/intake"    element={<Intake />} />
                     <Route path="/dossiers"  element={<Dossiers />} />
                     <Route path="/termine"   element={<Termine />} />
                     <Route path="/praesenz"  element={<Praesenz />} />

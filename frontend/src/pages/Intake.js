@@ -1,0 +1,308 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import client from '../api/client';
+import NeueAnfrageModal from '../components/NeueAnfrageModal';
+import Modal from '../components/Modal';
+import FormField, { inputStyle, btnRow, btnPrimary, btnSecondary } from '../components/FormField';
+
+const BUCKETS = [
+    { key: 'vorabklaerung',          label: 'Vorabklärung' },
+    { key: 'berufsmassnahmen',       label: 'Berufsmassnahmen' },
+    { key: 'integrationsmassnahmen', label: 'Integrationsmassnahmen' },
+    { key: 'beratung_coaching',      label: 'Beratung & Coaching' },
+    { key: 'programmstart',          label: 'Programmstart' },
+];
+
+const LABEL_FARBEN = { 'LE': '#16A34A', 'TN': '#2563EB', 'MA': '#7C3AED' };
+
+const ABSAGE_GRUENDE = ['Nicht IV unterstützt', 'Keine Antwort', 'Kein passendes Programmangebot', 'Diverses'];
+
+function heute() { return new Date().toISOString().slice(0, 10); }
+function fmtDatum(d) {
+    return d ? new Date(d).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
+}
+
+function AbsageModal({ open, onClose, onConfirm }) {
+    const [grund, setGrund] = useState(ABSAGE_GRUENDE[0]);
+    const [notiz, setNotiz] = useState('');
+
+    useEffect(() => {
+        if (open) { setGrund(ABSAGE_GRUENDE[0]); setNotiz(''); }
+    }, [open]);
+
+    return (
+        <Modal open={open} onClose={onClose} title="Anfrage absagen" width={420}>
+            <FormField label="Grund">
+                <select style={inputStyle} value={grund} onChange={e => setGrund(e.target.value)}>
+                    {ABSAGE_GRUENDE.map(g => <option key={g}>{g}</option>)}
+                </select>
+            </FormField>
+            {grund === 'Diverses' && (
+                <FormField label="Notiz">
+                    <textarea
+                        style={{ ...inputStyle, minHeight: 70, resize: 'vertical', lineHeight: 1.5 }}
+                        value={notiz}
+                        onChange={e => setNotiz(e.target.value)}
+                        placeholder="Begründung…"
+                    />
+                </FormField>
+            )}
+            <div style={btnRow}>
+                <button style={btnSecondary} onClick={onClose}>Abbrechen</button>
+                <button style={{ ...btnPrimary, background: '#B91C1C' }} onClick={() => onConfirm(grund, notiz)}>Absagen</button>
+            </div>
+        </Modal>
+    );
+}
+
+function Karte({ d, abgeschlossen, onNavigate, onDragStart, onAbsage }) {
+    return (
+        <div
+            draggable={!abgeschlossen}
+            onDragStart={abgeschlossen ? undefined : onDragStart}
+            onClick={onNavigate}
+            style={{
+                background: abgeschlossen ? '#F5F4F0' : '#fff',
+                border: '1px solid rgba(0,0,0,.09)',
+                borderRadius: 6, padding: 8, marginBottom: 5,
+                cursor: 'pointer', transition: 'border-color .15s',
+                opacity: abgeschlossen ? .6 : 1,
+                position: 'relative',
+            }}
+            onMouseOver={e => !abgeschlossen && (e.currentTarget.style.borderColor = '#2563EB')}
+            onMouseOut={e => !abgeschlossen && (e.currentTarget.style.borderColor = 'rgba(0,0,0,.09)')}
+        >
+            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 3 }}>
+                {d.vorname} {d.nachname}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+                {d.programm_name && (
+                    <span style={{
+                        fontSize: 9, padding: '2px 6px', borderRadius: 20, fontWeight: 500,
+                        background: (d.farbe_hex || '#888') + '22', color: d.farbe_hex || '#888',
+                        border: `1px solid ${d.farbe_hex || '#888'}33`
+                    }}>{d.programm_name}</span>
+                )}
+                {d.klient_label && LABEL_FARBEN[d.klient_label] && (
+                    <span style={{
+                        fontSize: 9, padding: '2px 6px', borderRadius: 20, fontWeight: 500, fontFamily: 'monospace',
+                        background: LABEL_FARBEN[d.klient_label] + '22', color: LABEL_FARBEN[d.klient_label],
+                        border: `1px solid ${LABEL_FARBEN[d.klient_label]}33`
+                    }}>{d.klient_label}</span>
+                )}
+            </div>
+            <div style={{ fontSize: 10, color: '#6B6860' }}>{d.auftraggeber}</div>
+            <div style={{ fontSize: 10, color: '#A09D97', marginTop: 1 }}>Eingang: {fmtDatum(d.eingang_datum)}</div>
+
+            {abgeschlossen ? (
+                d.absage_grund && (
+                    <div style={{ fontSize: 10, color: '#B91C1C', marginTop: 5, fontStyle: 'italic' }}>
+                        {d.absage_grund}
+                    </div>
+                )
+            ) : (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}>
+                    <button
+                        onClick={e => { e.stopPropagation(); onAbsage(); }}
+                        style={{
+                            fontSize: 10, padding: '2px 8px', cursor: 'pointer',
+                            border: '1px solid rgba(220,38,38,.2)', borderRadius: 5,
+                            background: '#FEF2F2', color: '#B91C1C', fontFamily: 'inherit'
+                        }}
+                    >Absagen</button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default function Intake() {
+    const [dossiers, setDossiers] = useState([]);
+    const [standorte, setStandorte] = useState([]);
+    const [laden, setLaden] = useState(true);
+    const [filterStandort, setFilterStandort] = useState('');
+    const [anfrageModal, setAnfrageModal] = useState(false);
+    const [aufgeklappt, setAufgeklappt] = useState({});
+    const [absageDossier, setAbsageDossier] = useState(null);
+    const [dragOverBucket, setDragOverBucket] = useState('');
+    const navigate = useNavigate();
+
+    function ladeDossiers() {
+        return client.get('/dossiers').then(r => setDossiers(r.data));
+    }
+
+    useEffect(() => {
+        Promise.all([ladeDossiers(), client.get('/standorte').then(r => setStandorte(r.data))])
+            .catch(console.error)
+            .finally(() => setLaden(false));
+    }, []);
+
+    const gefiltert = filterStandort
+        ? dossiers.filter(d => d.standort_kuerzel === filterStandort)
+        : dossiers;
+
+    async function verschieben(dossier, neuerBucket) {
+        if (dossier.pipeline_status === neuerBucket) return;
+        const alterLabel = BUCKETS.find(b => b.key === dossier.pipeline_status)?.label || dossier.pipeline_status;
+        const neuerLabel = BUCKETS.find(b => b.key === neuerBucket)?.label || neuerBucket;
+        try {
+            await client.put(`/dossiers/${dossier.dossier_id}/intake`, {
+                pipeline_status: neuerBucket,
+                intake_abgeschlossen: dossier.intake_abgeschlossen || false,
+                absage_grund: dossier.absage_grund || null,
+                absage_notiz: dossier.absage_notiz || null,
+            });
+            await client.post('/journal', {
+                klient_id: dossier.klient_id,
+                kategorie: 'Sonstiges',
+                datum: heute(),
+                text: `Intake: Verschoben von ${alterLabel} nach ${neuerLabel}`,
+            });
+            await ladeDossiers();
+        } catch (err) { console.error(err); }
+    }
+
+    async function absagen(grund, notiz) {
+        const dossier = absageDossier;
+        if (!dossier) return;
+        try {
+            await client.put(`/dossiers/${dossier.dossier_id}/intake`, {
+                pipeline_status: dossier.pipeline_status,
+                intake_abgeschlossen: true,
+                absage_grund: grund,
+                absage_notiz: grund === 'Diverses' ? notiz : null,
+            });
+            await client.post('/journal', {
+                klient_id: dossier.klient_id,
+                kategorie: 'Sonstiges',
+                datum: heute(),
+                text: `Intake: Abgesagt — ${grund}`,
+            });
+            setAbsageDossier(null);
+            await ladeDossiers();
+        } catch (err) { console.error(err); }
+    }
+
+    function toggleAufgeklappt(key) {
+        setAufgeklappt(prev => ({ ...prev, [key]: !prev[key] }));
+    }
+
+    return (
+        <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div>
+                        <div style={{ fontSize: 19, fontWeight: 600 }}>Intake</div>
+                        <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle laufenden Anfragen nach Bucket</div>
+                    </div>
+                    <select value={filterStandort} onChange={e => setFilterStandort(e.target.value)} style={{
+                        fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
+                        borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28,
+                        marginTop: 2
+                    }}>
+                        <option value="">Alle Standorte</option>
+                        {standorte.map(s => (
+                            <option key={s.standort_id} value={s.kuerzel}>{s.kuerzel} — {s.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <button onClick={() => setAnfrageModal(true)} style={{
+                    padding: '7px 14px', fontSize: 13, fontWeight: 500,
+                    cursor: 'pointer', border: 'none', borderRadius: 6,
+                    background: '#2563EB', color: '#fff', fontFamily: 'inherit'
+                }}>+ Neue Anfrage</button>
+            </div>
+
+            {laden ? (
+                <div style={{ color: '#6B6860', fontSize: 12 }}>Laden…</div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 9 }}>
+                    {BUCKETS.map(bucket => {
+                        const alle = gefiltert.filter(d => d.pipeline_status === bucket.key);
+                        const aktive = alle.filter(d => !d.intake_abgeschlossen);
+                        const abgeschlossen = alle.filter(d => d.intake_abgeschlossen);
+                        const offen = !!aufgeklappt[bucket.key];
+                        const abschlussLabel = bucket.key === 'programmstart' ? 'Start erfolgt' : 'Abgeschlossen';
+
+                        return (
+                            <div key={bucket.key}
+                                onDragOver={e => { e.preventDefault(); setDragOverBucket(bucket.key); }}
+                                onDragLeave={() => setDragOverBucket('')}
+                                onDrop={e => {
+                                    e.preventDefault();
+                                    setDragOverBucket('');
+                                    const id = e.dataTransfer.getData('text/plain');
+                                    const dossier = dossiers.find(x => x.dossier_id === id);
+                                    if (dossier) verschieben(dossier, bucket.key);
+                                }}
+                                style={{
+                                    background: '#fff',
+                                    border: `1px solid ${dragOverBucket === bucket.key ? '#2563EB' : 'rgba(0,0,0,.09)'}`,
+                                    borderRadius: 10, padding: 9, boxShadow: '0 1px 3px rgba(0,0,0,.07)',
+                                    minHeight: 140, transition: 'border-color .1s'
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em' }}>{bucket.label}</span>
+                                    <span style={{
+                                        fontSize: 10, fontWeight: 600, fontFamily: 'monospace',
+                                        background: '#F5F4F0', border: '1px solid rgba(0,0,0,.09)',
+                                        borderRadius: 20, padding: '1px 6px', color: '#6B6860'
+                                    }}>{aktive.length}</span>
+                                </div>
+
+                                {aktive.map(d => (
+                                    <Karte
+                                        key={d.dossier_id}
+                                        d={d}
+                                        abgeschlossen={false}
+                                        onNavigate={() => navigate(`/dossiers/${d.dossier_id}`)}
+                                        onDragStart={e => e.dataTransfer.setData('text/plain', d.dossier_id)}
+                                        onAbsage={() => setAbsageDossier(d)}
+                                    />
+                                ))}
+
+                                {abgeschlossen.length > 0 && (
+                                    <>
+                                        <div style={{ borderTop: '1px solid rgba(0,0,0,.07)', margin: '8px 0' }} />
+                                        <button
+                                            onClick={() => toggleAufgeklappt(bucket.key)}
+                                            style={{
+                                                width: '100%', textAlign: 'left', fontSize: 10.5, fontWeight: 600,
+                                                color: '#6B6860', cursor: 'pointer', border: 'none', background: 'transparent',
+                                                fontFamily: 'inherit', padding: '3px 0'
+                                            }}
+                                        >{offen ? '▾' : '▸'} {abschlussLabel} ({abgeschlossen.length})</button>
+                                        {offen && abgeschlossen.map(d => (
+                                            <Karte
+                                                key={d.dossier_id}
+                                                d={d}
+                                                abgeschlossen={true}
+                                                onNavigate={() => navigate(`/dossiers/${d.dossier_id}`)}
+                                                onAbsage={() => {}}
+                                            />
+                                        ))}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            <NeueAnfrageModal
+                open={anfrageModal}
+                onClose={() => setAnfrageModal(false)}
+                onSaved={() => {
+                    setAnfrageModal(false);
+                    ladeDossiers();
+                }}
+            />
+            <AbsageModal
+                open={!!absageDossier}
+                onClose={() => setAbsageDossier(null)}
+                onConfirm={absagen}
+            />
+        </div>
+    );
+}

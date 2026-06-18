@@ -114,6 +114,25 @@ router.post('/', auth, async (req, res) => {
             [dossier_id, nummer.trim(), datum || null, bemerkung?.trim() || null, stat,
              verrechnungsart || null, betrag || null]
         );
+
+        // Intake automatisch abschliessen, wenn Verfügung im Bucket "Programmstart" eingetragen wird
+        const dosRes = await pgClient.query(
+            `SELECT klient_id, pipeline_status FROM dossier WHERE dossier_id = $1`,
+            [dossier_id]
+        );
+        if (dosRes.rows[0]?.pipeline_status === 'programmstart') {
+            await pgClient.query(
+                `UPDATE dossier SET intake_abgeschlossen = TRUE, absage_grund = 'Verfügung eingetragen', updated_at = NOW()
+                 WHERE dossier_id = $1`,
+                [dossier_id]
+            );
+            await pgClient.query(
+                `INSERT INTO journal_eintrag (klient_id, user_id, kategorie, datum, text)
+                 VALUES ($1, $2, 'Sonstiges', CURRENT_DATE, 'Intake abgeschlossen — Verfügung eingetragen, Start erfolgt')`,
+                [dosRes.rows[0].klient_id, req.user.user_id]
+            );
+        }
+
         await pgClient.query('COMMIT');
         res.status(201).json(result.rows[0]);
     } catch (err) {
