@@ -122,7 +122,7 @@ router.post('/', auth, async (req, res) => {
         );
         if (dosRes.rows[0]?.pipeline_status === 'programmstart') {
             await pgClient.query(
-                `UPDATE dossier SET intake_abgeschlossen = TRUE, absage_grund = 'Verfügung eingetragen', updated_at = NOW()
+                `UPDATE dossier SET intake_abgeschlossen = TRUE, absage_grund = 'Verfügung eingetragen', status = 'inaktiv', updated_at = NOW()
                  WHERE dossier_id = $1`,
                 [dossier_id]
             );

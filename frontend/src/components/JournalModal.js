@@ -7,6 +7,8 @@ const KATEGORIEN = [
     'Absenz', 'Kommunikation zuweisende Stelle', 'Externe Person', 'Sonstiges',
 ];
 
+const ABSAGE_GRUENDE = ['Nicht IV unterstützt', 'Keine Antwort', 'Kein passendes Programmangebot', 'Diverses'];
+
 function fmtOption(min) {
     if (min === 0) return '— Keine Dauer —';
     const h = Math.floor(min / 60);
@@ -24,7 +26,7 @@ function FieldLabel({ children, required }) {
     );
 }
 
-export default function JournalModal({ open, onClose, klientId, dossierId, onSaved }) {
+export default function JournalModal({ open, onClose, klientId, dossierId, pipelineStatus, intakeAbgeschlossen, onSaved }) {
     const [kat, setKat] = useState('Standortgespräch');
     const [datum, setDatum] = useState('');
     const [leistungId, setLeistungId] = useState('');
@@ -32,8 +34,13 @@ export default function JournalModal({ open, onClose, klientId, dossierId, onSav
     const [verrechenbar, setVerrechenbar] = useState(false);
     const [text, setText] = useState('');
     const [leistungen, setLeistungen] = useState([]);
+    const [absageGrund, setAbsageGrund] = useState(ABSAGE_GRUENDE[0]);
+    const [absageNotiz, setAbsageNotiz] = useState('');
     const [fehler, setFehler] = useState('');
     const [laden, setLaden] = useState(false);
+
+    const kategorien = intakeAbgeschlossen ? KATEGORIEN : [...KATEGORIEN, 'Absage'];
+    const istAbsage = kat === 'Absage';
 
     useEffect(() => {
         if (!open) return;
@@ -43,6 +50,8 @@ export default function JournalModal({ open, onClose, klientId, dossierId, onSav
         setDauerMin(0);
         setVerrechenbar(false);
         setText('');
+        setAbsageGrund(ABSAGE_GRUENDE[0]);
+        setAbsageNotiz('');
         setFehler('');
 
         const ladeLeistungenFallback = () =>
@@ -73,7 +82,34 @@ export default function JournalModal({ open, onClose, klientId, dossierId, onSav
         setVerrechenbar(!!id);
     }
 
+    async function handleAbsage() {
+        setLaden(true);
+        setFehler('');
+        try {
+            await client.put(`/dossiers/${dossierId}/intake`, {
+                pipeline_status: pipelineStatus,
+                intake_abgeschlossen: true,
+                absage_grund: absageGrund,
+                absage_notiz: absageGrund === 'Diverses' ? absageNotiz : null,
+            });
+            const r = await client.post('/journal', {
+                klient_id: klientId,
+                kategorie: 'Absage',
+                datum,
+                text: `Intake: Abgesagt — ${absageGrund}`,
+            });
+            onSaved(r.data);
+            onClose();
+        } catch (err) {
+            setFehler(err.response?.data?.error || 'Fehler beim Speichern.');
+        } finally {
+            setLaden(false);
+        }
+    }
+
     async function handleSubmit() {
+        if (istAbsage) return handleAbsage();
+
         if (!text.trim()) {
             setFehler('Text ist erforderlich.');
             return;
@@ -113,7 +149,7 @@ export default function JournalModal({ open, onClose, klientId, dossierId, onSav
                     <div>
                         <FieldLabel>Kategorie</FieldLabel>
                         <select value={kat} onChange={e => setKat(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
-                            {KATEGORIEN.map(k => <option key={k} value={k}>{k}</option>)}
+                            {kategorien.map(k => <option key={k} value={k}>{k}</option>)}
                         </select>
                     </div>
                     <div>
@@ -121,45 +157,68 @@ export default function JournalModal({ open, onClose, klientId, dossierId, onSav
                         <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={inputStyle} />
                     </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 10 }}>
-                    <div>
-                        <FieldLabel>Tarifnr. / Leistung</FieldLabel>
-                        <select value={leistungId} onChange={e => handleLeistungChange(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
-                            <option value="">— Keine Leistung —</option>
-                            {leistungen.map(l => (
-                                <option key={l.leistung_id} value={l.leistung_id}>
-                                    {l.tarifnr} · {l.bezeichnung}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <FieldLabel>Dauer</FieldLabel>
-                        <select value={dauerMin} onChange={e => setDauerMin(Number(e.target.value))} style={{ ...inputStyle, cursor: 'pointer' }}>
-                            {DAUER_OPTIONEN.map(m => (
-                                <option key={m} value={m}>{fmtOption(m)}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                        type="checkbox"
-                        id="jm-verrechenbar"
-                        checked={verrechenbar}
-                        onChange={e => setVerrechenbar(e.target.checked)}
-                        style={{ width: 14, height: 14, cursor: 'pointer' }}
-                    />
-                    <label htmlFor="jm-verrechenbar" style={{ fontSize: 12.5, color: '#1A1917', cursor: 'pointer' }}>Verrechenbar</label>
-                </div>
-                <div>
-                    <FieldLabel required>Text / Notiz</FieldLabel>
-                    <textarea
-                        value={text} onChange={e => setText(e.target.value)}
-                        placeholder="Notiz erfassen…" rows={4}
-                        style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }}
-                    />
-                </div>
+                {istAbsage ? (
+                    <>
+                        <div>
+                            <FieldLabel>Absage-Grund</FieldLabel>
+                            <select value={absageGrund} onChange={e => setAbsageGrund(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                                {ABSAGE_GRUENDE.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                        </div>
+                        {absageGrund === 'Diverses' && (
+                            <div>
+                                <FieldLabel>Notiz</FieldLabel>
+                                <textarea
+                                    value={absageNotiz} onChange={e => setAbsageNotiz(e.target.value)}
+                                    placeholder="Begründung…" rows={3}
+                                    style={{ ...inputStyle, resize: 'vertical', minHeight: 70 }}
+                                />
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 10 }}>
+                            <div>
+                                <FieldLabel>Tarifnr. / Leistung</FieldLabel>
+                                <select value={leistungId} onChange={e => handleLeistungChange(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                                    <option value="">— Keine Leistung —</option>
+                                    {leistungen.map(l => (
+                                        <option key={l.leistung_id} value={l.leistung_id}>
+                                            {l.tarifnr} · {l.bezeichnung}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <FieldLabel>Dauer</FieldLabel>
+                                <select value={dauerMin} onChange={e => setDauerMin(Number(e.target.value))} style={{ ...inputStyle, cursor: 'pointer' }}>
+                                    {DAUER_OPTIONEN.map(m => (
+                                        <option key={m} value={m}>{fmtOption(m)}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input
+                                type="checkbox"
+                                id="jm-verrechenbar"
+                                checked={verrechenbar}
+                                onChange={e => setVerrechenbar(e.target.checked)}
+                                style={{ width: 14, height: 14, cursor: 'pointer' }}
+                            />
+                            <label htmlFor="jm-verrechenbar" style={{ fontSize: 12.5, color: '#1A1917', cursor: 'pointer' }}>Verrechenbar</label>
+                        </div>
+                        <div>
+                            <FieldLabel required>Text / Notiz</FieldLabel>
+                            <textarea
+                                value={text} onChange={e => setText(e.target.value)}
+                                placeholder="Notiz erfassen…" rows={4}
+                                style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }}
+                            />
+                        </div>
+                    </>
+                )}
             </div>
 
             {fehler && (

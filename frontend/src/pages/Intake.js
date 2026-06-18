@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import NeueAnfrageModal from '../components/NeueAnfrageModal';
-import Modal from '../components/Modal';
-import FormField, { inputStyle, btnRow, btnPrimary, btnSecondary } from '../components/FormField';
 
 const BUCKETS = [
     { key: 'vorabklaerung',          label: 'Vorabklärung' },
@@ -15,47 +13,12 @@ const BUCKETS = [
 
 const LABEL_FARBEN = { 'LE': '#16A34A', 'TN': '#2563EB', 'MA': '#7C3AED' };
 
-const ABSAGE_GRUENDE = ['Nicht IV unterstützt', 'Keine Antwort', 'Kein passendes Programmangebot', 'Diverses'];
-
 function heute() { return new Date().toISOString().slice(0, 10); }
 function fmtDatum(d) {
     return d ? new Date(d).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
 }
 
-function AbsageModal({ open, onClose, onConfirm }) {
-    const [grund, setGrund] = useState(ABSAGE_GRUENDE[0]);
-    const [notiz, setNotiz] = useState('');
-
-    useEffect(() => {
-        if (open) { setGrund(ABSAGE_GRUENDE[0]); setNotiz(''); }
-    }, [open]);
-
-    return (
-        <Modal open={open} onClose={onClose} title="Anfrage absagen" width={420}>
-            <FormField label="Grund">
-                <select style={inputStyle} value={grund} onChange={e => setGrund(e.target.value)}>
-                    {ABSAGE_GRUENDE.map(g => <option key={g}>{g}</option>)}
-                </select>
-            </FormField>
-            {grund === 'Diverses' && (
-                <FormField label="Notiz">
-                    <textarea
-                        style={{ ...inputStyle, minHeight: 70, resize: 'vertical', lineHeight: 1.5 }}
-                        value={notiz}
-                        onChange={e => setNotiz(e.target.value)}
-                        placeholder="Begründung…"
-                    />
-                </FormField>
-            )}
-            <div style={btnRow}>
-                <button style={btnSecondary} onClick={onClose}>Abbrechen</button>
-                <button style={{ ...btnPrimary, background: '#B91C1C' }} onClick={() => onConfirm(grund, notiz)}>Absagen</button>
-            </div>
-        </Modal>
-    );
-}
-
-function Karte({ d, abgeschlossen, onNavigate, onDragStart, onAbsage }) {
+function Karte({ d, abgeschlossen, onNavigate, onDragStart }) {
     return (
         <div
             draggable={!abgeschlossen}
@@ -94,22 +57,9 @@ function Karte({ d, abgeschlossen, onNavigate, onDragStart, onAbsage }) {
             <div style={{ fontSize: 10, color: '#6B6860' }}>{d.auftraggeber}</div>
             <div style={{ fontSize: 10, color: '#A09D97', marginTop: 1 }}>Eingang: {fmtDatum(d.eingang_datum)}</div>
 
-            {abgeschlossen ? (
-                d.absage_grund != null && (
-                    <div style={{ fontSize: 10, color: '#B91C1C', marginTop: 5, fontStyle: 'italic' }}>
-                        {d.absage_grund}
-                    </div>
-                )
-            ) : (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}>
-                    <button
-                        onClick={e => { e.stopPropagation(); onAbsage(); }}
-                        style={{
-                            fontSize: 10, padding: '2px 8px', cursor: 'pointer',
-                            border: '1px solid rgba(220,38,38,.2)', borderRadius: 5,
-                            background: '#FEF2F2', color: '#B91C1C', fontFamily: 'inherit'
-                        }}
-                    >Absagen</button>
+            {abgeschlossen && d.absage_grund != null && (
+                <div style={{ fontSize: 10, color: '#B91C1C', marginTop: 5, fontStyle: 'italic' }}>
+                    {d.absage_grund}
                 </div>
             )}
         </div>
@@ -123,7 +73,6 @@ export default function Intake() {
     const [filterStandort, setFilterStandort] = useState('');
     const [anfrageModal, setAnfrageModal] = useState(false);
     const [aufgeklappt, setAufgeklappt] = useState({});
-    const [absageDossier, setAbsageDossier] = useState(null);
     const [dragOverBucket, setDragOverBucket] = useState('');
     const navigate = useNavigate();
 
@@ -158,27 +107,6 @@ export default function Intake() {
                 datum: heute(),
                 text: `Intake: Verschoben von ${alterLabel} nach ${neuerLabel}`,
             });
-            await ladeDossiers();
-        } catch (err) { console.error(err); }
-    }
-
-    async function absagen(grund, notiz) {
-        const dossier = absageDossier;
-        if (!dossier) return;
-        try {
-            await client.put(`/dossiers/${dossier.dossier_id}/intake`, {
-                pipeline_status: dossier.pipeline_status,
-                intake_abgeschlossen: true,
-                absage_grund: grund,
-                absage_notiz: grund === 'Diverses' ? notiz : null,
-            });
-            await client.post('/journal', {
-                klient_id: dossier.klient_id,
-                kategorie: 'Sonstiges',
-                datum: heute(),
-                text: `Intake: Abgesagt — ${grund}`,
-            });
-            setAbsageDossier(null);
             await ladeDossiers();
         } catch (err) { console.error(err); }
     }
@@ -258,7 +186,6 @@ export default function Intake() {
                                         abgeschlossen={false}
                                         onNavigate={() => navigate(`/dossiers/${d.dossier_id}`)}
                                         onDragStart={e => e.dataTransfer.setData('text/plain', d.dossier_id)}
-                                        onAbsage={() => setAbsageDossier(d)}
                                     />
                                 ))}
 
@@ -279,7 +206,6 @@ export default function Intake() {
                                                 d={d}
                                                 abgeschlossen={true}
                                                 onNavigate={() => navigate(`/dossiers/${d.dossier_id}`)}
-                                                onAbsage={() => {}}
                                             />
                                         ))}
                                     </>
@@ -297,11 +223,6 @@ export default function Intake() {
                     setAnfrageModal(false);
                     ladeDossiers();
                 }}
-            />
-            <AbsageModal
-                open={!!absageDossier}
-                onClose={() => setAbsageDossier(null)}
-                onConfirm={absagen}
             />
         </div>
     );

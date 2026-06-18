@@ -13,6 +13,14 @@ router.get('/', auth, async (req, res) => {
                 d.dossier_id, d.auftraggeber, d.kanal,
                 d.eingang_datum, d.pipeline_status, d.abbruch_grund,
                 d.intake_abgeschlossen, d.absage_grund, d.absage_notiz,
+                CASE
+                    WHEN d.status = 'inaktiv' THEN 'inaktiv'
+                    WHEN EXISTS (
+                        SELECT 1 FROM programm_verlauf pv3
+                        WHERE pv3.dossier_id = d.dossier_id AND pv3.status = 'Abgeschlossen'
+                    ) THEN 'inaktiv'
+                    ELSE COALESCE(d.status, 'aktiv')
+                END AS status,
                 k.klient_id, k.nachname, k.vorname,
                 p.name AS programm_name, p.farbe_hex, p.avg_dauer_tage,
                 ph.label AS phase_label,
@@ -266,7 +274,9 @@ router.put('/:id/intake', auth, async (req, res) => {
         const result = await db.query(
             `UPDATE dossier SET
                 pipeline_status = $1, intake_abgeschlossen = $2,
-                absage_grund = $3, absage_notiz = $4, updated_at = NOW()
+                absage_grund = $3, absage_notiz = $4,
+                status = CASE WHEN $2::boolean THEN 'inaktiv' ELSE status END,
+                updated_at = NOW()
              WHERE dossier_id = $5
              RETURNING *`,
             [pipeline_status, intake_abgeschlossen || false, absage_grund || null, absage_notiz || null, req.params.id]
