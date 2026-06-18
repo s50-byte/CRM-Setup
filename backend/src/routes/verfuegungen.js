@@ -160,7 +160,7 @@ router.post('/', auth, async (req, res) => {
 
 // PUT /api/verfuegungen/:id
 router.put('/:id', auth, async (req, res) => {
-    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag } = req.body;
+    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag, programm_id } = req.body;
     if (!nummer) return res.status(400).json({ error: 'Nummer ist erforderlich' });
     const pgClient = await db.connect();
     try {
@@ -185,6 +185,26 @@ router.put('/:id', auth, async (req, res) => {
             await pgClient.query('ROLLBACK');
             return res.status(404).json({ error: 'Nicht gefunden' });
         }
+
+        // Programm nachträglich setzen, falls Dossier noch keines hat (z.B. Altfälle vor Programm-Auswahl im Modal)
+        if (programm_id && dossier_id) {
+            const dosRes = await pgClient.query(
+                `SELECT akt_programm_id FROM dossier WHERE dossier_id = $1`,
+                [dossier_id]
+            );
+            if (!dosRes.rows[0]?.akt_programm_id) {
+                await pgClient.query(
+                    `UPDATE dossier SET akt_programm_id = $1, updated_at = NOW() WHERE dossier_id = $2`,
+                    [programm_id, dossier_id]
+                );
+                await pgClient.query(
+                    `INSERT INTO programm_verlauf (dossier_id, programm_id, status, start_datum)
+                     VALUES ($1, $2, 'Laufend', COALESCE($3, CURRENT_DATE))`,
+                    [dossier_id, programm_id, datum || null]
+                );
+            }
+        }
+
         await pgClient.query('COMMIT');
         res.json(result.rows[0]);
     } catch (err) {

@@ -25,7 +25,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
     const [fehler, setFehler] = useState('');
     const [laden, setLaden] = useState(false);
 
-    const zeigtProgrammWahl = !verfuegung && !dossier?.akt_programm_id;
+    const zeigtProgrammWahl = !dossier?.akt_programm_id;
 
     useEffect(() => {
         if (!open) return;
@@ -170,7 +170,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                                 ))}
                             </select>
                             <div style={{ fontSize: 11, color: '#6B6860', marginTop: 4 }}>
-                                Erste Verfügung des Dossiers — startet das Programm.
+                                Dossier hat noch kein Programm — Auswahl startet es.
                             </div>
                         </div>
                     )}
