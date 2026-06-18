@@ -102,6 +102,7 @@ export default function DossierDetail() {
     // Ziele
     const [ziele, setZiele] = useState([]);
     const [zielInput, setZielInput] = useState('');
+    const [zielFehler, setZielFehler] = useState('');
 
     // Modals
     const [zuweisungModal, setZuweisungModal] = useState(false);
@@ -174,25 +175,37 @@ export default function DossierDetail() {
 
     async function addZiel() {
         if (!zielInput.trim()) return;
+        setZielFehler('');
         try {
             const r = await client.post(`/dossiers/${id}/ziele`, { text: zielInput.trim() });
             setZiele(prev => [...prev, r.data]);
             setZielInput('');
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            setZielFehler(err.response?.data?.error || 'Fehler beim Erstellen des Ziels.');
+        }
     }
 
     async function toggleZiel(ziel_id) {
+        setZielFehler('');
         try {
             const r = await client.put(`/dossiers/${id}/ziele/${ziel_id}`);
             setZiele(prev => prev.map(z => z.ziel_id === ziel_id ? r.data : z));
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            setZielFehler(err.response?.data?.error || 'Fehler beim Aktualisieren des Ziels.');
+        }
     }
 
     async function deleteZiel(ziel_id) {
+        setZielFehler('');
         try {
             await client.delete(`/dossiers/${id}/ziele/${ziel_id}`);
             setZiele(prev => prev.filter(z => z.ziel_id !== ziel_id));
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            setZielFehler(err.response?.data?.error || 'Fehler beim Löschen des Ziels.');
+        }
     }
 
     function reloadVerfuegungen() {
@@ -604,15 +617,26 @@ export default function DossierDetail() {
                                     }}>×</button>
                                 </div>
                             ))}
-                            <div style={{ display: 'flex', gap: 7, marginTop: ziele.length > 0 ? 10 : 0 }}>
-                                <input
-                                    value={zielInput} onChange={e => setZielInput(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && addZiel()}
-                                    placeholder="Neues Ziel eingeben…"
-                                    style={{ flex: 1, fontSize: 12.5, padding: '6px 10px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, fontFamily: 'inherit', outline: 'none' }}
-                                />
-                                <button onClick={addZiel} style={{ padding: '6px 14px', fontSize: 12.5, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', fontWeight: 500 }}>+</button>
-                            </div>
+                            {zielFehler && (
+                                <div style={{ fontSize: 12, color: '#B91C1C', background: '#FEF2F2', border: '1px solid rgba(185,28,28,.15)', borderRadius: 6, padding: '6px 10px', marginTop: ziele.length > 0 ? 10 : 0 }}>
+                                    {zielFehler}
+                                </div>
+                            )}
+                            {dossier?.akt_verlauf_id ? (
+                                <div style={{ display: 'flex', gap: 7, marginTop: ziele.length > 0 || zielFehler ? 10 : 0 }}>
+                                    <input
+                                        value={zielInput} onChange={e => setZielInput(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && addZiel()}
+                                        placeholder="Neues Ziel eingeben…"
+                                        style={{ flex: 1, fontSize: 12.5, padding: '6px 10px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, fontFamily: 'inherit', outline: 'none' }}
+                                    />
+                                    <button onClick={addZiel} style={{ padding: '6px 14px', fontSize: 12.5, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', fontWeight: 500 }}>+</button>
+                                </div>
+                            ) : (
+                                <div style={{ fontSize: 12, color: '#9A3412', background: '#FFF7ED', border: '1px solid rgba(154,52,18,.15)', borderRadius: 6, padding: '7px 10px', marginTop: ziele.length > 0 ? 10 : 0 }}>
+                                    Programm noch nicht gestartet — Ziele können erst nach der ersten Verfügung mit Programm erfasst werden.
+                                </div>
+                            )}
                         </div>
                     </div>
 
