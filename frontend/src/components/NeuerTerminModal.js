@@ -179,17 +179,24 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
                 </div>
             </FormField>
             <FormField label="Ich nehme teil">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '5px 0' }}>
-                    <input
-                        type="checkbox"
-                        checked={ichNehmeTeile}
-                        onChange={e => setIchNehmeTeile(e.target.checked)}
-                        style={{ accentColor: '#2563EB', width: 15, height: 15, flexShrink: 0 }}
-                    />
-                    <span style={{ fontSize: 12.5, color: ichNehmeTeile ? '#1A1917' : '#A09D97' }}>
-                        {ichNehmeTeile ? 'Ja — ich nehme an diesem Termin teil' : 'Nein — ich nehme nicht teil'}
-                    </span>
-                </label>
+                <div style={{
+                    display: 'flex', borderRadius: 20, background: '#F5F4F0', padding: 2,
+                    border: '1px solid rgba(0,0,0,.09)', width: 'fit-content',
+                }}>
+                    {[{ val: true, label: 'Ja' }, { val: false, label: 'Nein' }].map(({ val, label }) => (
+                        <button
+                            key={label}
+                            type="button"
+                            onClick={() => setIchNehmeTeile(val)}
+                            style={{
+                                padding: '3px 14px', fontSize: 11, fontWeight: 500, border: 'none', borderRadius: 18,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                                background: ichNehmeTeile === val ? '#2563EB' : 'transparent',
+                                color: ichNehmeTeile === val ? '#fff' : '#6B6860',
+                            }}
+                        >{label}</button>
+                    ))}
+                </div>
             </FormField>
             <FormField label="Notiz">
                 <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical', lineHeight: 1.5 }}
