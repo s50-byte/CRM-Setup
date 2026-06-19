@@ -47,6 +47,7 @@ router.get('/', auth, async (req, res) => {
 
 // POST /api/termine — Neuer Termin
 router.post('/', auth, async (req, res) => {
+    console.log('POST /termine body:', req.body);
     const { klient_id, typ, datum, zeit, notiz, personen } = req.body;
 
     if (!klient_id || !typ || !datum) {

@@ -131,6 +131,8 @@ export default function DossierDetail() {
     const [zielInput, setZielInput] = useState('');
     const [zielFehler, setZielFehler] = useState('');
 
+    const [termine, setTermine] = useState([]);
+
     // Modals
     const [zuweisungModal, setZuweisungModal] = useState(false);
     const [externeModal, setExterneModal] = useState(false);
@@ -180,8 +182,10 @@ export default function DossierDetail() {
         if (!dossier?.klient_id) return;
         Promise.all([
             client.get(`/journal/${dossier.klient_id}`),
-        ]).then(([j]) => {
+            client.get(`/termine?klient_id=${dossier.klient_id}`),
+        ]).then(([j, t]) => {
             setJournal(j.data);
+            setTermine(t.data);
         }).catch(console.error);
     }, [dossier?.klient_id]);
 
@@ -238,6 +242,13 @@ export default function DossierDetail() {
 
     function reloadVerfuegungen() {
         client.get(`/verfuegungen/${id}`).then(r => setVerfuegungen(r.data)).catch(console.error);
+    }
+
+    function loadTermine() {
+        if (!dossier?.klient_id) return;
+        client.get(`/termine?klient_id=${dossier.klient_id}`)
+            .then(r => setTermine(r.data))
+            .catch(console.error);
     }
 
     function reloadDossier() {
@@ -400,11 +411,6 @@ export default function DossierDetail() {
                                 cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
                                 background: '#fff', fontFamily: 'inherit', color: '#1A1917'
                             }}>Ferien erfassen</button>
-                            <button onClick={() => setTerminModal(true)} style={{
-                                padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
-                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
-                                background: '#fff', fontFamily: 'inherit', color: '#1A1917'
-                            }}>+ Termin erfassen</button>
                             <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
                                 padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
                                 cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
@@ -834,6 +840,34 @@ export default function DossierDetail() {
                         })}
                     </div>
 
+                    {/* Termine */}
+                    <div style={{ ...CARD, padding: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
+                            <span style={SECTION_HDR}>Termine</span>
+                            <button onClick={() => setTerminModal(true)} style={{ fontSize: 11, padding: '3px 9px', cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5, background: '#fff', fontFamily: 'inherit', color: '#2563EB', fontWeight: 500 }}>+ Termin</button>
+                        </div>
+                        {termine.length === 0 ? (
+                            <div style={{ fontSize: 12, color: '#6B6860' }}>Keine Termine</div>
+                        ) : termine.map(t => (
+                            <div key={t.termin_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 7px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 500 }}>{t.typ}</div>
+                                    <div style={{ fontSize: 11, color: '#6B6860' }}>
+                                        {fmt(t.datum)}{t.zeit ? ` · ${t.zeit.slice(0, 5)}` : ''}
+                                    </div>
+                                </div>
+                                {t.status && (
+                                    <span style={{
+                                        fontSize: 10, padding: '2px 6px', borderRadius: 10, fontFamily: 'monospace',
+                                        background: t.status === 'erledigt' ? '#ECFDF5' : '#F5F4F0',
+                                        color: t.status === 'erledigt' ? '#15803D' : '#6B6860',
+                                        border: t.status === 'erledigt' ? '1px solid rgba(22,163,74,.15)' : '1px solid rgba(0,0,0,.09)',
+                                    }}>{t.status}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
                     {/* Verfügungen */}
                     <div style={{ ...CARD, padding: '1rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
@@ -1067,7 +1101,7 @@ export default function DossierDetail() {
                 open={terminModal}
                 onClose={() => setTerminModal(false)}
                 klientId={dossier?.klient_id}
-                onSaved={() => setTerminModal(false)}
+                onSaved={() => { setTerminModal(false); loadTermine(); }}
             />
 
         </div>
