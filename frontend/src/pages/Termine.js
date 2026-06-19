@@ -10,6 +10,9 @@ const STATUS_STYLE = {
     'Abgesagt':   { bg: '#FEF2F2', color: '#B91C1C', border: 'rgba(220,38,38,.15)' },
 };
 
+const TYPEN = ['Erstgespräch', 'Schnuppereinsatz', 'Standortgespräch', 'Programmstart', 'Abschlussgespräch'];
+const STATUSWERTE = ['Ausstehend', 'Geplant', 'Bestätigt', 'Abgesagt'];
+
 function sortData(arr, field, dir) {
     if (!field) return arr;
     return [...arr].sort((a, b) => {
@@ -21,21 +24,36 @@ function sortData(arr, field, dir) {
     });
 }
 
+const filterStyle = {
+    fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
+    borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28,
+};
+
 export default function Termine() {
     const navigate = useNavigate();
     const [termine, setTermine] = useState([]);
+    const [benutzer, setBenutzer] = useState([]);
     const [laden, setLaden] = useState(true);
     const [terminModal, setTerminModal] = useState(false);
     const [detailTermin, setDetailTermin] = useState(null);
-    const [filter, setFilter] = useState('');
     const [sortField, setSortField] = useState('datum');
     const [sortDir, setSortDir] = useState('asc');
 
+    const [suche, setSuche] = useState('');
+    const [filterTyp, setFilterTyp] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterDatumVon, setFilterDatumVon] = useState('');
+    const [filterDatumBis, setFilterDatumBis] = useState('');
+    const [filterPerson, setFilterPerson] = useState('');
+
     useEffect(() => {
-        client.get('/termine')
-            .then(r => setTermine(r.data))
-            .catch(console.error)
-            .finally(() => setLaden(false));
+        Promise.all([
+            client.get('/termine'),
+            client.get('/benutzer'),
+        ]).then(([tRes, bRes]) => {
+            setTermine(tRes.data);
+            setBenutzer(bRes.data);
+        }).catch(console.error).finally(() => setLaden(false));
     }, []);
 
     const handleSort = field => {
@@ -52,8 +70,32 @@ export default function Termine() {
         } catch (err) { console.error(err); }
     }
 
+    const filterAktiv = suche || filterTyp || filterStatus || filterDatumVon || filterDatumBis || filterPerson;
+
+    function resetFilter() {
+        setSuche('');
+        setFilterTyp('');
+        setFilterStatus('');
+        setFilterDatumVon('');
+        setFilterDatumBis('');
+        setFilterPerson('');
+    }
+
+    const sucheLower = suche.toLowerCase();
     const gefiltert = sortData(
-        termine.filter(t => !filter || t.typ === filter),
+        termine.filter(t => {
+            if (filterTyp && t.typ !== filterTyp) return false;
+            if (filterStatus && t.status !== filterStatus) return false;
+            if (filterDatumVon && t.datum < filterDatumVon) return false;
+            if (filterDatumBis && t.datum > filterDatumBis) return false;
+            if (filterPerson && !(t.personen || []).some(p => p.user_id === filterPerson)) return false;
+            if (suche) {
+                const klient = `${t.vorname || ''} ${t.nachname || ''}`.toLowerCase();
+                const notiz = (t.notiz || '').toLowerCase();
+                if (!klient.includes(sucheLower) && !notiz.includes(sucheLower)) return false;
+            }
+            return true;
+        }),
         sortField, sortDir
     );
 
@@ -80,29 +122,68 @@ export default function Termine() {
                 }}>+ Neuer Termin</button>
             </div>
 
+            {/* Filter-Leiste */}
             <div style={{
-                display: 'flex', alignItems: 'center', gap: 7, marginBottom: '1.1rem',
                 background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10,
-                padding: '.5rem .875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)'
+                padding: '.625rem .875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)',
+                marginBottom: '1.1rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8
             }}>
-                <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em' }}>Filter</span>
-                <select value={filter} onChange={e => setFilter(e.target.value)} style={{
-                    fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
-                    borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28
-                }}>
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', flexShrink: 0 }}>Filter</span>
+
+                {/* Freitext-Suche */}
+                <input
+                    type="text"
+                    placeholder="Klient oder Notiz…"
+                    value={suche}
+                    onChange={e => setSuche(e.target.value)}
+                    style={{ ...filterStyle, width: 160, background: '#fff', border: '1px solid rgba(0,0,0,.12)' }}
+                />
+
+                {/* Typ */}
+                <select value={filterTyp} onChange={e => setFilterTyp(e.target.value)} style={filterStyle}>
                     <option value="">Alle Typen</option>
-                    <option>Erstgespräch</option>
-                    <option>Schnuppereinsatz</option>
-                    <option>Standortgespräch</option>
-                    <option>Programmstart</option>
-                    <option>Abschlussgespräch</option>
+                    {TYPEN.map(t => <option key={t}>{t}</option>)}
                 </select>
-                {filter && (
-                    <button onClick={() => setFilter('')} style={{
-                        height: 28, padding: '0 9px', fontSize: 12, cursor: 'pointer',
+
+                {/* Status */}
+                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={filterStyle}>
+                    <option value="">Alle Status</option>
+                    {STATUSWERTE.map(s => <option key={s}>{s}</option>)}
+                </select>
+
+                {/* Datum von/bis */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: '#A09D97' }}>Von</span>
+                    <input
+                        type="date"
+                        value={filterDatumVon}
+                        onChange={e => setFilterDatumVon(e.target.value)}
+                        style={{ ...filterStyle, width: 130 }}
+                    />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: '#A09D97' }}>Bis</span>
+                    <input
+                        type="date"
+                        value={filterDatumBis}
+                        onChange={e => setFilterDatumBis(e.target.value)}
+                        style={{ ...filterStyle, width: 130 }}
+                    />
+                </div>
+
+                {/* Teilnehmende Person */}
+                <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} style={{ ...filterStyle, maxWidth: 160 }}>
+                    <option value="">Alle Personen</option>
+                    {benutzer.map(b => <option key={b.user_id} value={b.user_id}>{b.full_name}</option>)}
+                </select>
+
+                {/* Reset */}
+                {filterAktiv && (
+                    <button onClick={resetFilter} style={{
+                        height: 28, padding: '0 10px', fontSize: 12, cursor: 'pointer',
                         border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                        background: 'transparent', color: '#6B6860', fontFamily: 'inherit'
-                    }}>× Reset</button>
+                        background: 'transparent', color: '#6B6860', fontFamily: 'inherit', flexShrink: 0
+                    }}>× Zurücksetzen</button>
                 )}
             </div>
 
@@ -124,7 +205,9 @@ export default function Termine() {
                         {laden ? (
                             <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Laden…</td></tr>
                         ) : gefiltert.length === 0 ? (
-                            <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Termine</td></tr>
+                            <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>
+                                {filterAktiv ? 'Keine Treffer für die gewählten Filter' : 'Keine Termine'}
+                            </td></tr>
                         ) : gefiltert.map((t, i) => {
                             const s = STATUS_STYLE[t.status] || STATUS_STYLE['Ausstehend'];
                             return (
@@ -161,6 +244,7 @@ export default function Termine() {
                     </tbody>
                 </table>
             </div>
+
             {detailTermin && (
                 <div onClick={() => setDetailTermin(null)} style={{
                     position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)',
