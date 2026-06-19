@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 import BenutzerModal from '../../components/BenutzerModal';
 
 const ROLLEN_FARBEN = {
@@ -52,7 +53,10 @@ function StandortBadge({ kuerzel }) {
     );
 }
 
+const PW_INIT = { open: false, benutzer: null, pw: '', pw2: '', laden: false, fehler: '', erfolg: false };
+
 export default function Benutzer() {
+    const { benutzer: eingeloggterUser } = useAuth();
     const [benutzer, setBenutzer] = useState([]);
     const [laden, setLaden] = useState(true);
     const [alleStandorte, setAlleStandorte] = useState([]);
@@ -60,6 +64,8 @@ export default function Benutzer() {
     const [filterRolle, setFilterRolle] = useState('Alle');
     const [filterAktiv, setFilterAktiv] = useState('aktiv');
     const [modal, setModal] = useState({ open: false, benutzer: null });
+    const [pwModal, setPwModal] = useState(PW_INIT);
+    const istAdmin = eingeloggterUser?.system_rolle === 'admin';
 
     const laden_daten = useCallback(async () => {
         setLaden(true);
@@ -78,6 +84,25 @@ export default function Benutzer() {
     }, []);
 
     useEffect(() => { laden_daten(); }, [laden_daten]);
+
+    async function handlePwReset() {
+        if (pwModal.pw.length < 8) {
+            setPwModal(m => ({ ...m, fehler: 'Passwort muss mindestens 8 Zeichen lang sein.' }));
+            return;
+        }
+        if (pwModal.pw !== pwModal.pw2) {
+            setPwModal(m => ({ ...m, fehler: 'Passwörter stimmen nicht überein.' }));
+            return;
+        }
+        setPwModal(m => ({ ...m, laden: true, fehler: '' }));
+        try {
+            await client.put(`/benutzer/${pwModal.benutzer.user_id}/passwort-reset`, { passwort: pwModal.pw });
+            setPwModal(m => ({ ...m, laden: false, erfolg: true }));
+            setTimeout(() => setPwModal(PW_INIT), 1500);
+        } catch (err) {
+            setPwModal(m => ({ ...m, laden: false, fehler: err.response?.data?.error || 'Fehler beim Zurücksetzen.' }));
+        }
+    }
 
     const gefiltert = benutzer.filter(b => {
         const aktiv_ok = filterAktiv === 'alle' ? true : (filterAktiv === 'aktiv' ? b.aktiv : !b.aktiv);
@@ -205,12 +230,22 @@ export default function Benutzer() {
                                         </span>
                                     </td>
                                     <td style={{ padding: '9px 12px', textAlign: 'right' }}>
-                                        <button
-                                            onClick={() => setModal({ open: true, benutzer: b })}
-                                            style={{ padding: '4px 12px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', color: '#1A1917', fontFamily: 'inherit' }}
-                                        >
-                                            Bearbeiten
-                                        </button>
+                                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                            {istAdmin && (
+                                                <button
+                                                    onClick={() => setPwModal({ ...PW_INIT, open: true, benutzer: b })}
+                                                    style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#F5F4F0', color: '#6B6860', fontFamily: 'inherit' }}
+                                                >
+                                                    Passwort
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => setModal({ open: true, benutzer: b })}
+                                                style={{ padding: '4px 12px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', color: '#1A1917', fontFamily: 'inherit' }}
+                                            >
+                                                Bearbeiten
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -225,6 +260,71 @@ export default function Benutzer() {
                 onSaved={laden_daten}
                 benutzer={modal.benutzer}
             />
+
+            {/* Passwort-Reset-Modal */}
+            {pwModal.open && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: 12, padding: '1.5rem', width: 380, boxShadow: '0 8px 32px rgba(0,0,0,.18)' }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Passwort zurücksetzen</div>
+                        <div style={{ fontSize: 12.5, color: '#6B6860', marginBottom: 16 }}>für {pwModal.benutzer?.full_name}</div>
+
+                        {pwModal.erfolg ? (
+                            <div style={{ fontSize: 13, color: '#15803D', background: '#F0FDF4', border: '1px solid rgba(21,128,61,.15)', borderRadius: 6, padding: '10px 12px', textAlign: 'center' }}>
+                                Passwort wurde zurückgesetzt ✓
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>
+                                            Neues Passwort <span style={{ color: '#B91C1C' }}>*</span>
+                                        </label>
+                                        <input
+                                            type="password"
+                                            value={pwModal.pw}
+                                            onChange={e => setPwModal(m => ({ ...m, pw: e.target.value, fehler: '' }))}
+                                            placeholder="Mind. 8 Zeichen"
+                                            style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>
+                                            Passwort bestätigen <span style={{ color: '#B91C1C' }}>*</span>
+                                        </label>
+                                        <input
+                                            type="password"
+                                            value={pwModal.pw2}
+                                            onChange={e => setPwModal(m => ({ ...m, pw2: e.target.value, fehler: '' }))}
+                                            placeholder="Wiederholen"
+                                            style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                                        />
+                                    </div>
+                                </div>
+                                {pwModal.fehler && (
+                                    <div style={{ fontSize: 12.5, color: '#B91C1C', background: '#FEF2F2', border: '1px solid rgba(185,28,28,.15)', borderRadius: 6, padding: '7px 10px', marginTop: 10 }}>
+                                        {pwModal.fehler}
+                                    </div>
+                                )}
+                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                                    <button
+                                        onClick={() => setPwModal(PW_INIT)}
+                                        style={{ padding: '7px 16px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}
+                                    >
+                                        Abbrechen
+                                    </button>
+                                    <button
+                                        onClick={handlePwReset}
+                                        disabled={pwModal.laden}
+                                        style={{ padding: '7px 16px', fontSize: 13, cursor: pwModal.laden ? 'default' : 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', fontWeight: 500, opacity: pwModal.laden ? 0.6 : 1 }}
+                                    >
+                                        {pwModal.laden ? 'Speichern…' : 'Passwort setzen'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

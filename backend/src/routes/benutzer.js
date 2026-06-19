@@ -382,6 +382,29 @@ router.put('/:id', auth, requireManagement, async (req, res) => {
     }
 });
 
+// PUT /api/benutzer/:id/passwort-reset — Passwort als Admin zurücksetzen
+router.put('/:id/passwort-reset', auth, async (req, res) => {
+    if (req.user.system_rolle !== 'admin') {
+        return res.status(403).json({ error: 'Nur Admins dürfen Passwörter zurücksetzen' });
+    }
+    const { passwort } = req.body;
+    if (!passwort || passwort.length < 8) {
+        return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen lang sein' });
+    }
+    try {
+        const hash = await bcrypt.hash(passwort, 10);
+        const result = await db.query(
+            `UPDATE benutzer SET password_hash = $1, updated_at = NOW() WHERE user_id = $2 RETURNING user_id`,
+            [hash, req.params.id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Zurücksetzen des Passworts' });
+    }
+});
+
 // PUT /api/benutzer/:id/deaktivieren — Benutzer deaktivieren
 router.put('/:id/deaktivieren', auth, requireManagement, async (req, res) => {
     try {
