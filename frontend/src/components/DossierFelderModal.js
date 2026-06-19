@@ -3,7 +3,7 @@ import Modal from './Modal';
 import FormField, { inputStyle, btnRow, btnPrimary, btnSecondary } from './FormField';
 import client from '../api/client';
 
-const ABTEILUNGEN = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert'];
+const ABTEILUNGEN = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert', 'Beratung & Coaching'];
 
 function toggleBtn(active) {
     return {

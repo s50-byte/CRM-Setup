@@ -12,7 +12,7 @@ const pool = new Pool({
 const VORNAMEN  = ['Anna','Peter','Maria','Thomas','Lisa','Hans','Sandra','Michael','Claudia','Daniel','Ursula','Stefan','Monika','Andreas','Petra','Roland','Brigitte','Markus','Nicole','Beat'];
 const NACHNAMEN = ['Müller','Schmid','Keller','Weber','Zimmermann','Meier','Huber','Steiner','Brunner','Widmer','Berger','Fischer','Baumann','Schneider','Koch','Bürki','Wenger','Gerber','Lüthi','Graf'];
 const KANAELE   = ['Telefon', 'E-Mail', 'Direkt'];
-const ABTEILUNGEN = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert'];
+const ABTEILUNGEN = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert', 'Beratung & Coaching'];
 const LABELS    = ['LE', 'TN', 'TN', 'MA', 'TN'];  // TN häufiger
 
 // Pipeline-Status rotiert durch alle 5 Werte

@@ -53,6 +53,7 @@ const MANAGEMENT_NAV = [
     { path: '/management/reporting',   label: 'Reporting',  icon: '📊' },
     { path: '/management/leistungen',  label: 'Leistungskatalog', icon: '📋' },
     { path: '/management/benutzer',    label: 'Benutzer',   icon: '⚙' },
+    { path: '/standorte',              label: 'Standorte',  icon: '📍' },
 ];
 
 function Platzhalter({ titel }) {

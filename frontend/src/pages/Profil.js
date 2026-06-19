@@ -40,7 +40,7 @@ function Toggle({ label, checked, onChange }) {
 }
 
 const ROLLEN_LISTE = ['Klientenführung', 'Job Coach', 'Fachperson', 'Intake'];
-const ABTEILUNGEN_LISTE = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert'];
+const ABTEILUNGEN_LISTE = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert', 'Beratung & Coaching'];
 const BEREICH_LISTE = [
     { value: 'BM', label: 'Berufsmassnahmen' },
     { value: 'IM', label: 'Integrationsmassnahmen' },
@@ -60,7 +60,7 @@ export default function Profil() {
     const [standorte, setStandorte] = useState(new Set());
     const [abteilungen, setAbteilungen] = useState(new Set());
     const [programmGruppen, setProgrammGruppen] = useState([]);
-    const [aufgeklappt, setAufgeklappt] = useState({ BM: true, IM: true, BC: true, GM: true });
+    const [aufgeklappt, setAufgeklappt] = useState({ BM: false, IM: false, BC: false, GM: false });
     const [alleStandorte, setAlleStandorte] = useState([]);
     const [rollenMsg, setRollenMsg] = useState('');
     const [programmeMsg, setProgrammeMsg] = useState('');
