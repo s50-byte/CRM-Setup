@@ -69,12 +69,30 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
-// PUT /api/leistungen/:id — bearbeiten (nur Leitungsteam)
+// PUT /api/leistungen/:id — bearbeiten oder aktiv-Status setzen (nur Leitungsteam)
 router.put('/:id', auth, async (req, res) => {
     if (!LEITUNGSTEAM.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
-    const { bezeichnung, einheit, tarif, tarifziffer, entschaedigungsart, produkt_nr, kostenart, kostenstelle } = req.body;
+    const { bezeichnung, einheit, tarif, tarifziffer, entschaedigungsart, produkt_nr, kostenart, kostenstelle, aktiv } = req.body;
+
+    // Nur aktiv-Toggle (Aktivieren/Deaktivieren ohne Vollupdate)
+    if (aktiv !== undefined && !produkt_nr && !bezeichnung) {
+        try {
+            const result = await db.query(
+                `UPDATE leistung SET aktiv = $1, updated_at = NOW()
+                 WHERE leistung_id = $2
+                 RETURNING ${FELDER}`,
+                [aktiv === true, req.params.id]
+            );
+            if (result.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
+            return res.json(result.rows[0]);
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Fehler beim Aktualisieren des Status' });
+        }
+    }
+
     if (!produkt_nr || !bezeichnung) {
         return res.status(400).json({ error: 'Produkt-Nr. und Bezeichnung sind erforderlich' });
     }

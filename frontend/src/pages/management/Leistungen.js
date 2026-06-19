@@ -98,6 +98,15 @@ export default function Leistungen() {
         }
     }
 
+    async function aktivieren(id) {
+        try {
+            await client.put(`/leistungen/${id}`, { aktiv: true });
+            laden_();
+        } catch {
+            alert('Fehler beim Aktivieren.');
+        }
+    }
+
     const sortiert = [...liste].sort((a, b) => {
         const va = a[sortKey];
         const vb = b[sortKey];
@@ -211,12 +220,19 @@ export default function Leistungen() {
                                                 >
                                                     Bearbeiten
                                                 </button>
-                                                {l.aktiv && (
+                                                {l.aktiv ? (
                                                     <button
                                                         onClick={() => deaktivieren(l.leistung_id)}
                                                         style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(185,28,28,.2)', borderRadius: 5, background: '#FEF2F2', fontFamily: 'inherit', color: '#B91C1C' }}
                                                     >
                                                         Deaktivieren
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => aktivieren(l.leistung_id)}
+                                                        style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(21,128,61,.2)', borderRadius: 5, background: '#F0FDF4', fontFamily: 'inherit', color: '#15803D' }}
+                                                    >
+                                                        Aktivieren
                                                     </button>
                                                 )}
                                             </div>
