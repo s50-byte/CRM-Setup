@@ -25,6 +25,7 @@ import Auslastung from '../pages/management/Auslastung';
 import Benutzer from '../pages/management/Benutzer';
 import Reporting from '../pages/management/Reporting';
 import Feedback from '../pages/management/Feedback';
+import Vorlagen from '../pages/management/Vorlagen';
 
 const MANAGEMENT_ROLLEN = ['leitungsteam', 'admin'];
 
@@ -58,6 +59,7 @@ const MANAGEMENT_NAV = [
     { path: '/management/leistungen',  label: 'Leistungskatalog', icon: '📋' },
     { path: '/management/benutzer',    label: 'Benutzer',   icon: '⚙' },
     { path: '/standorte',              label: 'Standorte',  icon: '📍' },
+    { path: '/management/vorlagen',    label: 'Dokumentvorlagen', icon: '📄' },
     { path: '/management/feedback',    label: 'Feedback',   icon: '💬' },
 ];
 
@@ -253,6 +255,7 @@ export default function Layout() {
                     <Route path="/management/reporting"    element={<Reporting />} />
                     <Route path="/management/leistungen"   element={<Leistungen />} />
                     <Route path="/management/benutzer"     element={<Benutzer />} />
+                    <Route path="/management/vorlagen"     element={<Vorlagen />} />
                     <Route path="/management/feedback"     element={<Feedback />} />
                 </Routes>
             </div>
