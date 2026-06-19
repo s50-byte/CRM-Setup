@@ -24,13 +24,14 @@ const PHASE_STYLE = {
 const SEL = { fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28 };
 
 const COLS = [
-    { label: 'Name',      field: 'nachname' },
-    { label: 'Programm',  field: 'programm_name' },
-    { label: 'Phase',     field: 'pipeline_status' },
-    { label: 'Laufzeit',  field: null },
-    { label: 'Betreuung', field: null },
-    { label: '',          field: null },
-    { label: '',          field: null },
+    { label: 'Name',                 field: 'nachname' },
+    { label: 'Standort',             field: 'standort_kuerzel' },
+    { label: 'Programm',             field: 'programm_name' },
+    { label: 'Phase',                field: 'pipeline_status' },
+    { label: 'Laufzeit',             field: null },
+    { label: 'Zugewiesene Personen', field: null },
+    { label: '',                     field: null },
+    { label: '',                     field: null },
 ];
 
 function berechneTageVerbleibend(start_datum, avg_dauer_tage) {
@@ -60,11 +61,11 @@ function sortData(arr, field, dir) {
     });
 }
 
-function DossierTabelle({ rows, sortField, sortDir, onSort, navigate }) {
+function DossierTabelle({ rows, sortField, sortDir, onSort, navigate, filterAktiv }) {
     const si = f => !f ? '' : sortField === f ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
 
     return (
-        <table style={{ width: '100%', minWidth: 800, borderCollapse: 'collapse', fontSize: 12.5 }}>
+        <table style={{ width: '100%', minWidth: 860, borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
                 <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
                     {COLS.map((c, i) => (
@@ -79,7 +80,9 @@ function DossierTabelle({ rows, sortField, sortDir, onSort, navigate }) {
             </thead>
             <tbody>
                 {rows.length === 0 ? (
-                    <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>Keine Dossiers</td></tr>
+                    <tr><td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>
+                        {filterAktiv ? 'Keine Treffer für die gewählten Filter' : 'Keine Dossiers'}
+                    </td></tr>
                 ) : rows.map((d, i) => {
                     const farbe = FARBEN[d.programm_name] || '#888';
                     const ps = PHASE_STYLE[d.pipeline_status] || { bg: '#F5F4F0', color: '#6B6860' };
@@ -96,6 +99,9 @@ function DossierTabelle({ rows, sortField, sortDir, onSort, navigate }) {
                                     background: istInaktiv ? '#9CA3AF' : '#16A34A', marginRight: 7, verticalAlign: 'middle'
                                 }} title={istInaktiv ? 'Inaktiv' : 'Aktiv'} />
                                 {d.nachname} {d.vorname}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontSize: 11.5, color: '#6B6860' }}>
+                                {d.standort_kuerzel || '—'}
                             </td>
                             <td style={{ padding: '8px 12px' }}>
                                 {d.programm_name ? (
@@ -151,10 +157,12 @@ function DossierTabelle({ rows, sortField, sortDir, onSort, navigate }) {
 export default function Dossiers() {
     const [dossiers, setDossiers] = useState([]);
     const [laden, setLaden] = useState(true);
-    const [filterTyp, setFilterTyp] = useState('');
-    const [filterPhase, setFilterPhase] = useState('');
-    const [filterStandort, setFilterStandort] = useState('');
     const [suche, setSuche] = useState('');
+    const [filterTyp, setFilterTyp] = useState('');
+    const [filterStandort, setFilterStandort] = useState('');
+    const [filterPerson, setFilterPerson] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterLabel, setFilterLabel] = useState('');
     const [sortField, setSortField] = useState('');
     const [sortDir, setSortDir] = useState('asc');
     const [sortFieldInaktiv, setSortFieldInaktiv] = useState('');
@@ -179,22 +187,33 @@ export default function Dossiers() {
         else { setSortFieldInaktiv(field); setSortDirInaktiv('asc'); }
     };
 
+    // Distinct-Listen aus geladenen Dossiers
     const standorte = [...new Set(dossiers.map(d => d.standort_kuerzel).filter(Boolean))].sort();
+    const personenListe = [...new Map(
+        dossiers.flatMap(d => d.zugewiesen || []).map(u => [u.user_id, u])
+    ).values()].sort((a, b) => a.full_name.localeCompare(b.full_name, 'de'));
+
+    const filterAktiv = !!(suche || filterTyp || filterStandort || filterPerson || filterStatus || filterLabel);
+
+    function resetFilter() {
+        setSuche(''); setFilterTyp(''); setFilterStandort('');
+        setFilterPerson(''); setFilterStatus(''); setFilterLabel('');
+    }
 
     const gefiltert = dossiers.filter(d => {
         const name = `${d.nachname} ${d.vorname}`.toLowerCase();
-        return (
-            (!suche || name.includes(suche.toLowerCase())) &&
-            (!filterTyp || d.programm_name === filterTyp) &&
-            (!filterPhase || d.pipeline_status === filterPhase) &&
-            (!filterStandort || d.standort_kuerzel === filterStandort)
-        );
+        if (suche && !name.includes(suche.toLowerCase())) return false;
+        if (filterTyp && d.programm_name !== filterTyp) return false;
+        if (filterStandort && d.standort_kuerzel !== filterStandort) return false;
+        if (filterPerson && !(d.zugewiesen || []).some(u => u.user_id === filterPerson)) return false;
+        if (filterStatus === 'Aktiv' && d.status === 'inaktiv') return false;
+        if (filterStatus === 'Inaktiv' && d.status !== 'inaktiv') return false;
+        if (filterLabel && d.klient_label !== filterLabel) return false;
+        return true;
     });
 
     const aktive = sortData(gefiltert.filter(d => d.status !== 'inaktiv'), sortField, sortDir);
     const inaktive = sortData(gefiltert.filter(d => d.status === 'inaktiv'), sortFieldInaktiv, sortDirInaktiv);
-
-    const hasFilter = suche || filterTyp || filterPhase || filterStandort;
 
     if (laden) {
         return <div style={{ padding: '2rem', color: '#6B6860', fontSize: 13 }}>Laden…</div>;
@@ -215,38 +234,56 @@ export default function Dossiers() {
             </div>
 
             <div style={{
-                display: 'flex', alignItems: 'center', gap: 7, marginBottom: '1.1rem',
+                display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginBottom: '1.1rem',
                 background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10,
                 padding: '.5rem .875rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)'
             }}>
-                <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em' }}>Filter</span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', flexShrink: 0 }}>Filter</span>
+
                 <input type="text" value={suche} onChange={e => setSuche(e.target.value)}
                     placeholder="Name suchen…"
-                    style={{ ...SEL, width: 140, outline: 'none' }}
+                    style={{ ...SEL, width: 140, background: '#fff', border: '1px solid rgba(0,0,0,.12)', outline: 'none' }}
                 />
+
                 <select value={filterTyp} onChange={e => setFilterTyp(e.target.value)} style={SEL}>
-                    <option value="">Alle Typen</option>
+                    <option value="">Alle Programme</option>
                     {Object.keys(FARBEN).map(t => <option key={t}>{t}</option>)}
                 </select>
-                <select value={filterPhase} onChange={e => setFilterPhase(e.target.value)} style={SEL}>
-                    <option value="">Alle Phasen</option>
-                    {Object.keys(PHASE_STYLE).map(p => <option key={p}>{p}</option>)}
-                </select>
+
                 <select value={filterStandort} onChange={e => setFilterStandort(e.target.value)} style={SEL}>
                     <option value="">Alle Standorte</option>
                     {standorte.map(s => <option key={s}>{s}</option>)}
                 </select>
-                {hasFilter && (
-                    <button onClick={() => { setSuche(''); setFilterTyp(''); setFilterPhase(''); setFilterStandort(''); }} style={{
-                        height: 28, padding: '0 9px', fontSize: 12, cursor: 'pointer',
+
+                <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} style={{ ...SEL, maxWidth: 160 }}>
+                    <option value="">Alle Personen</option>
+                    {personenListe.map(u => <option key={u.user_id} value={u.user_id}>{u.full_name}</option>)}
+                </select>
+
+                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={SEL}>
+                    <option value="">Alle Status</option>
+                    <option value="Aktiv">Aktiv</option>
+                    <option value="Inaktiv">Inaktiv</option>
+                </select>
+
+                <select value={filterLabel} onChange={e => setFilterLabel(e.target.value)} style={SEL}>
+                    <option value="">Alle Labels</option>
+                    <option value="LE">LE</option>
+                    <option value="TN">TN</option>
+                    <option value="MA">MA</option>
+                </select>
+
+                {filterAktiv && (
+                    <button onClick={resetFilter} style={{
+                        height: 28, padding: '0 10px', fontSize: 12, cursor: 'pointer',
                         border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                        background: 'transparent', color: '#6B6860', fontFamily: 'inherit'
-                    }}>× Reset</button>
+                        background: 'transparent', color: '#6B6860', fontFamily: 'inherit', flexShrink: 0
+                    }}>× Zurücksetzen</button>
                 )}
             </div>
 
             <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                <DossierTabelle rows={aktive} sortField={sortField} sortDir={sortDir} onSort={handleSort} navigate={navigate} />
+                <DossierTabelle rows={aktive} sortField={sortField} sortDir={sortDir} onSort={handleSort} navigate={navigate} filterAktiv={filterAktiv} />
             </div>
 
             <div style={{ marginTop: '1.25rem' }}>
@@ -257,7 +294,7 @@ export default function Dossiers() {
                 }}>{inaktiveOffen ? '▾' : '▸'} Inaktive Dossiers ({inaktive.length})</button>
                 {inaktiveOffen && (
                     <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)', marginTop: 8 }}>
-                        <DossierTabelle rows={inaktive} sortField={sortFieldInaktiv} sortDir={sortDirInaktiv} onSort={handleSortInaktiv} navigate={navigate} />
+                        <DossierTabelle rows={inaktive} sortField={sortFieldInaktiv} sortDir={sortDirInaktiv} onSort={handleSortInaktiv} navigate={navigate} filterAktiv={filterAktiv} />
                     </div>
                 )}
             </div>
