@@ -118,10 +118,10 @@ export default function Programme() {
             const r = await client.get('/programme?grouped=true');
             const gs = r.data.gruppen || [];
             setGruppen(gs);
-            // Alle Gruppen standardmässig aufklappen
-            const initExpanded = {};
-            gs.forEach(g => { initExpanded[g.gruppe] = true; });
-            setExpandedGruppe(prev => ({ ...initExpanded, ...prev }));
+            setExpandedGruppe(prev => {
+                const init = { BM: false, IM: false, BC: false, GM: false };
+                return { ...init, ...prev };
+            });
         } catch (err) { console.error(err); }
         finally { setLaden(false); }
     }, []);
