@@ -40,7 +40,7 @@ function Toggle({ label, checked, onChange }) {
 }
 
 const ROLLEN_LISTE = ['Klientenführung', 'Job Coach', 'Fachperson', 'Intake'];
-const ABTEILUNGEN_LISTE = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert', 'Beratung & Coaching'];
+const ABTEILUNGEN_LISTE = ['Admin 1', 'Admin 2', 'Admin 3', 'Beratung & Coaching', 'BI IT', 'Logistik', 'Restwert', 'Telefonservice', 'Wäscheservice'];
 const BEREICH_LISTE = [
     { value: 'BM', label: 'Berufsmassnahmen' },
     { value: 'IM', label: 'Integrationsmassnahmen' },

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import client from '../api/client';
-const ABTEILUNGEN = ['BI IT', 'Admin 1', 'Admin 2', 'Admin 3', 'Logistik', 'Telefonservice', 'Wäscheservice', 'Restwert', 'Beratung & Coaching'];
+const ABTEILUNGEN = ['Admin 1', 'Admin 2', 'Admin 3', 'Beratung & Coaching', 'BI IT', 'Logistik', 'Restwert', 'Telefonservice', 'Wäscheservice'];
 
 const STATUS_OPTS = [
     { value: 'anwesend',       label: 'Anwesend',       bg: '#ECFDF5', color: '#15803D' },

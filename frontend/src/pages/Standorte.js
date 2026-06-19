@@ -4,7 +4,7 @@ import Modal from '../components/Modal';
 import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } from '../components/FormField';
 import { useAuth } from '../context/AuthContext';
 
-function LehrberufeAbschnitt({ standortId }) {
+function LehrberufeAbschnitt({ standortId, bearbeitbar }) {
     const [berufe, setBerufe] = useState([]);
     const [laden, setLaden] = useState(true);
     const [speichernBeruf, setSpeichernBeruf] = useState(null);
@@ -39,6 +39,22 @@ function LehrberufeAbschnitt({ standortId }) {
     }
 
     if (laden) return null;
+
+    if (!bearbeitbar) {
+        const aktiveBerufe = berufe.filter(b => b.aktiv);
+        if (aktiveBerufe.length === 0) return null;
+        return (
+            <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid rgba(0,0,0,.06)' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Ausbildungsberufe</div>
+                {aktiveBerufe.map(b => (
+                    <div key={b.beruf} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 12 }}>
+                        <span style={{ flex: 1, color: '#1A1917', minWidth: 0 }}>{b.beruf}</span>
+                        <span style={{ color: '#6B6860', fontFamily: 'monospace' }}>{b.bewilligte_plaetze} / {b.total_plaetze}</span>
+                    </div>
+                ))}
+            </div>
+        );
+    }
 
     return (
         <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid rgba(0,0,0,.06)' }}>
@@ -89,6 +105,11 @@ export default function Standorte() {
     const [bearbeitenId, setBearbeitenId] = useState(null);
     const [form, setForm] = useState({ name: '', kuerzel: '', adresse: '', plz: '', ort: '', telefon: '', email: '', aktiv: true });
     const [fehler, setFehler] = useState('');
+    const [kaderAufgeklappt, setKaderAufgeklappt] = useState({});
+
+    function toggleKaderAufgeklappt(standortId) {
+        setKaderAufgeklappt(prev => ({ ...prev, [standortId]: !prev[standortId] }));
+    }
 
     useEffect(() => {
         laden && client.get('/standorte')
@@ -201,35 +222,46 @@ export default function Standorte() {
                             {s.telefon && <><span style={{ color: '#6B6860' }}>Telefon</span><span>{s.telefon}</span></>}
                             {s.email && <><span style={{ color: '#6B6860' }}>E-Mail</span><span style={{ color: '#2563EB' }}>{s.email}</span></>}
                         </div>
-                        {(s.benutzer || []).length > 0 && (
-                            <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid rgba(0,0,0,.06)' }}>
-                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Zugewiesen</div>
-                                {(s.benutzer || []).slice(0, 4).map(u => (
-                                    <div key={u.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                                        <div style={{
-                                            width: 26, height: 26, borderRadius: 6, flexShrink: 0,
-                                            background: '#EEF3FE', color: '#1D4ED8',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontSize: 9.5, fontWeight: 600
-                                        }}>{u.avatar_initials || u.full_name?.split(' ').map(n => n[0]).join('').slice(0, 3)}</div>
-                                        <div style={{ minWidth: 0 }}>
-                                            <div style={{ fontSize: 12, fontWeight: 500, color: '#1A1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.full_name}</div>
-                                            {(u.rollen || []).length > 0 && (
-                                                <div style={{ fontSize: 10.5, color: '#6B6860', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {u.rollen.join(', ')}
-                                                </div>
-                                            )}
+                        <LehrberufeAbschnitt standortId={s.standort_id} bearbeitbar={managementModus} />
+                        {(s.benutzer || []).length > 0 && (() => {
+                            const kader = [...(s.benutzer || [])].sort((a, b) => a.full_name.localeCompare(b.full_name));
+                            const offen = !!kaderAufgeklappt[s.standort_id];
+                            const sichtbar = offen ? kader : kader.slice(0, 5);
+                            return (
+                                <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid rgba(0,0,0,.06)' }}>
+                                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Zugewiesene Kader</div>
+                                    {sichtbar.map(u => (
+                                        <div key={u.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                                            <div style={{
+                                                width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+                                                background: '#EEF3FE', color: '#1D4ED8',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: 9.5, fontWeight: 600
+                                            }}>{u.avatar_initials || u.full_name?.split(' ').map(n => n[0]).join('').slice(0, 3)}</div>
+                                            <div style={{ minWidth: 0 }}>
+                                                <div style={{ fontSize: 12, fontWeight: 500, color: '#1A1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.full_name}</div>
+                                                {(u.rollen || []).length > 0 && (
+                                                    <div style={{ fontSize: 10.5, color: '#6B6860', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {u.rollen.join(', ')}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                                {(s.benutzer || []).length > 4 && (
-                                    <div style={{ fontSize: 11, color: '#6B6860', paddingLeft: 34, marginTop: 2 }}>
-                                        + {s.benutzer.length - 4} weitere
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        {managementModus && <LehrberufeAbschnitt standortId={s.standort_id} />}
+                                    ))}
+                                    {kader.length > 5 && (
+                                        <button
+                                            onClick={() => toggleKaderAufgeklappt(s.standort_id)}
+                                            style={{
+                                                fontSize: 11, color: '#2563EB', background: 'none', border: 'none',
+                                                cursor: 'pointer', padding: 0, marginTop: 2, fontFamily: 'inherit',
+                                            }}
+                                        >
+                                            {offen ? 'Weniger anzeigen' : `+ ${kader.length - 5} weitere`}
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
                 ))}
             </div>
