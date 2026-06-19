@@ -187,6 +187,13 @@ router.put('/:id/absagen', auth, async (req, res) => {
             ? `${klientResult.rows[0].vorname} ${klientResult.rows[0].nachname}`
             : '';
 
+        await dbClient.query(
+            `DELETE FROM dashboard_meldung
+             WHERE aenderungen->0->>'termin_id' = $1
+               AND aenderungen->0->>'typ' = 'termin_einladung'`,
+            [req.params.id]
+        );
+
         const teilnehmende = await dbClient.query(
             `SELECT user_id FROM termin_user WHERE termin_id = $1`,
             [req.params.id]

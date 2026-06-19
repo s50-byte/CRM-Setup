@@ -75,13 +75,31 @@ function MeldungKarte({ m, onAcknowledge, onTerminClick, abgesagteTerminIds }) {
                             <div
                                 key={i}
                                 onClick={!abgesagt && a.termin_id && onTerminClick ? () => onTerminClick(a.termin_id) : undefined}
-                                style={{ marginTop: 3, cursor: !abgesagt && a.termin_id && onTerminClick ? 'pointer' : 'default', opacity: abgesagt ? 0.65 : 1 }}
+                                style={{
+                                    marginTop: 4,
+                                    display: 'flex', gap: 10, padding: '8px 10px',
+                                    background: abgesagt ? '#F5F4F0' : '#EEF3FE',
+                                    borderRadius: 7,
+                                    border: `1px solid ${abgesagt ? 'rgba(0,0,0,.07)' : 'rgba(37,99,235,.15)'}`,
+                                    cursor: !abgesagt && a.termin_id && onTerminClick ? 'pointer' : 'default',
+                                    opacity: abgesagt ? 0.6 : 1,
+                                }}
                             >
-                                <div style={{ fontSize: 12, fontWeight: 600, color: abgesagt ? '#A09D97' : (a.termin_id && onTerminClick ? '#2563EB' : '#1A1917'), textDecorationLine: abgesagt ? 'line-through' : (a.termin_id && onTerminClick ? 'underline' : 'none'), textDecorationColor: 'rgba(37,99,235,.3)' }}>
-                                    Neuer Termin: {a.termin_typ} am {new Date(a.datum).toLocaleDateString('de-CH')}
+                                <div style={{ fontSize: 16, lineHeight: 1, marginTop: 1, flexShrink: 0 }}>📅</div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: abgesagt ? '#6B6860' : '#1D4ED8' }}>
+                                            Termin: {a.termin_typ}
+                                        </div>
+                                        {abgesagt && (
+                                            <span style={{ fontSize: 9.5, padding: '1px 5px', borderRadius: 8, background: '#FEF2F2', color: '#B91C1C', border: '1px solid rgba(220,38,38,.2)', fontFamily: 'monospace' }}>Abgesagt</span>
+                                        )}
+                                    </div>
+                                    <div style={{ fontSize: 11.5, color: '#374151', marginTop: 2 }}>
+                                        {new Date(a.datum).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: '#6B6860', marginTop: 1 }}>Klient: {a.klient_name}</div>
                                 </div>
-                                {abgesagt && <div style={{ fontSize: 10.5, color: '#B91C1C', marginTop: 1 }}>Termin wurde abgesagt</div>}
-                                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Klient: {a.klient_name}</div>
                             </div>
                         );
                     }
