@@ -61,7 +61,7 @@ router.get('/alle', auth, async (req, res) => {
              LEFT JOIN benutzer u    ON u.user_id    = m.erstellt_von
              LEFT JOIN benutzer empf ON empf.user_id = m.empfaenger_id
              WHERE ${bedingungen.join(' AND ')}
-             ORDER BY empf.full_name, m.created_at`,
+             ORDER BY ${datum ? 'empf.full_name, m.created_at' : 'm.created_at DESC'}`,
             params
         );
         res.json(result.rows);
