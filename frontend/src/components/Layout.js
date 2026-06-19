@@ -32,7 +32,7 @@ const NAV = [
     { section: 'Mein Bereich' },
     { path: '/',          label: 'Dashboard',         icon: '⊞' },
     { path: '/aufgaben',  label: 'Aufgaben',           icon: '☑' },
-    { path: '/meine',     label: 'Meine Klienten',    icon: '♥' },
+    { path: '/meine',     label: 'Meine Klienten',    icon: '👥' },
     { path: '/termine',   label: 'Kliententermine',    icon: '📅' },
     { section: 'Operativ' },
     { path: '/intake',    label: 'Intake',             icon: '🔽' },
