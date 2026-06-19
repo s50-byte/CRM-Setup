@@ -168,6 +168,23 @@ router.delete('/:id', auth, nurManagement, async (req, res) => {
     }
 });
 
+// POST /api/vorlagen/vorschau (live — kein gespeichertes Dokument nötig)
+router.post('/vorschau', auth, async (req, res) => {
+    const { inhalt, klient_id } = req.body;
+    if (!inhalt) return res.status(400).json({ error: 'inhalt erforderlich' });
+    try {
+        let daten = BEISPIEL_DATEN;
+        if (klient_id) {
+            const echte = await ladeDatenFuerKlient(klient_id);
+            if (echte) daten = echte;
+        }
+        res.json({ vorschau: fuelleVorlage(inhalt, daten) });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler bei der Vorschau' });
+    }
+});
+
 // POST /api/vorlagen/:id/vorschau
 router.post('/:id/vorschau', auth, async (req, res) => {
     console.log('POST /vorlagen/:id/vorschau body:', req.body, 'id:', req.params.id);

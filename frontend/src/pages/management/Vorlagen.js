@@ -72,11 +72,23 @@ export default function Vorlagen() {
         setVorschauText('');
     }
 
-    function oeffneBearbeiten(v) {
+    async function oeffneBearbeiten(v) {
+        console.log('Vorlage öffnen:', v);
         setAusgewaehlt(v.vorlage_id);
-        setForm({ name: v.name, beschreibung: v.beschreibung || '', inhalt: v.inhalt, typ: v.typ || 'brief' });
+        setForm({ name: v.name || '', beschreibung: v.beschreibung || '', inhalt: '', typ: v.typ || 'brief' });
         setVorschauOffen(false);
         setVorschauText('');
+        try {
+            const r = await client.get(`/vorlagen/${v.vorlage_id}`);
+            setForm({
+                name: r.data.name || '',
+                beschreibung: r.data.beschreibung || '',
+                inhalt: r.data.inhalt || '',
+                typ: r.data.typ || 'brief',
+            });
+        } catch (err) {
+            console.error('Vorlage laden:', err);
+        }
     }
 
     function schliesseEditor() {
@@ -131,11 +143,16 @@ export default function Vorlagen() {
     }
 
     async function handleVorschau() {
-        if (!ausgewaehlt || ausgewaehlt === 'neu') return;
+        if (!form.inhalt.trim()) return;
         setVorschauLaden(true);
         setVorschauOffen(true);
         try {
-            const r = await client.post(`/vorlagen/${ausgewaehlt}/vorschau`, {});
+            let r;
+            if (ausgewaehlt === 'neu') {
+                r = await client.post('/vorlagen/vorschau', { inhalt: form.inhalt });
+            } else {
+                r = await client.post(`/vorlagen/${ausgewaehlt}/vorschau`, {});
+            }
             setVorschauText(r.data.vorschau);
         } catch (err) {
             console.error(err);
@@ -276,15 +293,13 @@ export default function Vorlagen() {
                         </div>
 
                         <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-                            {ausgewaehlt !== 'neu' && (
-                                <button
-                                    onClick={handleVorschau}
-                                    disabled={vorschauLaden}
-                                    style={S.btn(false)}
-                                >
-                                    {vorschauLaden ? 'Lädt…' : '👁 Vorschau'}
-                                </button>
-                            )}
+                            <button
+                                onClick={handleVorschau}
+                                disabled={vorschauLaden || !form.inhalt.trim()}
+                                style={{ ...S.btn(false), opacity: !form.inhalt.trim() ? .5 : 1 }}
+                            >
+                                {vorschauLaden ? 'Lädt…' : '👁 Vorschau'}
+                            </button>
                             <button onClick={schliesseEditor} style={S.btn(false)}>Abbrechen</button>
                             <button
                                 onClick={handleSpeichern}
