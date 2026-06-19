@@ -6,7 +6,14 @@ export function AuthProvider({ children }) {
     const [benutzer, setBenutzer] = useState(
         JSON.parse(localStorage.getItem('benutzer') || 'null')
     );
-    const [managementModus, setManagementModus] = useState(false);
+    const [managementModus, setManagementModusState] = useState(
+        () => localStorage.getItem('managementModus') === 'true'
+    );
+
+    function setManagementModus(wert) {
+        localStorage.setItem('managementModus', String(wert));
+        setManagementModusState(wert);
+    }
 
     function login(token, user) {
         localStorage.setItem('token', token);
