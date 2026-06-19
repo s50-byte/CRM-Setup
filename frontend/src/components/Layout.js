@@ -17,6 +17,7 @@ import DossierPhase from '../pages/DossierPhase';
 import KlientDetail from '../pages/KlientDetail';
 import ExterneDetail from '../pages/ExterneDetail';
 import Standorte from '../pages/Standorte';
+import Klientenbesprechung from '../pages/Klientenbesprechung';
 import Gantt from '../pages/Gantt';
 import Leistungen from '../pages/management/Leistungen';
 import ManagementDashboard from '../pages/management/ManagementDashboard';
@@ -36,6 +37,7 @@ const NAV = [
     { section: 'Operativ' },
     { path: '/intake',    label: 'Intake',             icon: '⋮' },
     { path: '/dossiers',  label: 'Klientendossiers',   icon: '📁' },
+    { path: '/klientenbesprechung', label: 'Klientenbesprechung', icon: '💬' },
     { path: '/praesenz',  label: 'Präsenzkontrolle',   icon: '✓' },
     { section: 'Stammdaten' },
     { path: '/klienten',  label: 'Klienten',           icon: '👥' },
@@ -240,6 +242,7 @@ export default function Layout() {
                     <Route path="/programme" element={<Programme />} />
                     <Route path="/profil"    element={<Profil />} />
                     <Route path="/dossiers/:id/phase/:phase_id" element={<DossierPhase />} />
+                    <Route path="/klientenbesprechung" element={<Klientenbesprechung />} />
                     <Route path="/dossiers/:id" element={<DossierDetail />} />
                     <Route path="/klienten/:id" element={<KlientDetail />} />
                     <Route path="/externe/:id"  element={<ExterneDetail />} />
