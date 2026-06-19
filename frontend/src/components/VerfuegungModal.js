@@ -40,7 +40,7 @@ function positionSoll(p, leistungen, dauerMonate) {
 
 export default function VerfuegungModal({ open, onClose, dossierId, dossier, verfuegung, onSaved }) {
     const [aktTab, setAktTab] = useState('verfuegung');
-    const [nummer, setNummer] = useState('');
+    const [bezeichnung, setBezeichnung] = useState('');
     const [datum, setDatum] = useState('');
     const [status, setStatus] = useState('aktiv');
     const [bemerkung, setBemerkung] = useState('');
@@ -60,7 +60,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
     useEffect(() => {
         if (!open) return;
         client.get('/leistungen').then(r => setLeistungen(r.data)).catch(console.error);
-        setNummer(verfuegung?.nummer || '');
+        setBezeichnung(verfuegung?.nummer || '');
         setDatum(verfuegung?.datum ? verfuegung.datum.slice(0, 10) : '');
         setStatus(verfuegung?.status || 'aktiv');
         setBemerkung(verfuegung?.bemerkung || '');
@@ -107,8 +107,8 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
     }
 
     async function handleSubmit() {
-        if (!nummer.trim()) {
-            setFehler('Nummer ist erforderlich.');
+        if (!bezeichnung.trim()) {
+            setFehler('Bezeichnung ist erforderlich.');
             setAktTab('verfuegung');
             return;
         }
@@ -117,7 +117,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
         try {
             const payload = {
                 dossier_id: dossierId,
-                nummer: nummer.trim(),
+                nummer: bezeichnung.trim(),
                 datum: datum || null,
                 bemerkung: bemerkung.trim() || null,
                 status,
@@ -195,10 +195,10 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
             {aktTab === 'verfuegung' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
-                        <FieldLabel required>Nummer</FieldLabel>
+                        <FieldLabel required>Bezeichnung</FieldLabel>
                         <input
-                            type="text" value={nummer} onChange={e => setNummer(e.target.value)}
-                            placeholder="z.B. VFG-2026-001" style={inputStyle}
+                            type="text" value={bezeichnung} onChange={e => setBezeichnung(e.target.value)}
+                            placeholder="z.B. IV-Massnahme Detailhandel 2026" style={inputStyle}
                         />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
