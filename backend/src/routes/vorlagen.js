@@ -5,7 +5,8 @@ const auth = require('../middleware/auth');
 const MANAGEMENT_ROLLEN = ['leitungsteam', 'admin'];
 
 function nurManagement(req, res, next) {
-    if (!MANAGEMENT_ROLLEN.includes(req.benutzer?.system_rolle)) {
+    if (!MANAGEMENT_ROLLEN.includes(req.user?.system_rolle)) {
+        console.log('nurManagement: Zugriff verweigert, system_rolle:', req.user?.system_rolle);
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
     next();
@@ -116,6 +117,7 @@ router.get('/:id', auth, async (req, res) => {
 
 // POST /api/vorlagen
 router.post('/', auth, nurManagement, async (req, res) => {
+    console.log('POST /vorlagen user:', req.user?.system_rolle, req.user?.user_id);
     const { name, beschreibung, inhalt, typ } = req.body;
     if (!name || !inhalt) return res.status(400).json({ error: 'Name und Inhalt erforderlich' });
     try {
@@ -168,6 +170,7 @@ router.delete('/:id', auth, nurManagement, async (req, res) => {
 
 // POST /api/vorlagen/:id/vorschau
 router.post('/:id/vorschau', auth, async (req, res) => {
+    console.log('POST /vorlagen/:id/vorschau body:', req.body, 'id:', req.params.id);
     const { klient_id } = req.body;
     try {
         const vorlagenRes = await db.query(
