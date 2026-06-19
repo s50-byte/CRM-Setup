@@ -139,6 +139,7 @@ export default function DossierDetail() {
     const [felderModal, setFelderModal] = useState(false);
     const [ferienModal, setFerienModal] = useState(false);
     const [terminModal, setTerminModal] = useState(false);
+    const [detailTermin, setDetailTermin] = useState(null);
 
     // Programmhistorie
     const [verlaufOffen, setVerlaufOffen] = useState(false);
@@ -849,7 +850,13 @@ export default function DossierDetail() {
                         {termine.length === 0 ? (
                             <div style={{ fontSize: 12, color: '#6B6860' }}>Keine Termine</div>
                         ) : termine.map(t => (
-                            <div key={t.termin_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 7px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5 }}>
+                            <div
+                                key={t.termin_id}
+                                onClick={() => setDetailTermin(t)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 7px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5, cursor: 'pointer' }}
+                                onMouseEnter={e => e.currentTarget.style.background = '#EEF3FE'}
+                                onMouseLeave={e => e.currentTarget.style.background = '#F5F4F0'}
+                            >
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontSize: 12, fontWeight: 500 }}>{t.typ}</div>
                                     <div style={{ fontSize: 11, color: '#6B6860' }}>
@@ -1101,8 +1108,84 @@ export default function DossierDetail() {
                 open={terminModal}
                 onClose={() => setTerminModal(false)}
                 klientId={dossier?.klient_id}
+                dossierZuweisungen={zugewiesen}
                 onSaved={() => { setTerminModal(false); loadTermine(); }}
             />
+
+            {detailTermin && (
+                <div onClick={() => setDetailTermin(null)} style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)',
+                    zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                        background: '#fff', borderRadius: 12, padding: '1.5rem',
+                        width: 420, maxWidth: '90vw',
+                        boxShadow: '0 8px 32px rgba(0,0,0,.18)',
+                        maxHeight: '80vh', overflowY: 'auto'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                            <div>
+                                <div style={{ fontSize: 15, fontWeight: 600, color: '#1A1917' }}>{detailTermin.typ}</div>
+                                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 3, fontFamily: 'monospace' }}>
+                                    {new Date(detailTermin.datum).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                    {detailTermin.zeit ? ` · ${detailTermin.zeit.slice(0, 5)} Uhr` : ''}
+                                </div>
+                            </div>
+                            {detailTermin.status && (
+                                <span style={{
+                                    fontSize: 10.5, padding: '2px 8px', borderRadius: 10, fontFamily: 'monospace',
+                                    background: detailTermin.status === 'erledigt' ? '#ECFDF5' : '#F5F4F0',
+                                    color: detailTermin.status === 'erledigt' ? '#15803D' : '#6B6860',
+                                    border: detailTermin.status === 'erledigt' ? '1px solid rgba(22,163,74,.15)' : '1px solid rgba(0,0,0,.09)',
+                                }}>{detailTermin.status}</span>
+                            )}
+                        </div>
+
+                        {detailTermin.personen && detailTermin.personen.length > 0 && (
+                            <div style={{ marginBottom: 14 }}>
+                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Teilnehmende</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                    {detailTermin.personen.map((p, i) => (
+                                        <span key={i} style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                                            fontSize: 12, padding: '3px 9px 3px 5px',
+                                            borderRadius: 20, background: '#F5F4F0',
+                                            border: '1px solid rgba(0,0,0,.09)'
+                                        }}>
+                                            <div style={{
+                                                width: 18, height: 18, borderRadius: 5,
+                                                background: '#E5E7EB', color: '#374151',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: 8, fontWeight: 700
+                                            }}>{p.avatar_initials || p.full_name?.[0] || '?'}</div>
+                                            {p.full_name}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {detailTermin.notiz && (
+                            <div style={{ marginBottom: 14 }}>
+                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Notiz</div>
+                                <div style={{
+                                    fontSize: 13, padding: '10px 12px',
+                                    background: '#F5F4F0', border: '1px solid rgba(0,0,0,.09)',
+                                    borderRadius: 7, color: '#1A1917', lineHeight: 1.6, whiteSpace: 'pre-wrap'
+                                }}>{detailTermin.notiz}</div>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                            <button onClick={() => setDetailTermin(null)} style={{
+                                padding: '7px 18px', fontSize: 13, cursor: 'pointer',
+                                border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
+                                background: '#fff', fontFamily: 'inherit', color: '#1A1917', fontWeight: 500
+                            }}>Schliessen</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

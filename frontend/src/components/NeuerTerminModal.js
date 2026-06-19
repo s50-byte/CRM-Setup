@@ -5,24 +5,30 @@ import client from '../api/client';
 
 const TYPEN = ['Erstgespräch', 'Schnuppereinsatz', 'Standortgespräch', 'Programmstart', 'Abschlussgespräch'];
 
-export default function NeuerTerminModal({ open, onClose, onSaved, klientId }) {
+export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dossierZuweisungen }) {
     const [form, setForm] = useState({
         klient_id: klientId || '', typ: 'Erstgespräch', datum: '', zeit: '', notiz: ''
     });
     const [klienten, setKlienten] = useState([]);
     const [benutzer, setBenutzer] = useState([]);
     const [teilnehmende, setTeilnehmende] = useState([]);
+    const [dropdownOffen, setDropdownOffen] = useState(false);
     const [laden, setLaden] = useState(false);
     const [fehler, setFehler] = useState('');
 
     useEffect(() => {
         if (!open) return;
+        setDropdownOffen(false);
         if (!klientId) {
             client.get('/klienten').then(r => setKlienten(r.data)).catch(console.error);
         }
-        client.get('/benutzer').then(r => setBenutzer(r.data)).catch(console.error);
+        if (!dossierZuweisungen) {
+            client.get('/benutzer').then(r => setBenutzer(r.data)).catch(console.error);
+        }
         if (klientId) setForm(prev => ({ ...prev, klient_id: klientId }));
-    }, [open, klientId]);
+    }, [open, klientId, dossierZuweisungen]);
+
+    const personenListe = dossierZuweisungen || benutzer;
 
     function set(field, value) {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -62,6 +68,12 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId }) {
         }
     }
 
+    const selectedLabel = teilnehmende.length === 0
+        ? '— Auswählen —'
+        : teilnehmende.length === 1
+            ? (personenListe.find(b => b.user_id === teilnehmende[0])?.full_name || '1 Person')
+            : `${teilnehmende.length} Personen ausgewählt`;
+
     return (
         <Modal open={open} onClose={onClose} title="Neuer Termin">
             {fehler && (
@@ -95,37 +107,67 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId }) {
                 </FormField>
             </div>
             <FormField label="Teilnehmende">
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {benutzer.map(b => {
-                        const sel = teilnehmende.includes(b.user_id);
-                        return (
-                            <button
-                                key={b.user_id}
-                                type="button"
-                                onClick={() => toggleTeilnehmende(b.user_id)}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: 5,
-                                    padding: '4px 10px 4px 5px', fontSize: 12, cursor: 'pointer',
-                                    border: sel ? '1px solid rgba(37,99,235,.4)' : '1px solid rgba(0,0,0,.09)',
-                                    borderRadius: 20,
-                                    background: sel ? '#EEF3FE' : '#F5F4F0',
-                                    color: sel ? '#1D4ED8' : '#6B6860',
-                                    fontFamily: 'inherit', fontWeight: sel ? 500 : 400,
-                                    transition: 'all .15s',
-                                }}
-                            >
-                                <div style={{
-                                    width: 20, height: 20, borderRadius: 6,
-                                    background: sel ? '#2563EB' : '#9CA3AF',
-                                    color: '#fff', display: 'flex', alignItems: 'center',
-                                    justifyContent: 'center', fontSize: 8.5, fontWeight: 700, flexShrink: 0
-                                }}>{b.avatar_initials || b.full_name?.[0] || '?'}</div>
-                                {b.full_name}
-                            </button>
-                        );
-                    })}
-                    {benutzer.length === 0 && (
-                        <span style={{ fontSize: 12, color: '#A09D97' }}>Lädt…</span>
+                <div style={{ position: 'relative' }}>
+                    <button
+                        type="button"
+                        onClick={() => setDropdownOffen(o => !o)}
+                        style={{
+                            ...inputStyle,
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            cursor: 'pointer', textAlign: 'left', width: '100%',
+                            color: teilnehmende.length > 0 ? '#1A1917' : '#A09D97',
+                        }}
+                    >
+                        <span>{selectedLabel}</span>
+                        <span style={{ fontSize: 10, color: '#A09D97', marginLeft: 6 }}>{dropdownOffen ? '▲' : '▼'}</span>
+                    </button>
+
+                    {dropdownOffen && (
+                        <>
+                            <div onClick={() => setDropdownOffen(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
+                            <div style={{
+                                position: 'absolute', top: 'calc(100% + 3px)', left: 0, right: 0, zIndex: 10,
+                                background: '#fff', border: '1px solid rgba(0,0,0,.12)',
+                                borderRadius: 7, boxShadow: '0 4px 14px rgba(0,0,0,.12)',
+                                maxHeight: 200, overflowY: 'auto',
+                            }}>
+                                {personenListe.length === 0 ? (
+                                    <div style={{ padding: '10px 12px', fontSize: 12, color: '#A09D97' }}>Lädt…</div>
+                                ) : personenListe.map(b => {
+                                    const sel = teilnehmende.includes(b.user_id);
+                                    return (
+                                        <label
+                                            key={b.user_id}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 9,
+                                                padding: '8px 12px', cursor: 'pointer',
+                                                borderBottom: '1px solid rgba(0,0,0,.04)',
+                                                background: sel ? '#F0F5FF' : '#fff',
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={sel}
+                                                onChange={() => toggleTeilnehmende(b.user_id)}
+                                                style={{ accentColor: '#2563EB', flexShrink: 0 }}
+                                            />
+                                            <div style={{
+                                                width: 22, height: 22, borderRadius: 6,
+                                                background: sel ? '#2563EB' : '#D1D5DB',
+                                                color: '#fff', display: 'flex', alignItems: 'center',
+                                                justifyContent: 'center', fontSize: 8.5, fontWeight: 700, flexShrink: 0
+                                            }}>{b.avatar_initials || b.full_name?.[0] || '?'}</div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: 12, fontWeight: sel ? 500 : 400, color: '#1A1917' }}>{b.full_name}</div>
+                                                {b.rolle_im_fall && (
+                                                    <div style={{ fontSize: 10.5, color: '#6B6860' }}>{b.rolle_im_fall}</div>
+                                                )}
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </>
                     )}
                 </div>
             </FormField>
