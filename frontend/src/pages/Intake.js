@@ -68,9 +68,7 @@ function Karte({ d, abgeschlossen, onNavigate, onDragStart }) {
 
 export default function Intake() {
     const [dossiers, setDossiers] = useState([]);
-    const [standorte, setStandorte] = useState([]);
     const [laden, setLaden] = useState(true);
-    const [filterStandort, setFilterStandort] = useState('');
     const [suche, setSuche] = useState('');
     const [anfrageModal, setAnfrageModal] = useState(false);
     const [aufgeklappt, setAufgeklappt] = useState({});
@@ -82,14 +80,12 @@ export default function Intake() {
     }
 
     useEffect(() => {
-        Promise.all([ladeDossiers(), client.get('/standorte').then(r => setStandorte(r.data))])
+        ladeDossiers()
             .catch(console.error)
             .finally(() => setLaden(false));
     }, []);
 
-    const gefiltert = filterStandort
-        ? dossiers.filter(d => d.standort_kuerzel === filterStandort)
-        : dossiers;
+    const gefiltert = dossiers;
 
     function matchSuche(d) {
         if (!suche) return true;
@@ -135,16 +131,6 @@ export default function Intake() {
                         <div style={{ fontSize: 19, fontWeight: 600 }}>Intake</div>
                         <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle laufenden Anfragen nach Bucket</div>
                     </div>
-                    <select value={filterStandort} onChange={e => setFilterStandort(e.target.value)} style={{
-                        fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.09)',
-                        borderRadius: 6, background: '#F5F4F0', fontFamily: 'inherit', height: 28,
-                        marginTop: 2
-                    }}>
-                        <option value="">Alle Standorte</option>
-                        {standorte.map(s => (
-                            <option key={s.standort_id} value={s.kuerzel}>{s.kuerzel} — {s.name}</option>
-                        ))}
-                    </select>
                 </div>
                 <button onClick={() => setAnfrageModal(true)} style={{
                     padding: '7px 14px', fontSize: 13, fontWeight: 500,
