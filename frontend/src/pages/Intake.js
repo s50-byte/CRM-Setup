@@ -71,6 +71,7 @@ export default function Intake() {
     const [standorte, setStandorte] = useState([]);
     const [laden, setLaden] = useState(true);
     const [filterStandort, setFilterStandort] = useState('');
+    const [suche, setSuche] = useState('');
     const [anfrageModal, setAnfrageModal] = useState(false);
     const [aufgeklappt, setAufgeklappt] = useState({});
     const [dragOverBucket, setDragOverBucket] = useState('');
@@ -89,6 +90,17 @@ export default function Intake() {
     const gefiltert = filterStandort
         ? dossiers.filter(d => d.standort_kuerzel === filterStandort)
         : dossiers;
+
+    function matchSuche(d) {
+        if (!suche) return true;
+        const s = suche.toLowerCase();
+        return (
+            `${d.vorname} ${d.nachname}`.toLowerCase().includes(s) ||
+            (d.programm_name || '').toLowerCase().includes(s) ||
+            (d.auftraggeber || '').toLowerCase().includes(s) ||
+            (d.absage_grund || '').toLowerCase().includes(s)
+        );
+    }
 
     async function verschieben(dossier, neuerBucket) {
         if (dossier.pipeline_status === neuerBucket) return;
@@ -141,15 +153,29 @@ export default function Intake() {
                 }}>+ Neue Anfrage</button>
             </div>
 
+            <div style={{ marginBottom: '1rem' }}>
+                <input
+                    type="text"
+                    value={suche}
+                    onChange={e => setSuche(e.target.value)}
+                    placeholder="Klient suchen..."
+                    style={{
+                        fontSize: 12.5, padding: '6px 10px', borderRadius: 6,
+                        border: '1px solid rgba(0,0,0,.09)', background: '#F5F4F0',
+                        fontFamily: 'inherit', width: 240, outline: 'none'
+                    }}
+                />
+            </div>
+
             {laden ? (
                 <div style={{ color: '#6B6860', fontSize: 12 }}>Laden…</div>
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 9 }}>
                     {BUCKETS.map(bucket => {
                         const alle = gefiltert.filter(d => d.pipeline_status === bucket.key);
-                        const aktive = alle.filter(d => d.intake_abgeschlossen !== true);
-                        const abgeschlossen = alle.filter(d => d.intake_abgeschlossen === true);
-                        const offen = !!aufgeklappt[bucket.key];
+                        const aktive = alle.filter(d => d.intake_abgeschlossen !== true).filter(matchSuche);
+                        const abgeschlossen = alle.filter(d => d.intake_abgeschlossen === true).filter(matchSuche);
+                        const offen = !!aufgeklappt[bucket.key] || (!!suche && abgeschlossen.length > 0);
                         const abschlussLabel = bucket.key === 'programmstart' ? 'Start erfolgt' : 'Abgeschlossen';
 
                         return (
@@ -179,7 +205,11 @@ export default function Intake() {
                                     }}>{aktive.length}</span>
                                 </div>
 
-                                {aktive.map(d => (
+                                {aktive.length === 0 && abgeschlossen.length === 0 && suche ? (
+                                    <div style={{ fontSize: 11, color: '#A09D97', padding: '6px 2px', fontStyle: 'italic' }}>
+                                        Keine Ergebnisse für „{suche}"
+                                    </div>
+                                ) : aktive.map(d => (
                                     <Karte
                                         key={d.dossier_id}
                                         d={d}
