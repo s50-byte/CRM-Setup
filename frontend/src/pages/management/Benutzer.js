@@ -65,7 +65,8 @@ export default function Benutzer() {
     const [filterAktiv, setFilterAktiv] = useState('aktiv');
     const [modal, setModal] = useState({ open: false, benutzer: null });
     const [pwModal, setPwModal] = useState(PW_INIT);
-    const istAdmin = eingeloggterUser?.system_rolle === 'admin';
+    const istAdmin = ['leitungsteam', 'admin'].includes(eingeloggterUser?.system_rolle);
+    console.log('eingeloggter user:', eingeloggterUser?.system_rolle, '→ istAdmin:', istAdmin);
 
     const laden_daten = useCallback(async () => {
         setLaden(true);

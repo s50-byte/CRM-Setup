@@ -384,8 +384,8 @@ router.put('/:id', auth, requireManagement, async (req, res) => {
 
 // PUT /api/benutzer/:id/passwort-reset — Passwort als Admin zurücksetzen
 router.put('/:id/passwort-reset', auth, async (req, res) => {
-    if (req.user.system_rolle !== 'admin') {
-        return res.status(403).json({ error: 'Nur Admins dürfen Passwörter zurücksetzen' });
+    if (!['leitungsteam', 'admin'].includes(req.user.system_rolle)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
     }
     const { passwort } = req.body;
     if (!passwort || passwort.length < 8) {
