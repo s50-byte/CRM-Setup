@@ -44,6 +44,14 @@ export default function Termine() {
     };
     const si = f => !f ? '' : sortField === f ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
 
+    async function absagenTermin(termin_id) {
+        try {
+            const r = await client.put(`/termine/${termin_id}/absagen`);
+            setDetailTermin(r.data);
+            client.get('/termine').then(res => setTermine(res.data));
+        } catch (err) { console.error(err); }
+    }
+
     const gefiltert = sortData(
         termine.filter(t => !filter || t.typ === filter),
         sortField, sortDir
@@ -236,7 +244,15 @@ export default function Termine() {
                             )}
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 14, marginTop: 14, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, paddingTop: 14, marginTop: 14, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                            {detailTermin.status !== 'Abgesagt' && (
+                                <button onClick={() => absagenTermin(detailTermin.termin_id)} style={{
+                                    padding: '7px 18px', fontSize: 13, cursor: 'pointer',
+                                    border: '1px solid rgba(220,38,38,.2)', borderRadius: 6,
+                                    background: '#FEF2F2', fontFamily: 'inherit', color: '#B91C1C', fontWeight: 500,
+                                    marginRight: 'auto'
+                                }}>Absagen</button>
+                            )}
                             <button onClick={() => setDetailTermin(null)} style={{
                                 padding: '7px 18px', fontSize: 13, cursor: 'pointer',
                                 border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,

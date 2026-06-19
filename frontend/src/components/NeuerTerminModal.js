@@ -2,16 +2,19 @@ import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } from './FormField';
 import client from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 const TYPEN = ['Erstgespräch', 'Schnuppereinsatz', 'Standortgespräch', 'Programmstart', 'Abschlussgespräch'];
 
 export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dossierZuweisungen }) {
+    const { benutzer: currentUser } = useAuth();
     const [form, setForm] = useState({
         klient_id: klientId || '', typ: 'Erstgespräch', datum: '', zeit: '', notiz: ''
     });
     const [klienten, setKlienten] = useState([]);
     const [benutzer, setBenutzer] = useState([]);
     const [teilnehmende, setTeilnehmende] = useState([]);
+    const [ichNehmeTeile, setIchNehmeTeile] = useState(true);
     const [dropdownOffen, setDropdownOffen] = useState(false);
     const [laden, setLaden] = useState(false);
     const [fehler, setFehler] = useState('');
@@ -28,7 +31,7 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
         if (klientId) setForm(prev => ({ ...prev, klient_id: klientId }));
     }, [open, klientId, dossierZuweisungen]);
 
-    const personenListe = dossierZuweisungen || benutzer;
+    const personenListe = (dossierZuweisungen || benutzer).filter(b => b.user_id !== currentUser?.user_id);
 
     function set(field, value) {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -49,18 +52,22 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
         setFehler('');
         setLaden(true);
         try {
+            const teilnehmendeFinal = ichNehmeTeile && currentUser?.user_id
+                ? [...teilnehmende, currentUser.user_id]
+                : teilnehmende;
             await client.post('/termine', {
                 klient_id: effectiveKlientId,
                 typ: form.typ,
                 datum: form.datum,
                 zeit: form.zeit || null,
                 notiz: form.notiz || null,
-                teilnehmende,
+                teilnehmende: teilnehmendeFinal,
             });
             onSaved();
             onClose();
             setForm({ klient_id: klientId || '', typ: 'Erstgespräch', datum: '', zeit: '', notiz: '' });
             setTeilnehmende([]);
+            setIchNehmeTeile(true);
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Speichern');
         } finally {
@@ -170,6 +177,19 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
                         </>
                     )}
                 </div>
+            </FormField>
+            <FormField label="Ich nehme teil">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '5px 0' }}>
+                    <input
+                        type="checkbox"
+                        checked={ichNehmeTeile}
+                        onChange={e => setIchNehmeTeile(e.target.checked)}
+                        style={{ accentColor: '#2563EB', width: 15, height: 15, flexShrink: 0 }}
+                    />
+                    <span style={{ fontSize: 12.5, color: ichNehmeTeile ? '#1A1917' : '#A09D97' }}>
+                        {ichNehmeTeile ? 'Ja — ich nehme an diesem Termin teil' : 'Nein — ich nehme nicht teil'}
+                    </span>
+                </label>
             </FormField>
             <FormField label="Notiz">
                 <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical', lineHeight: 1.5 }}

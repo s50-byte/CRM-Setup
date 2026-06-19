@@ -166,6 +166,69 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
+// PUT /api/termine/:id/absagen — Termin absagen + Dashboard-Meldungen
+router.put('/:id/absagen', auth, async (req, res) => {
+    const dbClient = await db.connect();
+    try {
+        await dbClient.query('BEGIN');
+
+        const terminResult = await dbClient.query(
+            `UPDATE termin SET status = 'Abgesagt', updated_at = NOW()
+             WHERE termin_id = $1 RETURNING *`,
+            [req.params.id]
+        );
+        if (terminResult.rows.length === 0) {
+            await dbClient.query('ROLLBACK');
+            return res.status(404).json({ error: 'Termin nicht gefunden' });
+        }
+        const termin = terminResult.rows[0];
+
+        const klientResult = await dbClient.query(
+            `SELECT vorname, nachname FROM klient WHERE klient_id = $1`,
+            [termin.klient_id]
+        );
+        const klient_name = klientResult.rows[0]
+            ? `${klientResult.rows[0].vorname} ${klientResult.rows[0].nachname}`
+            : '';
+
+        const teilnehmende = await dbClient.query(
+            `SELECT user_id FROM termin_user WHERE termin_id = $1`,
+            [req.params.id]
+        );
+
+        for (const row of teilnehmende.rows) {
+            try {
+                await dbClient.query(
+                    `INSERT INTO dashboard_meldung (empfaenger_id, datum, aenderungen, erstellt_von)
+                     VALUES ($1, CURRENT_DATE, $2::jsonb, $3)`,
+                    [
+                        row.user_id,
+                        JSON.stringify([{
+                            typ: 'termin_absage',
+                            termin_id: req.params.id,
+                            termin_typ: termin.typ,
+                            datum: termin.datum,
+                            klient_name,
+                        }]),
+                        req.user.user_id,
+                    ]
+                );
+            } catch (meldungErr) {
+                console.error('Fehler beim Erstellen der dashboard_meldung (absage):', meldungErr);
+            }
+        }
+
+        await dbClient.query('COMMIT');
+        res.json(terminResult.rows[0]);
+    } catch (err) {
+        await dbClient.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Absagen des Termins' });
+    } finally {
+        dbClient.release();
+    }
+});
+
 // PUT /api/termine/:id/status — Status aktualisieren
 router.put('/:id/status', auth, async (req, res) => {
     const { status } = req.body;

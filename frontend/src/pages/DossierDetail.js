@@ -53,6 +53,14 @@ const SELECT_STYLE = {
     borderRadius: 5, background: '#fff', fontFamily: 'inherit', minWidth: 170, outline: 'none',
 };
 
+const STATUS_STYLE = {
+    'Ausstehend': { bg: '#FFFBEB', color: '#B45309', border: 'rgba(217,119,6,.15)' },
+    'Bestätigt':  { bg: '#ECFDF5', color: '#15803D', border: 'rgba(22,163,74,.15)' },
+    'Geplant':    { bg: '#EEF3FE', color: '#1D4ED8', border: 'rgba(37,99,235,.15)' },
+    'Abgesagt':   { bg: '#FEF2F2', color: '#B91C1C', border: 'rgba(220,38,38,.15)' },
+    'erledigt':   { bg: '#ECFDF5', color: '#15803D', border: 'rgba(22,163,74,.15)' },
+};
+
 const BERUF_OPTIONEN_M = ['Informatiker', 'ICT-Fachmann', 'Kaufmann', 'Logistiker', 'Kundendialog-Spezialist'];
 const BERUF_OPTIONEN_F = ['Informatikerin', 'ICT-Fachfrau', 'Kauffrau', 'Logistikerin', 'Kundendialog-Spezialistin'];
 const FACHRICHTUNG_OPTIONEN = ['Applikationsentwicklung (API)', 'Plattformentwicklung (PFE)'];
@@ -250,6 +258,14 @@ export default function DossierDetail() {
         client.get(`/termine?klient_id=${dossier.klient_id}`)
             .then(r => setTermine(r.data))
             .catch(console.error);
+    }
+
+    async function absagenTermin(termin_id) {
+        try {
+            const r = await client.put(`/termine/${termin_id}/absagen`);
+            setDetailTermin(r.data);
+            loadTermine();
+        } catch (err) { console.error(err); }
     }
 
     function reloadDossier() {
@@ -1131,14 +1147,15 @@ export default function DossierDetail() {
                                     {detailTermin.zeit ? ` · ${detailTermin.zeit.slice(0, 5)} Uhr` : ''}
                                 </div>
                             </div>
-                            {detailTermin.status && (
-                                <span style={{
-                                    fontSize: 10.5, padding: '2px 8px', borderRadius: 10, fontFamily: 'monospace',
-                                    background: detailTermin.status === 'erledigt' ? '#ECFDF5' : '#F5F4F0',
-                                    color: detailTermin.status === 'erledigt' ? '#15803D' : '#6B6860',
-                                    border: detailTermin.status === 'erledigt' ? '1px solid rgba(22,163,74,.15)' : '1px solid rgba(0,0,0,.09)',
-                                }}>{detailTermin.status}</span>
-                            )}
+                            {detailTermin.status && (() => {
+                                const s = STATUS_STYLE[detailTermin.status] || { bg: '#F5F4F0', color: '#6B6860', border: 'rgba(0,0,0,.09)' };
+                                return (
+                                    <span style={{
+                                        fontSize: 10.5, padding: '2px 8px', borderRadius: 10, fontFamily: 'monospace',
+                                        background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+                                    }}>{detailTermin.status}</span>
+                                );
+                            })()}
                         </div>
 
                         {detailTermin.personen && detailTermin.personen.length > 0 && (
@@ -1176,7 +1193,15 @@ export default function DossierDetail() {
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                            {detailTermin.status !== 'Abgesagt' && (
+                                <button onClick={() => absagenTermin(detailTermin.termin_id)} style={{
+                                    padding: '7px 18px', fontSize: 13, cursor: 'pointer',
+                                    border: '1px solid rgba(220,38,38,.2)', borderRadius: 6,
+                                    background: '#FEF2F2', fontFamily: 'inherit', color: '#B91C1C', fontWeight: 500,
+                                    marginRight: 'auto'
+                                }}>Absagen</button>
+                            )}
                             <button onClick={() => setDetailTermin(null)} style={{
                                 padding: '7px 18px', fontSize: 13, cursor: 'pointer',
                                 border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,

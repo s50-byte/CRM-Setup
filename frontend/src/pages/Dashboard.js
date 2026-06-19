@@ -55,6 +55,20 @@ function MeldungKarte({ m, onAcknowledge, onTerminClick }) {
                             </div>
                         );
                     }
+                    if (a.typ === 'termin_absage') {
+                        return (
+                            <div
+                                key={i}
+                                onClick={a.termin_id && onTerminClick ? () => onTerminClick(a.termin_id) : undefined}
+                                style={{ marginTop: 3, cursor: a.termin_id && onTerminClick ? 'pointer' : 'default' }}
+                            >
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#B91C1C', textDecorationLine: a.termin_id && onTerminClick ? 'underline' : 'none', textDecorationColor: 'rgba(185,28,28,.3)' }}>
+                                    Termin abgesagt: {a.termin_typ} am {new Date(a.datum).toLocaleDateString('de-CH')}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Klient: {a.klient_name}</div>
+                            </div>
+                        );
+                    }
                     if (a.typ === 'termin_einladung') {
                         return (
                             <div
