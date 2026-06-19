@@ -8,6 +8,7 @@ const auth = require('../middleware/auth');
 // GET /api/termine — Termine der eigenen Klienten (?klient_id=uuid für Filter)
 router.get('/', auth, async (req, res) => {
     const klientFilter = req.query.klient_id || null;
+    console.log('GET /termine user_id:', req.user.user_id, 'klient_id:', klientFilter);
     try {
         const result = await db.query(
             `SELECT
@@ -31,16 +32,23 @@ router.get('/', auth, async (req, res) => {
                AND (
                    $1::uuid IS NOT NULL
                    OR EXISTS (
-                       SELECT 1 FROM klient_user ku
-                       WHERE ku.klient_id = t.klient_id
+                       SELECT 1 FROM dossier d
+                       JOIN klient_user ku ON ku.klient_id = d.klient_id
+                       WHERE d.klient_id = t.klient_id
                          AND ku.user_id = $2
                          AND ku.aktiv = TRUE
+                   )
+                   OR EXISTS (
+                       SELECT 1 FROM termin_user tu2
+                       WHERE tu2.termin_id = t.termin_id
+                         AND tu2.user_id = $2
                    )
                )
              GROUP BY t.termin_id, k.klient_id, k.nachname, k.vorname
              ORDER BY t.datum ASC, t.zeit ASC NULLS LAST`,
             [klientFilter, req.user.user_id]
         );
+        console.log('GET /termine rows:', result.rows.length);
         res.json(result.rows);
     } catch (err) {
         console.error(err);
