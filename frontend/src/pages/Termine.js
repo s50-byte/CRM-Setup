@@ -32,7 +32,6 @@ const filterStyle = {
 export default function Termine() {
     const navigate = useNavigate();
     const [termine, setTermine] = useState([]);
-    const [benutzer, setBenutzer] = useState([]);
     const [laden, setLaden] = useState(true);
     const [terminModal, setTerminModal] = useState(false);
     const [detailTermin, setDetailTermin] = useState(null);
@@ -41,19 +40,17 @@ export default function Termine() {
 
     const [suche, setSuche] = useState('');
     const [filterTyp, setFilterTyp] = useState('');
+    const [filterKlient, setFilterKlient] = useState('');
+    const [filterPerson, setFilterPerson] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [filterDatumVon, setFilterDatumVon] = useState('');
     const [filterDatumBis, setFilterDatumBis] = useState('');
-    const [filterPerson, setFilterPerson] = useState('');
 
     useEffect(() => {
-        Promise.all([
-            client.get('/termine'),
-            client.get('/benutzer'),
-        ]).then(([tRes, bRes]) => {
-            setTermine(tRes.data);
-            setBenutzer(bRes.data);
-        }).catch(console.error).finally(() => setLaden(false));
+        client.get('/termine')
+            .then(r => setTermine(r.data))
+            .catch(console.error)
+            .finally(() => setLaden(false));
     }, []);
 
     const handleSort = field => {
@@ -70,25 +67,36 @@ export default function Termine() {
         } catch (err) { console.error(err); }
     }
 
-    const filterAktiv = suche || filterTyp || filterStatus || filterDatumVon || filterDatumBis || filterPerson;
+    const filterAktiv = suche || filterTyp || filterKlient || filterPerson || filterStatus || filterDatumVon || filterDatumBis;
 
     function resetFilter() {
         setSuche('');
         setFilterTyp('');
+        setFilterKlient('');
+        setFilterPerson('');
         setFilterStatus('');
         setFilterDatumVon('');
         setFilterDatumBis('');
-        setFilterPerson('');
     }
+
+    // Distinct-Listen aus geladenen Terminen
+    const klientenListe = [...new Map(
+        termine.map(t => [`${t.klient_id}`, { klient_id: t.klient_id, name: `${t.nachname} ${t.vorname}` }])
+    ).values()].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+
+    const personenListe = [...new Map(
+        termine.flatMap(t => t.personen || []).map(p => [p.user_id, p])
+    ).values()].sort((a, b) => a.full_name.localeCompare(b.full_name, 'de'));
 
     const sucheLower = suche.toLowerCase();
     const gefiltert = sortData(
         termine.filter(t => {
             if (filterTyp && t.typ !== filterTyp) return false;
+            if (filterKlient && t.klient_id !== filterKlient) return false;
+            if (filterPerson && !(t.personen || []).some(p => p.user_id === filterPerson)) return false;
             if (filterStatus && t.status !== filterStatus) return false;
             if (filterDatumVon && t.datum < filterDatumVon) return false;
             if (filterDatumBis && t.datum > filterDatumBis) return false;
-            if (filterPerson && !(t.personen || []).some(p => p.user_id === filterPerson)) return false;
             if (suche) {
                 const klient = `${t.vorname || ''} ${t.nachname || ''}`.toLowerCase();
                 const notiz = (t.notiz || '').toLowerCase();
@@ -145,6 +153,18 @@ export default function Termine() {
                     {TYPEN.map(t => <option key={t}>{t}</option>)}
                 </select>
 
+                {/* Klient */}
+                <select value={filterKlient} onChange={e => setFilterKlient(e.target.value)} style={{ ...filterStyle, maxWidth: 180 }}>
+                    <option value="">Alle Klienten</option>
+                    {klientenListe.map(k => <option key={k.klient_id} value={k.klient_id}>{k.name}</option>)}
+                </select>
+
+                {/* Teilnehmende */}
+                <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} style={{ ...filterStyle, maxWidth: 160 }}>
+                    <option value="">Alle Teilnehmenden</option>
+                    {personenListe.map(p => <option key={p.user_id} value={p.user_id}>{p.full_name}</option>)}
+                </select>
+
                 {/* Status */}
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={filterStyle}>
                     <option value="">Alle Status</option>
@@ -170,12 +190,6 @@ export default function Termine() {
                         style={{ ...filterStyle, width: 130 }}
                     />
                 </div>
-
-                {/* Teilnehmende Person */}
-                <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} style={{ ...filterStyle, maxWidth: 160 }}>
-                    <option value="">Alle Personen</option>
-                    {benutzer.map(b => <option key={b.user_id} value={b.user_id}>{b.full_name}</option>)}
-                </select>
 
                 {/* Reset */}
                 {filterAktiv && (
