@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import FeedbackModal from './FeedbackModal';
 import Dashboard from '../pages/Dashboard';
 import Klienten from '../pages/Klienten';
 import Externe from '../pages/Externe';
@@ -21,6 +23,7 @@ import ManagementDashboard from '../pages/management/ManagementDashboard';
 import Auslastung from '../pages/management/Auslastung';
 import Benutzer from '../pages/management/Benutzer';
 import Reporting from '../pages/management/Reporting';
+import Feedback from '../pages/management/Feedback';
 
 const MANAGEMENT_ROLLEN = ['leitungsteam', 'admin'];
 
@@ -53,6 +56,7 @@ const MANAGEMENT_NAV = [
     { path: '/management/leistungen',  label: 'Leistungskatalog', icon: '📋' },
     { path: '/management/benutzer',    label: 'Benutzer',   icon: '⚙' },
     { path: '/standorte',              label: 'Standorte',  icon: '📍' },
+    { path: '/management/feedback',    label: 'Feedback',   icon: '💬' },
 ];
 
 function Platzhalter({ titel }) {
@@ -88,6 +92,7 @@ export default function Layout() {
     const navigate = useNavigate();
     const location = useLocation();
     const istManagementUser = MANAGEMENT_ROLLEN.includes(benutzer?.system_rolle);
+    const [feedbackOffen, setFeedbackOffen] = useState(false);
 
     function handleLogout() {
         logout();
@@ -120,7 +125,8 @@ export default function Layout() {
                 alignItems: 'center',
                 padding: '0 1.25rem',
                 gap: 10,
-                zIndex: 30
+                zIndex: 30,
+                position: 'relative'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontWeight: 600, fontSize: 15 }}>
                     <div style={{
@@ -135,6 +141,14 @@ export default function Layout() {
                     background: '#FFFBEB', color: '#B45309',
                     border: '1px solid rgba(217,119,6,.15)', fontFamily: 'monospace'
                 }}>v2</span>
+
+                <button onClick={() => setFeedbackOffen(true)} style={{
+                    position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '5px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                    border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
+                    background: '#F5F4F0', color: '#6B6860', fontFamily: 'inherit'
+                }}>💬 Feedback</button>
 
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
                     {istManagementUser && (
@@ -231,8 +245,11 @@ export default function Layout() {
                     <Route path="/management/reporting"    element={<Reporting />} />
                     <Route path="/management/leistungen"   element={<Leistungen />} />
                     <Route path="/management/benutzer"     element={<Benutzer />} />
+                    <Route path="/management/feedback"     element={<Feedback />} />
                 </Routes>
             </div>
+
+            <FeedbackModal open={feedbackOffen} onClose={() => setFeedbackOffen(false)} />
         </div>
     );
 }
