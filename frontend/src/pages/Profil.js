@@ -60,6 +60,7 @@ export default function Profil() {
     const [standorte, setStandorte] = useState(new Set());
     const [abteilungen, setAbteilungen] = useState(new Set());
     const [programmGruppen, setProgrammGruppen] = useState([]);
+    const [aufgeklappt, setAufgeklappt] = useState({ BM: true, IM: true, BC: true, GM: true });
     const [alleStandorte, setAlleStandorte] = useState([]);
     const [rollenMsg, setRollenMsg] = useState('');
     const [programmeMsg, setProgrammeMsg] = useState('');
@@ -95,6 +96,9 @@ export default function Profil() {
 
     const toggleAbteilung = (name) =>
         setAbteilungen(prev => { const s = new Set(prev); s.has(name) ? s.delete(name) : s.add(name); return s; });
+
+    const toggleGruppeAufgeklappt = (gruppe) =>
+        setAufgeklappt(prev => ({ ...prev, [gruppe]: !(prev[gruppe] !== false) }));
 
     const speichernRollen = async () => {
         try {
@@ -241,14 +245,23 @@ export default function Profil() {
                 {/* Meine Programme */}
                 <div style={CARD}>
                     <div style={SECTION_LABEL}>Meine Programme</div>
-                    {programmGruppen.map(gruppe => (
-                        <div key={gruppe.gruppe}>
-                            <div style={GRUPPEN_HDR}>{gruppe.label}</div>
-                            {gruppe.programme.map(p => (
-                                <Toggle key={p.programm_id} label={p.name} checked={programme.has(p.programm_id)} onChange={() => toggleProgramm(p.programm_id)} />
-                            ))}
-                        </div>
-                    ))}
+                    {programmGruppen.map(gruppe => {
+                        const offen = aufgeklappt[gruppe.gruppe] !== false;
+                        return (
+                            <div key={gruppe.gruppe}>
+                                <div
+                                    onClick={() => toggleGruppeAufgeklappt(gruppe.gruppe)}
+                                    style={{ ...GRUPPEN_HDR, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}
+                                >
+                                    <span style={{ fontSize: 9, width: 10, display: 'inline-block' }}>{offen ? '▼' : '▶'}</span>
+                                    <span>{gruppe.label}</span>
+                                </div>
+                                {offen && gruppe.programme.map(p => (
+                                    <Toggle key={p.programm_id} label={p.name} checked={programme.has(p.programm_id)} onChange={() => toggleProgramm(p.programm_id)} />
+                                ))}
+                            </div>
+                        );
+                    })}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: '.875rem' }}>
                         <button onClick={speichernProgramme} style={{
                             padding: '7px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer',

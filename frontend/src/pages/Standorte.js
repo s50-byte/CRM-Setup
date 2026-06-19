@@ -82,14 +82,13 @@ function LehrberufeAbschnitt({ standortId }) {
 }
 
 export default function Standorte() {
-    const { benutzer, managementModus } = useAuth();
+    const { managementModus } = useAuth();
     const [standorte, setStandorte] = useState([]);
     const [laden, setLaden] = useState(true);
     const [modal, setModal] = useState(false);
     const [bearbeitenId, setBearbeitenId] = useState(null);
     const [form, setForm] = useState({ name: '', kuerzel: '', adresse: '', plz: '', ort: '', telefon: '', email: '', aktiv: true });
     const [fehler, setFehler] = useState('');
-    const kannBearbeiten = managementModus || ['leitungsteam', 'admin'].includes(benutzer?.system_rolle);
 
     useEffect(() => {
         laden && client.get('/standorte')
@@ -143,7 +142,7 @@ export default function Standorte() {
                     <div style={{ fontSize: 19, fontWeight: 600 }}>Standorte</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Standorte und Filialen verwalten</div>
                 </div>
-                {kannBearbeiten && (
+                {managementModus && (
                     <button onClick={neuerStandortOeffnen} style={{
                         padding: '7px 14px', fontSize: 13, fontWeight: 500,
                         cursor: 'pointer', border: 'none', borderRadius: 6,
@@ -152,7 +151,7 @@ export default function Standorte() {
                 )}
             </div>
 
-            {!kannBearbeiten && (
+            {!managementModus && (
                 <div style={{
                     background: '#FFFBEB', border: '1px solid rgba(217,119,6,.2)',
                     borderRadius: 8, padding: '10px 14px', fontSize: 12.5,
@@ -188,7 +187,7 @@ export default function Standorte() {
                                 color: s.aktiv ? '#15803D' : '#B91C1C',
                                 border: `1px solid ${s.aktiv ? 'rgba(22,163,74,.15)' : 'rgba(220,38,38,.15)'}`
                             }}>{s.aktiv ? 'Aktiv' : 'Inaktiv'}</span>
-                            {kannBearbeiten && (
+                            {managementModus && (
                                 <button onClick={() => bearbeitenOeffnen(s)} style={{
                                     padding: '3px 10px', fontSize: 11.5, fontWeight: 500, whiteSpace: 'nowrap',
                                     cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 5,
@@ -230,7 +229,7 @@ export default function Standorte() {
                                 )}
                             </div>
                         )}
-                        {kannBearbeiten && <LehrberufeAbschnitt standortId={s.standort_id} />}
+                        {managementModus && <LehrberufeAbschnitt standortId={s.standort_id} />}
                     </div>
                 ))}
             </div>
