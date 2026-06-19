@@ -54,7 +54,7 @@ export default function Termine() {
         { label: 'Zeit',     field: 'zeit' },
         { label: 'Typ',      field: 'typ' },
         { label: 'Klient/in',field: 'nachname' },
-        { label: 'Personen', field: null },
+        { label: 'Teilnehmende Personen', field: null },
         { label: 'Status',   field: 'status' },
     ];
 
@@ -201,7 +201,7 @@ export default function Termine() {
 
                             {detailTermin.personen && detailTermin.personen.length > 0 && (
                                 <div>
-                                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Teilnehmende</div>
+                                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Teilnehmende Personen</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                                         {detailTermin.personen.map((p, i) => (
                                             <span key={i} style={{

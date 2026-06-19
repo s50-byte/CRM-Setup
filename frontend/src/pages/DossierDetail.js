@@ -1143,7 +1143,7 @@ export default function DossierDetail() {
 
                         {detailTermin.personen && detailTermin.personen.length > 0 && (
                             <div style={{ marginBottom: 14 }}>
-                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Teilnehmende</div>
+                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Teilnehmende Personen</div>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                                     {detailTermin.personen.map((p, i) => (
                                         <span key={i} style={{

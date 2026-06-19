@@ -100,6 +100,7 @@ router.post('/', auth, async (req, res) => {
                             user_id,
                             JSON.stringify([{
                                 typ: 'termin_einladung',
+                                termin_id: termin_id,
                                 termin_typ: typ,
                                 datum: datum,
                                 klient_name: klient_name,
@@ -119,6 +120,39 @@ router.post('/', auth, async (req, res) => {
         res.status(500).json({ error: 'Fehler beim Erstellen des Termins' });
     } finally {
         dbClient.release();
+    }
+});
+
+// GET /api/termine/:id — Einzelner Termin
+router.get('/:id', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT
+                t.termin_id, t.typ, t.datum, t.zeit, t.status, t.notiz,
+                k.nachname, k.vorname, k.klient_id,
+                COALESCE(
+                    JSON_AGG(
+                        JSONB_BUILD_OBJECT(
+                            'user_id', u.user_id,
+                            'full_name', u.full_name,
+                            'avatar_initials', u.avatar_initials
+                        )
+                    ) FILTER (WHERE u.user_id IS NOT NULL),
+                    '[]'
+                ) AS personen
+             FROM termin t
+             JOIN klient k ON k.klient_id = t.klient_id
+             LEFT JOIN termin_user tu ON tu.termin_id = t.termin_id
+             LEFT JOIN benutzer u ON u.user_id = tu.user_id
+             WHERE t.termin_id = $1
+             GROUP BY t.termin_id, k.klient_id, k.nachname, k.vorname`,
+            [req.params.id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Termin nicht gefunden' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden des Termins' });
     }
 });
 

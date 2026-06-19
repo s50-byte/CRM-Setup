@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
 
+const STATUS_STYLE = {
+    'Ausstehend': { bg: '#FFFBEB', color: '#B45309', border: 'rgba(217,119,6,.15)' },
+    'Bestätigt':  { bg: '#ECFDF5', color: '#15803D', border: 'rgba(22,163,74,.15)' },
+    'Geplant':    { bg: '#EEF3FE', color: '#1D4ED8', border: 'rgba(37,99,235,.15)' },
+    'Abgesagt':   { bg: '#FEF2F2', color: '#B91C1C', border: 'rgba(220,38,38,.15)' },
+};
+
 function berechneTageVerbleibend(start_datum, avg_dauer_tage) {
     if (!start_datum || !avg_dauer_tage) return null;
     const ende = new Date(start_datum);
@@ -17,7 +24,7 @@ const STATUS_LABELS = {
     'feiertag': 'Feiertag', 'unfall': 'Unfall',
 };
 
-function MeldungKarte({ m, onAcknowledge }) {
+function MeldungKarte({ m, onAcknowledge, onTerminClick }) {
     const sl = s => STATUS_LABELS[s] || s || '—';
     return (
         <div style={{
@@ -50,8 +57,12 @@ function MeldungKarte({ m, onAcknowledge }) {
                     }
                     if (a.typ === 'termin_einladung') {
                         return (
-                            <div key={i} style={{ marginTop: 3 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1917' }}>
+                            <div
+                                key={i}
+                                onClick={a.termin_id && onTerminClick ? () => onTerminClick(a.termin_id) : undefined}
+                                style={{ marginTop: 3, cursor: a.termin_id && onTerminClick ? 'pointer' : 'default' }}
+                            >
+                                <div style={{ fontSize: 12, fontWeight: 600, color: a.termin_id && onTerminClick ? '#2563EB' : '#1A1917', textDecorationLine: a.termin_id && onTerminClick ? 'underline' : 'none', textDecorationColor: 'rgba(37,99,235,.3)' }}>
                                     Neuer Termin: {a.termin_typ} am {new Date(a.datum).toLocaleDateString('de-CH')}
                                 </div>
                                 <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>
@@ -114,6 +125,7 @@ export default function Dashboard() {
     const [fruehereMeldungen, setFruehereMeldungen] = useState([]);
     const [frueherOffen, setFrueherOffen] = useState(false);
     const [laden, setLaden] = useState(true);
+    const [detailTermin, setDetailTermin] = useState(null);
 
     useEffect(() => {
         async function laden() {
@@ -138,6 +150,15 @@ export default function Dashboard() {
         }
         laden();
     }, []);
+
+    async function ladeTerminDetail(termin_id) {
+        try {
+            const r = await client.get(`/termine/${termin_id}`);
+            setDetailTermin(r.data);
+        } catch (err) {
+            console.error(err);
+        }
+    }
 
     async function acknowledge(meldung_id) {
         try {
@@ -212,7 +233,7 @@ export default function Dashboard() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {meldungen.map(m => (
-                                <MeldungKarte key={m.meldung_id} m={m} onAcknowledge={acknowledge} />
+                                <MeldungKarte key={m.meldung_id} m={m} onAcknowledge={acknowledge} onTerminClick={ladeTerminDetail} />
                             ))}
                         </div>
                     )}
@@ -244,7 +265,7 @@ export default function Dashboard() {
                         {frueherOffen && (
                             <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '520px', overflowY: 'auto' }}>
                                 {fruehereMeldungen.map(m => (
-                                    <MeldungKarte key={m.meldung_id} m={m} />
+                                    <MeldungKarte key={m.meldung_id} m={m} onTerminClick={ladeTerminDetail} />
                                 ))}
                             </div>
                         )}
@@ -318,6 +339,100 @@ export default function Dashboard() {
                     ))}
                 </div>
             </div>
+
+            {detailTermin && (
+                <div onClick={() => setDetailTermin(null)} style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)',
+                    zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                        background: '#fff', borderRadius: 12, padding: '1.5rem',
+                        width: 480, maxWidth: '90vw',
+                        boxShadow: '0 8px 32px rgba(0,0,0,.18)',
+                        maxHeight: '85vh', overflowY: 'auto'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                            <div>
+                                <div style={{ fontSize: 16, fontWeight: 600, color: '#1A1917' }}>{detailTermin.typ}</div>
+                                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 3, fontFamily: 'monospace' }}>
+                                    {new Date(detailTermin.datum).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                    {detailTermin.zeit ? ` · ${detailTermin.zeit.slice(0, 5)} Uhr` : ''}
+                                </div>
+                            </div>
+                            {detailTermin.status && (() => {
+                                const s = STATUS_STYLE[detailTermin.status] || STATUS_STYLE['Ausstehend'];
+                                return (
+                                    <span style={{
+                                        fontSize: 11, padding: '3px 9px', borderRadius: 20,
+                                        background: s.bg, color: s.color,
+                                        border: `1px solid ${s.border}`, fontFamily: 'monospace'
+                                    }}>{detailTermin.status}</span>
+                                );
+                            })()}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div>
+                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Klient/in</div>
+                                <button
+                                    onClick={() => { setDetailTermin(null); navigate(`/klienten/${detailTermin.klient_id}`); }}
+                                    style={{
+                                        fontSize: 13, fontWeight: 500, color: '#2563EB', cursor: 'pointer',
+                                        border: 'none', background: 'none', padding: 0, fontFamily: 'inherit',
+                                        textDecoration: 'underline', textDecorationColor: 'rgba(37,99,235,.3)'
+                                    }}
+                                >
+                                    {detailTermin.vorname} {detailTermin.nachname}
+                                </button>
+                            </div>
+
+                            {detailTermin.personen && detailTermin.personen.length > 0 && (
+                                <div>
+                                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Teilnehmende Personen</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                        {detailTermin.personen.map((p, i) => (
+                                            <span key={i} style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                fontSize: 12, padding: '3px 9px 3px 5px',
+                                                borderRadius: 20, background: '#F5F4F0',
+                                                border: '1px solid rgba(0,0,0,.09)'
+                                            }}>
+                                                <div style={{
+                                                    width: 18, height: 18, borderRadius: 5,
+                                                    background: '#E5E7EB', color: '#374151',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: 8, fontWeight: 700
+                                                }}>{p.avatar_initials || p.full_name?.[0] || '?'}</div>
+                                                {p.full_name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {detailTermin.notiz && (
+                                <div>
+                                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Notiz</div>
+                                    <div style={{
+                                        fontSize: 13, padding: '10px 12px',
+                                        background: '#F5F4F0', border: '1px solid rgba(0,0,0,.09)',
+                                        borderRadius: 7, color: '#1A1917', lineHeight: 1.6,
+                                        whiteSpace: 'pre-wrap'
+                                    }}>{detailTermin.notiz}</div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 14, marginTop: 14, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                            <button onClick={() => setDetailTermin(null)} style={{
+                                padding: '7px 18px', fontSize: 13, cursor: 'pointer',
+                                border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
+                                background: '#fff', fontFamily: 'inherit', color: '#1A1917', fontWeight: 500
+                            }}>Schliessen</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -106,7 +106,7 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
                     <input type="time" style={inputStyle} value={form.zeit} onChange={e => set('zeit', e.target.value)} />
                 </FormField>
             </div>
-            <FormField label="Teilnehmende">
+            <FormField label="Teilnehmende Personen">
                 <div style={{ position: 'relative' }}>
                     <button
                         type="button"
