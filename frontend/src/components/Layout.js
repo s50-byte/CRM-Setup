@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Dashboard from '../pages/Dashboard';
@@ -88,15 +88,14 @@ function istManagementPfad(pathname) {
 }
 
 export default function Layout() {
-    const { benutzer, logout } = useAuth();
+    const { benutzer, logout, managementModus, setManagementModus } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const istManagementUser = MANAGEMENT_ROLLEN.includes(benutzer?.system_rolle);
-    const [managementModus, setManagementModus] = useState(() => istManagementPfad(location.pathname));
 
     useEffect(() => {
         setManagementModus(istManagementPfad(location.pathname));
-    }, [location.pathname]);
+    }, [location.pathname, setManagementModus]);
 
     function handleLogout() {
         logout();

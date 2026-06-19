@@ -82,14 +82,14 @@ function LehrberufeAbschnitt({ standortId }) {
 }
 
 export default function Standorte() {
-    const { benutzer } = useAuth();
+    const { benutzer, managementModus } = useAuth();
     const [standorte, setStandorte] = useState([]);
     const [laden, setLaden] = useState(true);
     const [modal, setModal] = useState(false);
-    const [form, setForm] = useState({ name: '', kuerzel: '', adresse: '', plz: '', ort: '', telefon: '', email: '' });
+    const [bearbeitenId, setBearbeitenId] = useState(null);
+    const [form, setForm] = useState({ name: '', kuerzel: '', adresse: '', plz: '', ort: '', telefon: '', email: '', aktiv: true });
     const [fehler, setFehler] = useState('');
-    const istManagement = benutzer?.system_rolle === 'management';
-    const istManagementModus = ['leitungsteam', 'admin'].includes(benutzer?.system_rolle);
+    const kannBearbeiten = managementModus || ['leitungsteam', 'admin'].includes(benutzer?.system_rolle);
 
     useEffect(() => {
         laden && client.get('/standorte')
@@ -100,14 +100,37 @@ export default function Standorte() {
 
     function set(f, v) { setForm(prev => ({ ...prev, [f]: v })); }
 
+    function neuerStandortOeffnen() {
+        setBearbeitenId(null);
+        setForm({ name: '', kuerzel: '', adresse: '', plz: '', ort: '', telefon: '', email: '', aktiv: true });
+        setFehler('');
+        setModal(true);
+    }
+
+    function bearbeitenOeffnen(s) {
+        setBearbeitenId(s.standort_id);
+        setForm({
+            name: s.name || '', kuerzel: s.kuerzel || '', adresse: s.adresse || '',
+            plz: s.plz || '', ort: s.ort || '', telefon: s.telefon || '', email: s.email || '',
+            aktiv: s.aktiv !== false,
+        });
+        setFehler('');
+        setModal(true);
+    }
+
     async function speichern() {
         if (!form.name || !form.kuerzel) { setFehler('Name und Kürzel erforderlich'); return; }
         setFehler('');
         try {
-            await client.post('/standorte', form);
+            if (bearbeitenId) {
+                await client.put(`/standorte/${bearbeitenId}`, form);
+            } else {
+                await client.post('/standorte', form);
+            }
             setModal(false);
+            setBearbeitenId(null);
             setLaden(true);
-            setForm({ name: '', kuerzel: '', adresse: '', plz: '', ort: '', telefon: '', email: '' });
+            setForm({ name: '', kuerzel: '', adresse: '', plz: '', ort: '', telefon: '', email: '', aktiv: true });
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Speichern');
         }
@@ -120,8 +143,8 @@ export default function Standorte() {
                     <div style={{ fontSize: 19, fontWeight: 600 }}>Standorte</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Standorte und Filialen verwalten</div>
                 </div>
-                {istManagement && (
-                    <button onClick={() => setModal(true)} style={{
+                {kannBearbeiten && (
+                    <button onClick={neuerStandortOeffnen} style={{
                         padding: '7px 14px', fontSize: 13, fontWeight: 500,
                         cursor: 'pointer', border: 'none', borderRadius: 6,
                         background: '#2563EB', color: '#fff', fontFamily: 'inherit'
@@ -129,7 +152,7 @@ export default function Standorte() {
                 )}
             </div>
 
-            {!istManagement && (
+            {!kannBearbeiten && (
                 <div style={{
                     background: '#FFFBEB', border: '1px solid rgba(217,119,6,.2)',
                     borderRadius: 8, padding: '10px 14px', fontSize: 12.5,
@@ -165,6 +188,13 @@ export default function Standorte() {
                                 color: s.aktiv ? '#15803D' : '#B91C1C',
                                 border: `1px solid ${s.aktiv ? 'rgba(22,163,74,.15)' : 'rgba(220,38,38,.15)'}`
                             }}>{s.aktiv ? 'Aktiv' : 'Inaktiv'}</span>
+                            {kannBearbeiten && (
+                                <button onClick={() => bearbeitenOeffnen(s)} style={{
+                                    padding: '3px 10px', fontSize: 11.5, fontWeight: 500, whiteSpace: 'nowrap',
+                                    cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 5,
+                                    background: '#fff', fontFamily: 'inherit', color: '#1A1917'
+                                }}>Bearbeiten</button>
+                            )}
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', rowGap: 4, fontSize: 12 }}>
                             {s.adresse && <><span style={{ color: '#6B6860' }}>Adresse</span><span>{s.adresse}</span></>}
@@ -200,12 +230,12 @@ export default function Standorte() {
                                 )}
                             </div>
                         )}
-                        {istManagementModus && <LehrberufeAbschnitt standortId={s.standort_id} />}
+                        {kannBearbeiten && <LehrberufeAbschnitt standortId={s.standort_id} />}
                     </div>
                 ))}
             </div>
 
-            <Modal open={modal} onClose={() => setModal(false)} title="Neuer Standort">
+            <Modal open={modal} onClose={() => { setModal(false); setBearbeitenId(null); }} title={bearbeitenId ? 'Standort bearbeiten' : 'Neuer Standort'}>
                 {fehler && <div style={{ background: '#FEF2F2', border: '1px solid rgba(220,38,38,.2)', borderRadius: 6, padding: '9px 12px', fontSize: 12, color: '#B91C1C', marginBottom: 12 }}>{fehler}</div>}
                 <div style={rowStyle}>
                     <FormField label="Name *"><input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="z.B. Zürich Hauptsitz" /></FormField>
@@ -220,8 +250,14 @@ export default function Standorte() {
                     <FormField label="Telefon"><input style={inputStyle} value={form.telefon} onChange={e => set('telefon', e.target.value)} /></FormField>
                     <FormField label="E-Mail"><input type="email" style={inputStyle} value={form.email} onChange={e => set('email', e.target.value)} /></FormField>
                 </div>
+                {bearbeitenId && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#1A1917', marginTop: 4, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={form.aktiv !== false} onChange={e => set('aktiv', e.target.checked)} />
+                        Standort aktiv
+                    </label>
+                )}
                 <div style={btnRow}>
-                    <button style={btnSecondary} onClick={() => setModal(false)}>Abbrechen</button>
+                    <button style={btnSecondary} onClick={() => { setModal(false); setBearbeitenId(null); }}>Abbrechen</button>
                     <button style={btnPrimary} onClick={speichern}>Speichern</button>
                 </div>
             </Modal>

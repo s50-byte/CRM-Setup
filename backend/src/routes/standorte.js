@@ -39,7 +39,7 @@ router.get('/', auth, async (req, res) => {
 
 // POST /api/standorte — Neuer Standort (nur Management)
 router.post('/', auth, async (req, res) => {
-    if (req.user.system_rolle !== 'management') {
+    if (!['leitungsteam', 'admin'].includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
     const { name, kuerzel, adresse, plz, ort, telefon, email } = req.body;
@@ -61,7 +61,7 @@ router.post('/', auth, async (req, res) => {
 
 // PUT /api/standorte/:id — Standort aktualisieren
 router.put('/:id', auth, async (req, res) => {
-    if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
+    if (!['leitungsteam', 'admin'].includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
     const { name, kuerzel, adresse, plz, ort, telefon, email, aktiv } = req.body;
