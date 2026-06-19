@@ -49,7 +49,7 @@ function LehrberufeAbschnitt({ standortId, bearbeitbar }) {
                 {aktiveBerufe.map(b => (
                     <div key={b.beruf} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 12 }}>
                         <span style={{ flex: 1, color: '#1A1917', minWidth: 0 }}>{b.beruf}</span>
-                        <span style={{ color: '#6B6860', fontFamily: 'monospace' }}>{b.bewilligte_plaetze} / {b.total_plaetze}</span>
+                        <span style={{ color: '#6B6860', fontFamily: 'monospace' }}>Bewilligt: {b.bewilligte_plaetze} · Total: {b.total_plaetze}</span>
                     </div>
                 ))}
             </div>

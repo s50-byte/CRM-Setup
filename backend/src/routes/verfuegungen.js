@@ -26,7 +26,9 @@ router.get('/:dossier_id', auth, async (req, res) => {
                                 'einheit', l.einheit,
                                 'soll_stunden', vp.soll_stunden,
                                 'reihenfolge', vp.reihenfolge,
-                                'stundenpreis', l.tarif
+                                'stundenpreis', l.tarif,
+                                'verrechnungsart', vp.verrechnungsart,
+                                'betrag', vp.betrag
                             ) ORDER BY vp.reihenfolge
                         ) FILTER (WHERE vp.position_id IS NOT NULL),
                         '[]'
@@ -42,43 +44,49 @@ router.get('/:dossier_id', auth, async (req, res) => {
 
         const rows = result.rows.map(v => {
             const dauerMonate = Math.max(1, parseInt(v.dauer_monate) || 1);
-            const betrag = parseFloat(v.betrag) || 0;
             const positionen = v.positionen || [];
-            const sollStunden = positionen.reduce((s, p) => s + (parseFloat(p.soll_stunden) || 0), 0);
-            const tarifLeistung = parseFloat(positionen[0]?.stundenpreis) || 0;
-            // Pro Stunde: tarifLeistung ist der Stundenpreis direkt
-            // Monatspauschale/Fallpauschale: effektiver Stundenpreis aus betrag / soll_stunden
-            const stundenpreis = v.verrechnungsart === 'stundenpauschale'
-                ? tarifLeistung
-                : (sollStunden > 0 ? betrag / sollStunden : 0);
+            const r1 = n => Math.round(n * 10) / 10;
+            const r2 = n => Math.round(n * 100) / 100;
 
-            let soll_total_ertrag = null;
-            let soll_stunden_total = null;
-            let soll_stunden_monat = null;
+            let ertragSum = 0, hTotalSum = 0, hMonatSum = 0, hatDaten = false;
 
-            if (v.verrechnungsart && betrag > 0) {
-                const r1 = n => Math.round(n * 10) / 10;
-                const r2 = n => Math.round(n * 100) / 100;
-                switch (v.verrechnungsart) {
+            for (const p of positionen) {
+                if (!p.verrechnungsart) continue;
+                const tarif = parseFloat(p.stundenpreis) || 0;
+                const betrag_pos = parseFloat(p.betrag) || 0;
+                const soll_h = parseFloat(p.soll_stunden) || 0;
+                switch (p.verrechnungsart) {
                     case 'monatspauschale':
-                        soll_total_ertrag = r2(betrag * dauerMonate);
-                        soll_stunden_monat = sollStunden > 0 ? r1(sollStunden) : (stundenpreis > 0 ? r1(betrag / stundenpreis) : null);
-                        soll_stunden_total = soll_stunden_monat !== null ? r1(soll_stunden_monat * dauerMonate) : null;
+                        if (betrag_pos > 0) {
+                            const hM = tarif > 0 ? betrag_pos / tarif : 0;
+                            ertragSum += betrag_pos * dauerMonate;
+                            hMonatSum += hM;
+                            hTotalSum += hM * dauerMonate;
+                            hatDaten = true;
+                        }
                         break;
                     case 'fallpauschale':
-                        soll_total_ertrag = r2(betrag);
-                        soll_stunden_total = sollStunden > 0 ? r1(sollStunden) : (stundenpreis > 0 ? r1(betrag / stundenpreis) : null);
-                        soll_stunden_monat = soll_stunden_total !== null ? r1(soll_stunden_total / dauerMonate) : null;
+                        if (betrag_pos > 0) {
+                            const hT = tarif > 0 ? betrag_pos / tarif : 0;
+                            ertragSum += betrag_pos;
+                            hTotalSum += hT;
+                            hMonatSum += dauerMonate > 0 ? hT / dauerMonate : 0;
+                            hatDaten = true;
+                        }
                         break;
                     case 'stundenpauschale':
-                        soll_stunden_total = r1(sollStunden);
-                        soll_stunden_monat = dauerMonate > 0 ? r1(sollStunden / dauerMonate) : null;
-                        soll_total_ertrag = stundenpreis > 0 ? r2(sollStunden * stundenpreis) : null;
+                        ertragSum += soll_h * tarif;
+                        hTotalSum += soll_h;
+                        hMonatSum += dauerMonate > 0 ? soll_h / dauerMonate : 0;
+                        hatDaten = true;
                         break;
-                    default:
-                        break;
+                    default: break;
                 }
             }
+
+            const soll_total_ertrag = hatDaten ? r2(ertragSum) : null;
+            const soll_stunden_total = hatDaten ? r1(hTotalSum) : null;
+            const soll_stunden_monat = hatDaten ? r1(hMonatSum) : null;
 
             return { ...v, dauer_monate: dauerMonate, soll_total_ertrag, soll_stunden_total, soll_stunden_monat };
         });
@@ -233,13 +241,13 @@ router.delete('/:id', auth, async (req, res) => {
 
 // POST /api/verfuegungen/:id/positionen
 router.post('/:id/positionen', auth, async (req, res) => {
-    const { leistung_id, soll_stunden, reihenfolge } = req.body;
+    const { leistung_id, soll_stunden, reihenfolge, verrechnungsart, betrag } = req.body;
     if (!leistung_id) return res.status(400).json({ error: 'leistung_id erforderlich' });
     try {
         const result = await db.query(
-            `INSERT INTO verfuegung_position (verfuegung_id, leistung_id, soll_stunden, reihenfolge)
-             VALUES ($1, $2, $3, $4) RETURNING *`,
-            [req.params.id, leistung_id, soll_stunden || 0, reihenfolge || 0]
+            `INSERT INTO verfuegung_position (verfuegung_id, leistung_id, soll_stunden, reihenfolge, verrechnungsart, betrag)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [req.params.id, leistung_id, soll_stunden || 0, reihenfolge || 0, verrechnungsart || null, betrag || null]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -250,14 +258,14 @@ router.post('/:id/positionen', auth, async (req, res) => {
 
 // PUT /api/verfuegungen/:id/positionen/:pos_id
 router.put('/:id/positionen/:pos_id', auth, async (req, res) => {
-    const { leistung_id, soll_stunden, reihenfolge } = req.body;
+    const { leistung_id, soll_stunden, reihenfolge, verrechnungsart, betrag } = req.body;
     if (!leistung_id) return res.status(400).json({ error: 'leistung_id erforderlich' });
     try {
         const result = await db.query(
             `UPDATE verfuegung_position
-             SET leistung_id = $1, soll_stunden = $2, reihenfolge = $3
-             WHERE position_id = $4 AND verfuegung_id = $5 RETURNING *`,
-            [leistung_id, soll_stunden || 0, reihenfolge || 0, req.params.pos_id, req.params.id]
+             SET leistung_id = $1, soll_stunden = $2, reihenfolge = $3, verrechnungsart = $4, betrag = $5
+             WHERE position_id = $6 AND verfuegung_id = $7 RETURNING *`,
+            [leistung_id, soll_stunden || 0, reihenfolge || 0, verrechnungsart || null, betrag || null, req.params.pos_id, req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
         res.json(result.rows[0]);

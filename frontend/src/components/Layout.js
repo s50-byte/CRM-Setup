@@ -142,13 +142,18 @@ export default function Layout() {
                     border: '1px solid rgba(217,119,6,.15)', fontFamily: 'monospace'
                 }}>v2</span>
 
-                <button onClick={() => setFeedbackOffen(true)} style={{
-                    position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '5px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                    border: '1px solid rgba(0,0,0,.09)', borderRadius: 6,
-                    background: '#F5F4F0', color: '#6B6860', fontFamily: 'inherit'
-                }}>💬 Feedback</button>
+                <button
+                    onClick={() => setFeedbackOffen(true)}
+                    onMouseEnter={e => e.currentTarget.style.background = '#B91C1C'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#DC2626'}
+                    style={{
+                        position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                        border: 'none', borderRadius: 6,
+                        background: '#DC2626', color: '#fff', fontFamily: 'inherit'
+                    }}
+                >💬 Feedback</button>
 
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
                     {istManagementUser && (

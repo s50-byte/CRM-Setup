@@ -90,17 +90,12 @@ function berechneWerte(dossierList, journalList, periode, kennzahlen) {
 
     for (const dos of dossierList) {
         if (!ueberlapp(dos.start_datum, dos.geplantes_enddatum, vonDate, bisDate)) continue;
-        const betrag = parseFloat(dos.betrag) || 0;
         const dauerMonate = Math.max(1, parseInt(dos.dauer_monate) || 1);
         const sollLeistungTotal = parseFloat(dos.soll_leistung_total) || 0;
         const sollStundenTotal = parseFloat(dos.soll_stunden_total) || 0;
         const kaderCount = Math.max(1, parseInt(dos.kader_count) || 1);
 
-        switch (dos.verrechnungsart) {
-            case 'monatspauschale': einnahmen_soll += betrag / kaderCount; break;
-            case 'fallpauschale':   einnahmen_soll += betrag / dauerMonate / kaderCount; break;
-            case 'stundenpauschale': einnahmen_soll += sollLeistungTotal / dauerMonate / kaderCount; break;
-        }
+        einnahmen_soll += sollLeistungTotal / dauerMonate / kaderCount;
         stunden_soll += sollStundenTotal / dauerMonate / kaderCount;
         klientenSet.add(String(dos.klient_id));
     }
@@ -286,8 +281,28 @@ router.post('/query', auth, async (req, res) => {
                            + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int, 1
                         )) AS dauer_monate,
                         v.betrag, v.verrechnungsart,
-                        COALESCE(SUM(vp.soll_stunden * COALESCE(l.tarif, 0)), 0) AS soll_leistung_total,
-                        COALESCE(SUM(vp.soll_stunden), 0) AS soll_stunden_total
+                        COALESCE(SUM(
+                            CASE vp.verrechnungsart
+                                WHEN 'monatspauschale' THEN COALESCE(vp.betrag, 0) * GREATEST(1, COALESCE(
+                                    (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
+                                   + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int, 1))
+                                WHEN 'fallpauschale' THEN COALESCE(vp.betrag, 0)
+                                ELSE COALESCE(vp.soll_stunden, 0) * COALESCE(l.tarif, 0)
+                            END
+                        ), 0) AS soll_leistung_total,
+                        COALESCE(SUM(
+                            CASE vp.verrechnungsart
+                                WHEN 'monatspauschale' THEN
+                                    CASE WHEN COALESCE(l.tarif, 0) > 0
+                                        THEN COALESCE(vp.betrag, 0) / l.tarif * GREATEST(1, COALESCE(
+                                             (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
+                                            + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int, 1))
+                                        ELSE 0 END
+                                WHEN 'fallpauschale' THEN
+                                    CASE WHEN COALESCE(l.tarif, 0) > 0 THEN COALESCE(vp.betrag, 0) / l.tarif ELSE 0 END
+                                ELSE COALESCE(vp.soll_stunden, 0)
+                            END
+                        ), 0) AS soll_stunden_total
                     FROM dossier d
                     JOIN klient k ON k.klient_id = d.klient_id
                     JOIN programm_verlauf pv ON pv.dossier_id = d.dossier_id AND pv.status = 'Laufend'

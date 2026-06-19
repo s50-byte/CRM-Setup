@@ -68,6 +68,8 @@ router.get('/', auth, async (req, res) => {
                         'tarifnr', l.tarifnr,
                         'bezeichnung', l.bezeichnung,
                         'soll_stunden', vp2.soll_stunden,
+                        'verrechnungsart', vp2.verrechnungsart,
+                        'betrag', vp2.betrag,
                         'ist_stunden', COALESCE(ROUND(
                             (SELECT SUM(j2.dauer_minuten) / 60.0
                              FROM journal_eintrag j2
@@ -134,23 +136,18 @@ router.get('/', auth, async (req, res) => {
         );
 
         let rows = result.rows.map(row => {
-            const betrag = parseFloat(row.verfuegung_betrag) || 0;
             const dauerMonate = Math.max(1, parseInt(row.dauer_monate) || 1);
             const positionen = row.positionen || [];
-            let soll_ertrag = null;
-            if (betrag > 0) {
-                switch (row.verrechnungsart) {
-                    case 'monatspauschale':
-                        soll_ertrag = Math.round(betrag * dauerMonate * 100) / 100;
-                        break;
-                    case 'fallpauschale':
-                        soll_ertrag = betrag;
-                        break;
-                    case 'stundenpauschale':
-                        soll_ertrag = Math.round(positionen.reduce((s, p) => s + (parseFloat(p.soll_chf) || 0), 0) * 100) / 100;
-                        break;
+            let ertragSum = 0;
+            for (const p of positionen) {
+                const betrag_pos = parseFloat(p.betrag) || 0;
+                switch (p.verrechnungsart) {
+                    case 'monatspauschale': ertragSum += betrag_pos * dauerMonate; break;
+                    case 'fallpauschale':   ertragSum += betrag_pos; break;
+                    case 'stundenpauschale': ertragSum += parseFloat(p.soll_chf) || 0; break;
                 }
             }
+            const soll_ertrag = ertragSum > 0 ? Math.round(ertragSum * 100) / 100 : null;
             return { ...row, soll_ertrag };
         });
 

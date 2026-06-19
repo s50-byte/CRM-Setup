@@ -447,8 +447,8 @@ export default function DossierDetail() {
                                 </div>
                             ))}
                         </div>
-                        {/* SOLL/IST-Aufwand — nur wenn aktive Verfügung mit Verrechnungsart, kein CHF */}
-                        {verfuegungen.some(v => v.status === 'aktiv' && v.verrechnungsart) && (() => {
+                        {/* SOLL/IST-Aufwand — nur wenn aktive Verfügung mit Positionen und SOLL-Stunden */}
+                        {verfuegungen.some(v => v.status === 'aktiv' && v.soll_stunden_total != null) && (() => {
                             const ist = parseFloat(dossier.ist_total) || 0;
                             const soll = parseFloat(dossier.soll_total) || 0;
                             const verr = parseFloat(dossier.ist_verrechenbar) || 0;
@@ -841,28 +841,13 @@ export default function DossierDetail() {
                         {/* Aktive Verfügungen */}
                         {verfuegungen.filter(v => v.status === 'aktiv').map(v => {
                             const VART_LABEL = { monatspauschale: 'Monatspausch.', fallpauschale: 'Fallpausch.', stundenpauschale: 'Std.pausch.' };
+                            const VART_BADGE_FARBE = { monatspauschale: { bg: '#EEF3FE', color: '#1D4ED8' }, fallpauschale: { bg: '#FFF7ED', color: '#9A3412' }, stundenpauschale: { bg: '#F0FDF4', color: '#15803D' } };
                             return (
                                 <div key={v.verfuegung_id} style={{ background: '#F0FDF4', border: '1px solid rgba(22,163,74,.2)', borderRadius: 7, padding: '8px 10px', marginBottom: 8 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                         <div>
                                             <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>{v.nummer}</div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2, flexWrap: 'wrap' }}>
-                                                {v.datum && <span style={{ fontSize: 10.5, color: '#6B6860' }}>{fmt(v.datum)}</span>}
-                                                {v.verrechnungsart && (
-                                                    <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(37,99,235,.15)', fontFamily: 'monospace' }}>
-                                                        {VART_LABEL[v.verrechnungsart] || v.verrechnungsart}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {(v.soll_stunden_monat != null || v.soll_stunden_total != null || v.soll_total_ertrag != null) && (
-                                                <div style={{ fontSize: 10.5, color: '#374151', marginTop: 3 }}>
-                                                    {[
-                                                        v.soll_stunden_monat != null && `${v.soll_stunden_monat}h/Mt.`,
-                                                        v.soll_stunden_total != null && `${v.soll_stunden_total}h ges.`,
-                                                        v.soll_total_ertrag != null && `CHF ${parseFloat(v.soll_total_ertrag).toFixed(2)}`,
-                                                    ].filter(Boolean).join(' · ')}
-                                                </div>
-                                            )}
+                                            {v.datum && <div style={{ fontSize: 10.5, color: '#6B6860', marginTop: 1 }}>{fmt(v.datum)}</div>}
                                         </div>
                                         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
                                             <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 10, background: '#ECFDF5', color: '#15803D', fontFamily: 'monospace' }}>aktiv</span>
@@ -870,13 +855,38 @@ export default function DossierDetail() {
                                         </div>
                                     </div>
                                     {(v.positionen || []).length > 0 && (
-                                        <div style={{ marginTop: 8, borderTop: '1px solid rgba(22,163,74,.15)', paddingTop: 7 }}>
-                                            {v.positionen.map((p, i) => (
-                                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '2px 0', borderBottom: i < v.positionen.length - 1 ? '1px solid rgba(0,0,0,.04)' : 'none' }}>
-                                                    <span style={{ color: '#374151' }}>{p.leistung_bezeichnung}</span>
-                                                    <span style={{ fontFamily: 'monospace', color: '#6B6860', flexShrink: 0, marginLeft: 8 }}>{Number(p.soll_stunden)} {p.einheit}</span>
+                                        <div style={{ marginTop: 8, borderTop: '1px solid rgba(22,163,74,.15)', paddingTop: 7, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                            {v.positionen.map((p, i) => {
+                                                const bf = p.verrechnungsart ? (VART_BADGE_FARBE[p.verrechnungsart] || {}) : {};
+                                                const betrag = parseFloat(p.betrag) || 0;
+                                                const soll_h = parseFloat(p.soll_stunden) || 0;
+                                                const tarif = parseFloat(p.stundenpreis) || 0;
+                                                let sollAnzeige = null;
+                                                if (p.verrechnungsart === 'monatspauschale' && betrag > 0)
+                                                    sollAnzeige = `CHF ${betrag.toFixed(2)}/Mt. · ${tarif > 0 ? (Math.round(betrag / tarif * 10) / 10) + 'h/Mt.' : ''}`;
+                                                else if (p.verrechnungsart === 'fallpauschale' && betrag > 0)
+                                                    sollAnzeige = `CHF ${betrag.toFixed(2)} ges.`;
+                                                else if (p.verrechnungsart === 'stundenpauschale')
+                                                    sollAnzeige = `${soll_h}h · CHF ${(soll_h * tarif).toFixed(2)}`;
+                                                return (
+                                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, flexWrap: 'wrap' }}>
+                                                        <span style={{ color: '#374151', flex: 1, minWidth: 0 }}>{p.leistung_bezeichnung}</span>
+                                                        {p.verrechnungsart && (
+                                                            <span style={{ fontSize: 9.5, padding: '1px 5px', borderRadius: 8, background: bf.bg, color: bf.color, border: `1px solid ${bf.color}22`, fontFamily: 'monospace', flexShrink: 0 }}>
+                                                                {VART_LABEL[p.verrechnungsart]}
+                                                            </span>
+                                                        )}
+                                                        {sollAnzeige && <span style={{ fontFamily: 'monospace', color: '#6B6860', fontSize: 11, flexShrink: 0 }}>{sollAnzeige}</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                            {(v.soll_stunden_total != null || v.soll_total_ertrag != null) && (
+                                                <div style={{ borderTop: '1px solid rgba(22,163,74,.12)', paddingTop: 5, fontSize: 11, color: '#374151', display: 'flex', gap: 10, fontWeight: 500 }}>
+                                                    <span>Gesamt-SOLL:</span>
+                                                    {v.soll_stunden_total != null && <span>{v.soll_stunden_total}h</span>}
+                                                    {v.soll_total_ertrag != null && <span>CHF {parseFloat(v.soll_total_ertrag).toFixed(2)}</span>}
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
                                     )}
                                     {v.bemerkung && <div style={{ fontSize: 11, color: '#6B6860', marginTop: 7, fontStyle: 'italic' }}>{v.bemerkung}</div>}
@@ -902,12 +912,20 @@ export default function DossierDetail() {
                                         </div>
                                         {(v.positionen || []).length > 0 && (
                                             <div style={{ marginTop: 5 }}>
-                                                {v.positionen.map((p, i) => (
-                                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9CA3AF', padding: '1px 0' }}>
-                                                        <span>{p.leistung_bezeichnung}</span>
-                                                        <span style={{ fontFamily: 'monospace', flexShrink: 0, marginLeft: 8 }}>{Number(p.soll_stunden)}</span>
-                                                    </div>
-                                                ))}
+                                                {v.positionen.map((p, i) => {
+                                                    const betrag = parseFloat(p.betrag) || 0;
+                                                    const soll_h = parseFloat(p.soll_stunden) || 0;
+                                                    const wert = p.verrechnungsart === 'monatspauschale' ? `CHF ${betrag.toFixed(2)}/Mt.`
+                                                        : p.verrechnungsart === 'fallpauschale' ? `CHF ${betrag.toFixed(2)}`
+                                                        : p.verrechnungsart === 'stundenpauschale' ? `${soll_h}h`
+                                                        : `${Number(p.soll_stunden)}h`;
+                                                    return (
+                                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9CA3AF', padding: '1px 0' }}>
+                                                            <span>{p.leistung_bezeichnung}</span>
+                                                            <span style={{ fontFamily: 'monospace', flexShrink: 0, marginLeft: 8 }}>{wert}</span>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
