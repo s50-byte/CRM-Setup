@@ -48,6 +48,18 @@ function MeldungKarte({ m, onAcknowledge }) {
                             </div>
                         );
                     }
+                    if (a.typ === 'termin_einladung') {
+                        return (
+                            <div key={i} style={{ marginTop: 3 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1917' }}>
+                                    Neuer Termin: {a.termin_typ} am {new Date(a.datum).toLocaleDateString('de-CH')}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>
+                                    Klient: {a.klient_name}
+                                </div>
+                            </div>
+                        );
+                    }
                     if (a.typ === 'feedback_eingang') {
                         return (
                             <div key={i} style={{ marginTop: 3 }}>

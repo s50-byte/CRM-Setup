@@ -59,40 +59,66 @@ router.get('/', auth, async (req, res) => {
 // POST /api/termine — Neuer Termin
 router.post('/', auth, async (req, res) => {
     console.log('POST /termine body:', req.body);
-    const { klient_id, typ, datum, zeit, notiz, personen } = req.body;
+    const { klient_id, typ, datum, zeit, notiz, teilnehmende } = req.body;
 
     if (!klient_id || !typ || !datum) {
         return res.status(400).json({ error: 'Klient, Typ und Datum erforderlich' });
     }
 
-    const client = await db.connect();
+    const dbClient = await db.connect();
     try {
-        await client.query('BEGIN');
+        await dbClient.query('BEGIN');
 
-        const termin = await client.query(
+        const termin = await dbClient.query(
             `INSERT INTO termin (klient_id, typ, datum, zeit, notiz)
              VALUES ($1, $2, $3, $4, $5) RETURNING *`,
             [klient_id, typ, datum, zeit || null, notiz || null]
         );
+        const termin_id = termin.rows[0].termin_id;
 
-        // Personen zuweisen
-        if (personen && personen.length > 0) {
-            for (const user_id of personen) {
-                await client.query(
+        // Klient-Name für Meldungstext
+        const klientRow = await dbClient.query(
+            `SELECT vorname, nachname FROM klient WHERE klient_id = $1`,
+            [klient_id]
+        );
+        const klient_name = klientRow.rows[0]
+            ? `${klientRow.rows[0].vorname} ${klientRow.rows[0].nachname}`
+            : '';
+
+        // Teilnehmende zuweisen + Dashboard-Meldung an alle ausser Ersteller
+        if (teilnehmende && teilnehmende.length > 0) {
+            for (const user_id of teilnehmende) {
+                await dbClient.query(
                     `INSERT INTO termin_user (termin_id, user_id) VALUES ($1, $2)`,
-                    [termin.rows[0].termin_id, user_id]
+                    [termin_id, user_id]
                 );
+                if (user_id !== req.user.user_id) {
+                    await dbClient.query(
+                        `INSERT INTO dashboard_meldung (empfaenger_id, datum, aenderungen, erstellt_von)
+                         VALUES ($1, CURRENT_DATE, $2::jsonb, $3)`,
+                        [
+                            user_id,
+                            JSON.stringify([{
+                                typ: 'termin_einladung',
+                                termin_typ: typ,
+                                datum: datum,
+                                klient_name: klient_name,
+                            }]),
+                            req.user.user_id,
+                        ]
+                    );
+                }
             }
         }
 
-        await client.query('COMMIT');
+        await dbClient.query('COMMIT');
         res.status(201).json(termin.rows[0]);
     } catch (err) {
-        await client.query('ROLLBACK');
+        await dbClient.query('ROLLBACK');
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Erstellen des Termins' });
     } finally {
-        client.release();
+        dbClient.release();
     }
 });
 
