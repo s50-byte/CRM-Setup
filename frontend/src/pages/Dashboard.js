@@ -130,6 +130,35 @@ export default function Dashboard() {
                                         </span>
                                     </div>
                                     {(m.aenderungen || []).map((a, i) => {
+                                        if (a.typ === 'feedback_antwort') {
+                                            return (
+                                                <div key={i} style={{ marginTop: 3 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1917' }}>
+                                                        Antwort auf dein Feedback: <span style={{ color: '#15803D' }}>{a.status_label || a.status}</span>
+                                                    </div>
+                                                    <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>{a.antwort}</div>
+                                                    {a.feedback_notiz && (
+                                                        <div style={{ fontSize: 11, color: '#A09D97', marginTop: 3 }}>
+                                                            Dein Feedback: {a.feedback_notiz.length > 80 ? a.feedback_notiz.slice(0, 80) + '…' : a.feedback_notiz}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+                                        if (a.typ === 'feedback_eingang') {
+                                            return (
+                                                <div key={i} style={{ marginTop: 3 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1917' }}>
+                                                        Neues Feedback von {m.erstellt_von_name || 'Unbekannt'}{a.screen ? `: ${a.screen}` : ''}
+                                                    </div>
+                                                    {a.notiz && (
+                                                        <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>
+                                                            {a.notiz.length > 100 ? a.notiz.slice(0, 100) + '…' : a.notiz}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
                                         if (a.alter_status === 'Vorabklärung') {
                                             return (
                                                 <div key={i} style={{ fontSize: 12, color: '#6B6860', marginTop: 3 }}>

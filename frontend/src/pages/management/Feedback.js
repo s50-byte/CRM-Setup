@@ -1,11 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
 
+const STATUS_LABELS = {
+    offen:         'Offen',
+    implementiert: 'Implementiert ✓',
+    out_of_scope:  'Out of Scope',
+    backlog:       'Backlog',
+};
+
+const STATUS_FARBEN = {
+    offen:         { bg: '#F5F4F0', color: '#6B6860' },
+    implementiert: { bg: '#F0FDF4', color: '#15803D' },
+    out_of_scope:  { bg: '#FFF7ED', color: '#C2410C' },
+    backlog:       { bg: '#EEF3FE', color: '#1D4ED8' },
+};
+
 const TH = ({ children, right }) => (
     <th style={{ textAlign: right ? 'right' : 'left', padding: '7px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap', background: '#F5F4F0' }}>
         {children}
     </th>
 );
+
+function StatusBadge({ status }) {
+    const s = status || 'offen';
+    const f = STATUS_FARBEN[s] || STATUS_FARBEN.offen;
+    return (
+        <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 10, background: f.bg, color: f.color, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+            {STATUS_LABELS[s] || s}
+        </span>
+    );
+}
 
 function fmtDatum(d) {
     const dt = new Date(d);
@@ -17,11 +41,22 @@ function csvEscape(v) {
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
+const ANT_INIT = { open: false, feedback: null, status: 'implementiert', antwort: '', laden: false, fehler: '' };
+
+const inputStyle = {
+    width: '100%', fontSize: 13, padding: '7px 10px',
+    border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
+    background: '#fff', fontFamily: 'inherit', outline: 'none',
+    boxSizing: 'border-box', color: '#1A1917',
+};
+
 export default function Feedback() {
     const [feedbacks, setFeedbacks] = useState([]);
     const [laden, setLaden] = useState(true);
     const [filterBenutzer, setFilterBenutzer] = useState('Alle');
     const [filterScreen, setFilterScreen] = useState('Alle');
+    const [filterStatus, setFilterStatus] = useState('Alle');
+    const [antModal, setAntModal] = useState(ANT_INIT);
 
     const laden_daten = useCallback(async () => {
         setLaden(true);
@@ -43,13 +78,15 @@ export default function Feedback() {
     const gefiltert = feedbacks.filter(f => {
         const benutzer_ok = filterBenutzer === 'Alle' || f.full_name === filterBenutzer;
         const screen_ok = filterScreen === 'Alle' || f.screen === filterScreen;
-        return benutzer_ok && screen_ok;
+        const status_ok = filterStatus === 'Alle' || (f.status || 'offen') === filterStatus;
+        return benutzer_ok && screen_ok && status_ok;
     });
 
     function exportCsv() {
-        const header = ['Datum', 'Benutzer', 'E-Mail', 'Screen', 'Notiz'];
+        const header = ['Datum', 'Benutzer', 'E-Mail', 'Screen', 'Notiz', 'Status', 'Antwort'];
         const zeilen = gefiltert.map(f => [
-            fmtDatum(f.created_at), f.full_name || '', f.email || '', f.screen || '', f.notiz,
+            fmtDatum(f.created_at), f.full_name || '', f.email || '', f.screen || '',
+            f.notiz, STATUS_LABELS[f.status || 'offen'] || '', f.antwort || '',
         ]);
         const csv = [header, ...zeilen].map(row => row.map(csvEscape).join(',')).join('\n');
         const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -61,9 +98,27 @@ export default function Feedback() {
         URL.revokeObjectURL(url);
     }
 
+    async function handleAntwort() {
+        if (!antModal.antwort.trim()) {
+            setAntModal(m => ({ ...m, fehler: 'Antwort ist erforderlich.' }));
+            return;
+        }
+        setAntModal(m => ({ ...m, laden: true, fehler: '' }));
+        try {
+            await client.put(`/feedback/${antModal.feedback.feedback_id}/antwort`, {
+                status: antModal.status,
+                antwort: antModal.antwort,
+            });
+            setAntModal(ANT_INIT);
+            laden_daten();
+        } catch (err) {
+            setAntModal(m => ({ ...m, laden: false, fehler: err.response?.data?.error || 'Fehler beim Speichern.' }));
+        }
+    }
+
     const selectStyle = {
         fontSize: 12.5, padding: '4px 8px', border: '1px solid rgba(0,0,0,.12)',
-        borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#1A1917', cursor: 'pointer'
+        borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#1A1917', cursor: 'pointer',
     };
 
     return (
@@ -98,6 +153,13 @@ export default function Feedback() {
                         {screenListe.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <label style={{ fontSize: 11.5, fontWeight: 500, color: '#6B6860' }}>Status</label>
+                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
+                        <option value="Alle">Alle</option>
+                        {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                </div>
             </div>
 
             {laden ? (
@@ -111,12 +173,15 @@ export default function Feedback() {
                                 <TH>Benutzer</TH>
                                 <TH>Screen</TH>
                                 <TH>Notiz</TH>
+                                <TH>Status</TH>
+                                <TH>Antwort</TH>
+                                <TH right></TH>
                             </tr>
                         </thead>
                         <tbody>
                             {gefiltert.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: '#A09D97', fontSize: 12 }}>
+                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#A09D97', fontSize: 12 }}>
                                         Keine Feedback-Einträge gefunden
                                     </td>
                                 </tr>
@@ -129,11 +194,117 @@ export default function Feedback() {
                                         {f.email && <div style={{ fontSize: 11, color: '#6B6860' }}>{f.email}</div>}
                                     </td>
                                     <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontSize: 11.5, color: '#1D4ED8' }}>{f.screen || '—'}</td>
-                                    <td style={{ padding: '9px 12px', color: '#1A1917', maxWidth: 420 }}>{f.notiz}</td>
+                                    <td style={{ padding: '9px 12px', color: '#1A1917', maxWidth: 280 }}>
+                                        <span title={f.notiz}>{f.notiz.length > 80 ? f.notiz.slice(0, 80) + '…' : f.notiz}</span>
+                                    </td>
+                                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
+                                        <StatusBadge status={f.status} />
+                                    </td>
+                                    <td style={{ padding: '9px 12px', color: '#6B6860', maxWidth: 220, fontSize: 12 }}>
+                                        {f.antwort
+                                            ? <span title={f.antwort}>{f.antwort.length > 60 ? f.antwort.slice(0, 60) + '…' : f.antwort}</span>
+                                            : <span style={{ color: '#A09D97' }}>—</span>
+                                        }
+                                    </td>
+                                    <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                        <button
+                                            onClick={() => setAntModal({
+                                                open: true, feedback: f,
+                                                status: f.status && f.status !== 'offen' ? f.status : 'implementiert',
+                                                antwort: f.antwort || '',
+                                                laden: false, fehler: '',
+                                            })}
+                                            style={{
+                                                padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+                                                border: '1px solid rgba(0,0,0,.12)', borderRadius: 5,
+                                                background: (!f.status || f.status === 'offen') ? '#2563EB' : '#fff',
+                                                color: (!f.status || f.status === 'offen') ? '#fff' : '#1A1917',
+                                                fontFamily: 'inherit',
+                                            }}
+                                        >
+                                            {(!f.status || f.status === 'offen') ? 'Beantworten' : 'Bearbeiten'}
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {/* Antwort-Modal */}
+            {antModal.open && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: 12, padding: '1.5rem', width: 480, boxShadow: '0 8px 32px rgba(0,0,0,.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Feedback beantworten</div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {/* Original-Feedback (readonly) */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>
+                                    Feedback von {antModal.feedback?.full_name}
+                                </label>
+                                <div style={{ fontSize: 12.5, padding: '8px 10px', background: '#F5F4F0', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, color: '#374151', lineHeight: 1.5 }}>
+                                    {antModal.feedback?.notiz}
+                                </div>
+                                {antModal.feedback?.screen && (
+                                    <div style={{ fontSize: 11, color: '#6B6860', marginTop: 3 }}>Screen: <span style={{ fontFamily: 'monospace', color: '#1D4ED8' }}>{antModal.feedback.screen}</span></div>
+                                )}
+                            </div>
+
+                            {/* Status */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>
+                                    Status
+                                </label>
+                                <select
+                                    value={antModal.status}
+                                    onChange={e => setAntModal(m => ({ ...m, status: e.target.value }))}
+                                    style={{ ...inputStyle, cursor: 'pointer' }}
+                                >
+                                    <option value="implementiert">Implementiert ✓</option>
+                                    <option value="out_of_scope">Out of Scope</option>
+                                    <option value="backlog">Backlog</option>
+                                </select>
+                            </div>
+
+                            {/* Antwort */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>
+                                    Antwort <span style={{ color: '#B91C1C' }}>*</span>
+                                </label>
+                                <textarea
+                                    value={antModal.antwort}
+                                    onChange={e => setAntModal(m => ({ ...m, antwort: e.target.value, fehler: '' }))}
+                                    placeholder="Antwort an den Feedback-Ersteller…"
+                                    rows={4}
+                                    style={{ ...inputStyle, resize: 'vertical' }}
+                                />
+                            </div>
+                        </div>
+
+                        {antModal.fehler && (
+                            <div style={{ fontSize: 12.5, color: '#B91C1C', background: '#FEF2F2', border: '1px solid rgba(185,28,28,.15)', borderRadius: 6, padding: '7px 10px', marginTop: 10 }}>
+                                {antModal.fehler}
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                            <button
+                                onClick={() => setAntModal(ANT_INIT)}
+                                style={{ padding: '7px 16px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}
+                            >
+                                Abbrechen
+                            </button>
+                            <button
+                                onClick={handleAntwort}
+                                disabled={antModal.laden}
+                                style={{ padding: '7px 16px', fontSize: 13, cursor: antModal.laden ? 'default' : 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', fontWeight: 500, opacity: antModal.laden ? .6 : 1 }}
+                            >
+                                {antModal.laden ? 'Speichern…' : 'Antwort speichern'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
