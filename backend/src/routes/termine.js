@@ -28,11 +28,14 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN termin_user tu ON tu.termin_id = t.termin_id
              LEFT JOIN benutzer u ON u.user_id = tu.user_id
              WHERE ($1::uuid IS NULL OR t.klient_id = $1::uuid)
-               AND EXISTS (
-                   SELECT 1 FROM klient_user ku
-                   WHERE ku.klient_id = t.klient_id
-                     AND ku.user_id = $2
-                     AND ku.aktiv = TRUE
+               AND (
+                   $1::uuid IS NOT NULL
+                   OR EXISTS (
+                       SELECT 1 FROM klient_user ku
+                       WHERE ku.klient_id = t.klient_id
+                         AND ku.user_id = $2
+                         AND ku.aktiv = TRUE
+                   )
                )
              GROUP BY t.termin_id, k.klient_id, k.nachname, k.vorname
              ORDER BY t.datum ASC, t.zeit ASC NULLS LAST`,
