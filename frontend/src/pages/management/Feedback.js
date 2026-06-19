@@ -71,6 +71,7 @@ export default function Feedback() {
     const [filterScreen, setFilterScreen] = useState('Alle');
     const [aufgeklappt, setAufgeklappt] = useState({ offen: true, backlog: true, implementiert: true, out_of_scope: false });
     const [antModal, setAntModal] = useState(ANT_INIT);
+    const [detailModal, setDetailModal] = useState(null);
 
     const laden_daten = useCallback(async () => {
         setLaden(true);
@@ -231,11 +232,21 @@ export default function Feedback() {
                                                     </td>
                                                     <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontSize: 11.5, color: '#1D4ED8' }}>{f.screen || '—'}</td>
                                                     <td style={{ padding: '9px 12px', color: '#1A1917', maxWidth: 280 }}>
-                                                        <span title={f.notiz}>{f.notiz.length > 80 ? f.notiz.slice(0, 80) + '…' : f.notiz}</span>
+                                                        <span
+                                                            onClick={() => setDetailModal(f)}
+                                                            style={{ cursor: 'pointer' }}
+                                                            title="Klicken für Details"
+                                                        >
+                                                            {f.notiz.length > 80 ? f.notiz.slice(0, 80) + '…' : f.notiz}
+                                                        </span>
                                                     </td>
                                                     <td style={{ padding: '9px 12px', color: '#6B6860', maxWidth: 220, fontSize: 12 }}>
                                                         {f.antwort
-                                                            ? <span title={f.antwort}>{f.antwort.length > 60 ? f.antwort.slice(0, 60) + '…' : f.antwort}</span>
+                                                            ? <span
+                                                                onClick={() => setDetailModal(f)}
+                                                                style={{ cursor: 'pointer' }}
+                                                                title="Klicken für Details"
+                                                              >{f.antwort.length > 80 ? f.antwort.slice(0, 80) + '…' : f.antwort}</span>
                                                             : <span style={{ color: '#A09D97' }}>—</span>
                                                         }
                                                     </td>
@@ -266,6 +277,56 @@ export default function Feedback() {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Detail-Modal */}
+            {detailModal && (
+                <div onClick={() => setDetailModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: '1.5rem', width: 520, maxWidth: '90vw', boxShadow: '0 8px 32px rgba(0,0,0,.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                            <div>
+                                <div style={{ fontSize: 15, fontWeight: 600, color: '#1A1917' }}>{detailModal.full_name || '—'}</div>
+                                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>{fmtDatum(detailModal.created_at)}</div>
+                            </div>
+                            {detailModal.screen && (
+                                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.09)', fontFamily: 'monospace' }}>
+                                    {detailModal.screen}
+                                </span>
+                            )}
+                        </div>
+
+                        <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Feedback</div>
+                        <div style={{ fontSize: 13, padding: '10px 12px', background: '#F5F4F0', border: '1px solid rgba(0,0,0,.09)', borderRadius: 7, color: '#1A1917', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 300, overflowY: 'auto', marginBottom: 14 }}>
+                            {detailModal.notiz}
+                        </div>
+
+                        {detailModal.antwort && (
+                            <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                    <span style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em' }}>Antwort</span>
+                                    {detailModal.status && (
+                                        <span style={{
+                                            fontSize: 10.5, padding: '1px 8px', borderRadius: 10, fontWeight: 600,
+                                            background: detailModal.status === 'implementiert' ? '#F0FDF4' : detailModal.status === 'backlog' ? '#EEF3FE' : '#FFF7ED',
+                                            color: detailModal.status === 'implementiert' ? '#15803D' : detailModal.status === 'backlog' ? '#1D4ED8' : '#C2410C',
+                                        }}>
+                                            {STATUS_LABELS[detailModal.status] || detailModal.status}
+                                        </span>
+                                    )}
+                                </div>
+                                <div style={{ fontSize: 13, padding: '10px 12px', background: '#F0FDF4', border: '1px solid rgba(22,163,74,.15)', borderRadius: 7, color: '#1A1917', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 250, overflowY: 'auto', marginBottom: 14 }}>
+                                    {detailModal.antwort}
+                                </div>
+                            </>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                            <button onClick={() => setDetailModal(null)} style={{ padding: '7px 18px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#1A1917', fontWeight: 500 }}>
+                                Schliessen
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
