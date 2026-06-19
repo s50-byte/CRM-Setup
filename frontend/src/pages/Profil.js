@@ -10,6 +10,12 @@ const SECTION_LABEL = {
     fontSize: 10.5, fontWeight: 600, color: '#6B6860',
     textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem'
 };
+const GRUPPEN_HDR = {
+    fontSize: 10.5, fontWeight: 600, color: '#A09D97',
+    textTransform: 'uppercase', letterSpacing: '.06em',
+    marginTop: '.875rem', marginBottom: '.4rem',
+    paddingBottom: '.35rem', borderBottom: '1px solid rgba(0,0,0,.07)',
+};
 
 function Toggle({ label, checked, onChange }) {
     return (
@@ -53,7 +59,7 @@ export default function Profil() {
     const [programme, setProgramme] = useState(new Set());
     const [standorte, setStandorte] = useState(new Set());
     const [abteilungen, setAbteilungen] = useState(new Set());
-    const [alleProgramme, setAlleProgramme] = useState([]);
+    const [programmGruppen, setProgrammGruppen] = useState([]);
     const [alleStandorte, setAlleStandorte] = useState([]);
     const [rollenMsg, setRollenMsg] = useState('');
     const [programmeMsg, setProgrammeMsg] = useState('');
@@ -71,7 +77,7 @@ export default function Profil() {
             setStandorte(new Set((r.data.standorte || []).map(s => s.standort_id)));
             setAbteilungen(new Set(r.data.abteilungen || []));
         }).catch(console.error);
-        client.get('/programme').then(r => setAlleProgramme(r.data)).catch(console.error);
+        client.get('/programme?grouped=true').then(r => setProgrammGruppen(r.data.gruppen || [])).catch(console.error);
         client.get('/standorte').then(r => setAlleStandorte(r.data)).catch(console.error);
     }, []);
 
@@ -235,8 +241,13 @@ export default function Profil() {
                 {/* Meine Programme */}
                 <div style={CARD}>
                     <div style={SECTION_LABEL}>Meine Programme</div>
-                    {alleProgramme.map(p => (
-                        <Toggle key={p.programm_id} label={p.name} checked={programme.has(p.programm_id)} onChange={() => toggleProgramm(p.programm_id)} />
+                    {programmGruppen.map(gruppe => (
+                        <div key={gruppe.gruppe}>
+                            <div style={GRUPPEN_HDR}>{gruppe.label}</div>
+                            {gruppe.programme.map(p => (
+                                <Toggle key={p.programm_id} label={p.name} checked={programme.has(p.programm_id)} onChange={() => toggleProgramm(p.programm_id)} />
+                            ))}
+                        </div>
                     ))}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: '.875rem' }}>
                         <button onClick={speichernProgramme} style={{
