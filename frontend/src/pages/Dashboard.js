@@ -158,9 +158,16 @@ export default function Dashboard() {
     const [frueherOffen, setFrueherOffen] = useState(false);
     const [laden, setLaden] = useState(true);
     const [detailTermin, setDetailTermin] = useState(null);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
-        async function laden() {
+        const onFocus = () => setRefreshKey(k => k + 1);
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+    }, []);
+
+    useEffect(() => {
+        async function loadData() {
             try {
                 const [tasksRes, termineRes, dossiersRes, meldungenRes, frueherRes] = await Promise.all([
                     client.get('/tasks'),
@@ -170,6 +177,7 @@ export default function Dashboard() {
                     client.get('/meldungen/alle?acknowledged=true'),
                 ]);
                 setTasks(tasksRes.data);
+                console.log('nächste termine:', termineRes.data);
                 setTermine(termineRes.data);
                 setDossiers(dossiersRes.data);
                 setMeldungen(meldungenRes.data);
@@ -180,8 +188,8 @@ export default function Dashboard() {
                 setLaden(false);
             }
         }
-        laden();
-    }, []);
+        loadData();
+    }, [refreshKey]);
 
     async function ladeTerminDetail(termin_id) {
         try {
@@ -217,6 +225,9 @@ export default function Dashboard() {
     const offeneTasks = tasks.filter(t => !t.erledigt);
     const heute = new Date().toISOString().slice(0, 10);
     const heuteTermine = termine.filter(t => t.datum === heute);
+    const naechsteTermine = termine
+        .filter(t => t.datum >= heute && t.status !== 'Abgesagt')
+        .sort((a, b) => a.datum.localeCompare(b.datum) || (a.zeit || '').localeCompare(b.zeit || ''));
     const baldAblaufend = dossiers.filter(d => {
         const tage = berechneTageVerbleibend(d.laufend_start_datum, d.avg_dauer_tage);
         return tage !== null && tage < 28;
@@ -355,8 +366,8 @@ export default function Dashboard() {
                         Nächste Termine
                     </div>
                     {laden ? <div style={{ color: '#6B6860', fontSize: 12 }}>Laden…</div> :
-                    termine.length === 0 ? <div style={{ color: '#6B6860', fontSize: 12 }}>Keine Termine</div> :
-                    termine.slice(0, 5).map((t, i) => (
+                    naechsteTermine.length === 0 ? <div style={{ color: '#6B6860', fontSize: 12 }}>Keine kommenden Termine</div> :
+                    naechsteTermine.slice(0, 5).map((t, i) => (
                         <div key={i} style={{
                             display: 'flex', alignItems: 'center', gap: 9,
                             padding: '7px 0', borderBottom: '1px solid rgba(0,0,0,.05)'
