@@ -210,6 +210,10 @@ export default function Dashboard() {
             .map(a => a.termin_id)
     );
 
+    const hatNurTerminEinladung = m => (m.aenderungen || []).every(a => a.typ === 'termin_einladung');
+    const meldungenAnzeige = meldungen.filter(m => !hatNurTerminEinladung(m));
+    const fruehereMeldungenAnzeige = fruehereMeldungen.filter(m => !hatNurTerminEinladung(m));
+
     const offeneTasks = tasks.filter(t => !t.erledigt);
     const heute = new Date().toISOString().slice(0, 10);
     const heuteTermine = termine.filter(t => t.datum === heute);
@@ -258,20 +262,20 @@ export default function Dashboard() {
                         <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em' }}>
                             Neue Benachrichtigungen
                         </div>
-                        {meldungen.length > 0 && (
+                        {meldungenAnzeige.length > 0 && (
                             <span style={{
                                 fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
                                 background: '#DC2626', color: '#fff', minWidth: 16, textAlign: 'center'
-                            }}>{meldungen.length}</span>
+                            }}>{meldungenAnzeige.length}</span>
                         )}
                     </div>
                     {laden ? (
                         <div style={{ color: '#6B6860', fontSize: 12 }}>Laden…</div>
-                    ) : meldungen.length === 0 ? (
+                    ) : meldungenAnzeige.length === 0 ? (
                         <div style={{ color: '#15803D', fontSize: 12.5, fontWeight: 500 }}>Keine offenen Meldungen ✓</div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {meldungen.map(m => (
+                            {meldungenAnzeige.map(m => (
                                 <MeldungKarte key={m.meldung_id} m={m} onAcknowledge={acknowledge} onTerminClick={ladeTerminDetail} abgesagteTerminIds={abgesagteTerminIds} />
                             ))}
                         </div>
@@ -279,7 +283,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Frühere Benachrichtigungen */}
-                {!laden && fruehereMeldungen.length > 0 && (
+                {!laden && fruehereMeldungenAnzeige.length > 0 && (
                     <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
                         <div
                             onClick={() => setFrueherOffen(v => !v)}
@@ -299,11 +303,11 @@ export default function Dashboard() {
                             <span style={{
                                 fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
                                 background: '#F5F4F0', color: '#6B6860', minWidth: 16, textAlign: 'center'
-                            }}>{fruehereMeldungen.length}</span>
+                            }}>{fruehereMeldungenAnzeige.length}</span>
                         </div>
                         {frueherOffen && (
                             <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '520px', overflowY: 'auto' }}>
-                                {fruehereMeldungen.map(m => (
+                                {fruehereMeldungenAnzeige.map(m => (
                                     <MeldungKarte key={m.meldung_id} m={m} onTerminClick={ladeTerminDetail} abgesagteTerminIds={abgesagteTerminIds} />
                                 ))}
                             </div>
