@@ -316,4 +316,71 @@ router.get('/dashboard', auth, requireManagement, async (req, res) => {
     }
 });
 
+// GET /api/management/lehrplaetze — Kapazitätsübersicht Lehrberufe pro Standort
+router.get('/lehrplaetze', auth, requireManagement, async (req, res) => {
+    try {
+        const result = await db.query(`
+            WITH lehrling AS (
+                SELECT
+                    d.standort_id,
+                    CASE d.ausbildung_beruf
+                        WHEN 'Informatiker' THEN 'Informatik'
+                        WHEN 'Informatikerin' THEN 'Informatik'
+                        WHEN 'Kaufmann' THEN 'Kaufmann/frau'
+                        WHEN 'Kauffrau' THEN 'Kaufmann/frau'
+                        WHEN 'Logistiker' THEN 'Logistik'
+                        WHEN 'Logistikerin' THEN 'Logistik'
+                        WHEN 'Kundendialog-Spezialist' THEN 'Kundendialog'
+                        WHEN 'Kundendialog-Spezialistin' THEN 'Kundendialog'
+                        ELSE NULL
+                    END AS beruf,
+                    p.name AS programm_name,
+                    d.abteilung, d.arbeitgeber_id
+                FROM dossier d
+                JOIN klient k ON k.klient_id = d.klient_id
+                JOIN programm_verlauf pv ON pv.dossier_id = d.dossier_id AND pv.status = 'Laufend'
+                JOIN programm p ON p.programm_id = pv.programm_id
+                WHERE k.aktiv = TRUE AND d.status != 'inaktiv'
+                  AND p.name IN ('Erstmalige berufliche Ausbildung', 'Gezielte Vorbereitung')
+            )
+            SELECT
+                sl.standort_id, st.name AS standort_name, st.kuerzel AS standort_kuerzel,
+                sl.beruf, sl.bewilligte_plaetze, sl.total_plaetze,
+                COUNT(*) FILTER (WHERE l.programm_name = 'Erstmalige berufliche Ausbildung' AND l.abteilung IS NOT NULL) AS belegt_intern,
+                COUNT(*) FILTER (WHERE l.programm_name = 'Erstmalige berufliche Ausbildung' AND l.arbeitgeber_id IS NOT NULL) AS belegt_extern,
+                COUNT(*) FILTER (WHERE l.programm_name = 'Gezielte Vorbereitung') AS reserviert
+            FROM standort_lehrberuf sl
+            JOIN standort st ON st.standort_id = sl.standort_id
+            LEFT JOIN lehrling l ON l.standort_id = sl.standort_id AND l.beruf = sl.beruf
+            WHERE sl.aktiv = TRUE
+            GROUP BY sl.standort_id, st.name, st.kuerzel, sl.beruf, sl.bewilligte_plaetze, sl.total_plaetze
+            ORDER BY st.name, sl.beruf
+        `);
+        const rows = result.rows.map(r => {
+            const bewilligt = parseInt(r.bewilligte_plaetze);
+            const belegtIntern = parseInt(r.belegt_intern);
+            const belegtExtern = parseInt(r.belegt_extern);
+            const reserviert = parseInt(r.reserviert);
+            const freiAktuell = bewilligt - belegtIntern - belegtExtern;
+            return {
+                standort_id: r.standort_id,
+                standort_name: r.standort_name,
+                standort_kuerzel: r.standort_kuerzel,
+                beruf: r.beruf,
+                bewilligte_plaetze: bewilligt,
+                total_plaetze: parseInt(r.total_plaetze),
+                belegt_intern: belegtIntern,
+                belegt_extern: belegtExtern,
+                reserviert,
+                frei_aktuell: freiAktuell,
+                frei_werdend: freiAktuell - reserviert,
+            };
+        });
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der Lehrplätze' });
+    }
+});
+
 module.exports = router;

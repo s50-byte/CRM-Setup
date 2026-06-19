@@ -83,6 +83,32 @@ function fmt(dateStr) {
     return new Date(dateStr).toLocaleDateString('de-CH');
 }
 
+function TaggeldToggle({ wert, gesperrt, onChange }) {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ fontSize: 10.5, color: '#A09D97', whiteSpace: 'nowrap' }}>Taggeldabrechnung</span>
+            <div style={{
+                display: 'flex', borderRadius: 20, background: '#F5F4F0', padding: 2,
+                border: '1px solid rgba(0,0,0,.09)', opacity: gesperrt ? .6 : 1,
+            }}>
+                {['intern', 'extern'].map(opt => (
+                    <button
+                        key={opt}
+                        disabled={gesperrt}
+                        onClick={() => onChange(opt)}
+                        style={{
+                            padding: '3px 10px', fontSize: 11, fontWeight: 500, border: 'none', borderRadius: 18,
+                            cursor: gesperrt ? 'default' : 'pointer', fontFamily: 'inherit',
+                            background: wert === opt ? '#2563EB' : 'transparent',
+                            color: wert === opt ? '#fff' : '#6B6860',
+                        }}
+                    >{opt}</button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export default function DossierDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -273,6 +299,14 @@ export default function DossierDetail() {
         }
     }
 
+    async function speichernTaggeld(wert) {
+        if (wert === dossier.taggeld_abrechnung) return;
+        try {
+            await client.put(`/dossiers/${id}/felder`, { taggeld_abrechnung: wert });
+            reloadDossier();
+        } catch (err) { console.error(err); }
+    }
+
     if (laden) return <div style={{ padding: '2rem', color: '#6B6860', fontSize: 13 }}>Laden…</div>;
     if (!dossier) return <div style={{ padding: '2rem', color: '#B91C1C', fontSize: 13 }}>Dossier nicht gefunden</div>;
 
@@ -334,6 +368,13 @@ export default function DossierDetail() {
                                     {dossier.pipeline_status}
                                 </span>
                             )}
+                        </div>
+                        <div style={{ marginTop: 9 }}>
+                            <TaggeldToggle
+                                wert={dossier.abteilung ? 'intern' : dossier.taggeld_abrechnung}
+                                gesperrt={!!dossier.abteilung}
+                                onChange={speichernTaggeld}
+                            />
                         </div>
                         {/* Buttons horizontal, kompakt */}
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
@@ -427,12 +468,15 @@ export default function DossierDetail() {
                 </div>
 
                 {/* Ausbildung */}
-                {dossier.programm_name === 'Erstmalige berufliche Ausbildung' && (() => {
+                {(dossier.programm_name === 'Erstmalige berufliche Ausbildung' || dossier.programm_name === 'Gezielte Vorbereitung') && (() => {
                     const berufOptionen = dossier.anrede === 'Frau' ? BERUF_OPTIONEN_F : BERUF_OPTIONEN_M;
                     const zeigtFachrichtung = ausbildung.beruf === 'Informatiker' || ausbildung.beruf === 'Informatikerin';
+                    const voraussichtlich = dossier.programm_name === 'Gezielte Vorbereitung';
                     return (
                         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.06)' }}>
-                            <div style={{ ...SECTION_HDR, marginBottom: 8 }}>Ausbildung</div>
+                            <div style={{ ...SECTION_HDR, marginBottom: 8 }}>
+                                Ausbildung{voraussichtlich && <span style={{ textTransform: 'none', fontWeight: 400, color: '#A09D97', letterSpacing: 0 }}> (Voraussichtlich)</span>}
+                            </div>
                             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                                     <label style={{ fontSize: 10.5, color: '#A09D97' }}>Beruf</label>

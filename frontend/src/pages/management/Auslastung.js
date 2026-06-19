@@ -23,6 +23,14 @@ const TH = ({ children, right }) => (
 
 const ROLLEN_FILTER = ['Alle', 'Klientenführung', 'Job Coach', 'Fachperson'];
 
+function freiFarbe(frei) {
+    return frei < 0 ? '#B91C1C' : frei === 0 ? '#D97706' : '#15803D';
+}
+
+function freiBg(frei) {
+    return frei < 0 ? '#FEF2F2' : frei === 0 ? '#FFFBEB' : '#ECFDF5';
+}
+
 export default function Auslastung() {
     const [data, setData] = useState(null);
     const [laden, setLaden] = useState(true);
@@ -30,12 +38,20 @@ export default function Auslastung() {
     const [aktiveTab, setAktiveTab] = useState('person');
     const [filterRolle, setFilterRolle] = useState('Alle');
     const [filterStandort, setFilterStandort] = useState('Alle');
+    const [lehrplaetze, setLehrplaetze] = useState([]);
+    const [lehrplaetzeLaden, setLehrplaetzeLaden] = useState(true);
+    const [lehrplaetzeFehler, setLehrplaetzeFehler] = useState(null);
+    const [gruppierung, setGruppierung] = useState('beruf');
 
     useEffect(() => {
         client.get('/management/dashboard')
             .then(r => setData(r.data))
             .catch(e => setFehler(e.response?.data?.error || 'Fehler beim Laden'))
             .finally(() => setLaden(false));
+        client.get('/management/lehrplaetze')
+            .then(r => setLehrplaetze(r.data))
+            .catch(e => setLehrplaetzeFehler(e.response?.data?.error || 'Fehler beim Laden'))
+            .finally(() => setLehrplaetzeLaden(false));
     }, []);
 
     if (laden) return <div style={{ color: '#6B6860', fontSize: 13, padding: '2rem' }}>Laden…</div>;
@@ -128,6 +144,9 @@ export default function Auslastung() {
                 </button>
                 <button style={tabStyle(aktiveTab === 'rolle')} onClick={() => setAktiveTab('rolle')}>
                     Nach Rolle
+                </button>
+                <button style={tabStyle(aktiveTab === 'lehrplaetze')} onClick={() => setAktiveTab('lehrplaetze')}>
+                    Lehrplätze
                 </button>
             </div>
 
@@ -287,6 +306,80 @@ export default function Auslastung() {
                     </div>
                 </div>
             )}
+
+            {/* Tab: Lehrplätze */}
+            {aktiveTab === 'lehrplaetze' && (() => {
+                if (lehrplaetzeLaden) return <div style={{ color: '#6B6860', fontSize: 13, padding: '1rem 0' }}>Laden…</div>;
+                if (lehrplaetzeFehler) return <div style={{ color: '#B91C1C', fontSize: 13, padding: '1rem 0' }}>⚠ {lehrplaetzeFehler}</div>;
+
+                const gruppen = {};
+                lehrplaetze.forEach(r => {
+                    const key = gruppierung === 'beruf' ? r.beruf : (r.standort_kuerzel || r.standort_name);
+                    if (!gruppen[key]) gruppen[key] = [];
+                    gruppen[key].push(r);
+                });
+
+                return (
+                    <div>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: '1rem' }}>
+                            <span style={{ fontSize: 11.5, color: '#6B6860', alignSelf: 'center', marginRight: 4 }}>Gruppieren nach</span>
+                            <button style={tabStyle(gruppierung === 'beruf')} onClick={() => setGruppierung('beruf')}>Beruf</button>
+                            <button style={tabStyle(gruppierung === 'standort')} onClick={() => setGruppierung('standort')}>Standort</button>
+                        </div>
+
+                        {lehrplaetze.length === 0 ? (
+                            <div style={{ color: '#A09D97', fontSize: 12.5, padding: '1rem 0' }}>Keine aktiven Lehrberufe erfasst.</div>
+                        ) : (
+                            <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                                    <thead>
+                                        <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
+                                            <TH>Beruf</TH>
+                                            <TH>Standort</TH>
+                                            <TH right>Bewilligt</TH>
+                                            <TH right>Total</TH>
+                                            <TH right>Belegt intern</TH>
+                                            <TH right>Extern</TH>
+                                            <TH right>Reserviert</TH>
+                                            <TH right>Frei aktuell</TH>
+                                            <TH right>Frei werdend</TH>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {Object.entries(gruppen).map(([key, zeilen]) => (
+                                            [
+                                                <tr key={`hdr-${key}`} style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.07)', borderTop: '1px solid rgba(0,0,0,.07)' }}>
+                                                    <td colSpan={9} style={{ padding: '6px 12px', fontSize: 10.5, fontWeight: 700, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                                                        {gruppierung === 'beruf' ? key : `Standort ${key}`}
+                                                    </td>
+                                                </tr>,
+                                                ...zeilen.map((r, i) => (
+                                                    <tr key={`${key}-${i}`} style={{ borderBottom: '1px solid rgba(0,0,0,.05)' }}>
+                                                        <td style={{ padding: '9px 12px', fontWeight: 500 }}>{r.beruf}</td>
+                                                        <td style={{ padding: '9px 12px' }}>{r.standort_kuerzel || r.standort_name}</td>
+                                                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{r.bewilligte_plaetze}</td>
+                                                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', color: '#6B6860' }}>{r.total_plaetze}</td>
+                                                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{r.belegt_intern}</td>
+                                                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{r.belegt_extern}</td>
+                                                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', color: '#6B6860' }}>{r.reserviert}</td>
+                                                        <td style={{ padding: '9px 12px', textAlign: 'right' }}>
+                                                            <span style={{
+                                                                fontFamily: 'monospace', fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                                                                color: freiFarbe(r.frei_aktuell), background: freiBg(r.frei_aktuell),
+                                                            }}>{r.frei_aktuell}</span>
+                                                        </td>
+                                                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', color: '#6B6860' }}>{r.frei_werdend}</td>
+                                                    </tr>
+                                                )),
+                                            ]
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
         </div>
     );
 }

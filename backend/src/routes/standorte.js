@@ -81,4 +81,50 @@ router.put('/:id', auth, async (req, res) => {
     }
 });
 
+const LEHRBERUFE = ['Informatik', 'Kaufmann/frau', 'Kundendialog', 'Logistik'];
+
+// GET /api/standorte/:id/lehrberufe — Alle 4 Lehrberufe mit Status für diesen Standort
+router.get('/:id/lehrberufe', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT beruf, aktiv, bewilligte_plaetze, total_plaetze
+             FROM standort_lehrberuf WHERE standort_id = $1`,
+            [req.params.id]
+        );
+        const byBeruf = {};
+        for (const row of result.rows) byBeruf[row.beruf] = row;
+        res.json(LEHRBERUFE.map(beruf => byBeruf[beruf] || {
+            beruf, aktiv: false, bewilligte_plaetze: 0, total_plaetze: 0,
+        }));
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der Lehrberufe' });
+    }
+});
+
+// PUT /api/standorte/:id/lehrberufe/:beruf — Lehrberuf-Status für diesen Standort speichern
+router.put('/:id/lehrberufe/:beruf', auth, async (req, res) => {
+    if (!['leitungsteam', 'admin'].includes(req.user.system_rolle)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+    if (!LEHRBERUFE.includes(req.params.beruf)) {
+        return res.status(400).json({ error: 'Unbekannter Lehrberuf' });
+    }
+    const { aktiv, bewilligte_plaetze, total_plaetze } = req.body;
+    try {
+        const result = await db.query(
+            `INSERT INTO standort_lehrberuf (standort_id, beruf, aktiv, bewilligte_plaetze, total_plaetze, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())
+             ON CONFLICT (standort_id, beruf) DO UPDATE SET
+                aktiv = $3, bewilligte_plaetze = $4, total_plaetze = $5, updated_at = NOW()
+             RETURNING beruf, aktiv, bewilligte_plaetze, total_plaetze`,
+            [req.params.id, req.params.beruf, aktiv === true, parseInt(bewilligte_plaetze) || 0, parseInt(total_plaetze) || 0]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern des Lehrberufs' });
+    }
+});
+
 module.exports = router;

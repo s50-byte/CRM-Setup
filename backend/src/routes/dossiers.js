@@ -565,7 +565,11 @@ router.put('/:id/felder', auth, async (req, res) => {
     const erlaubteFelder = [
         'zuweisende_person_id', 'abteilung', 'arbeitgeber_id',
         'ausbildung_beruf', 'ausbildung_abschluss', 'ausbildung_fachrichtung', 'ausbildung_lehrjahr',
+        'taggeld_abrechnung',
     ];
+    if ('taggeld_abrechnung' in req.body && ![null, undefined, '', 'intern', 'extern'].includes(req.body.taggeld_abrechnung)) {
+        return res.status(400).json({ error: "taggeld_abrechnung muss 'intern' oder 'extern' sein" });
+    }
     const sets = [];
     const params = [];
     let p = 1;

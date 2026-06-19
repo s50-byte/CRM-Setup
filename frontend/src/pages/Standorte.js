@@ -1,8 +1,85 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import client from '../api/client';
 import Modal from '../components/Modal';
 import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } from '../components/FormField';
 import { useAuth } from '../context/AuthContext';
+
+function LehrberufeAbschnitt({ standortId }) {
+    const [berufe, setBerufe] = useState([]);
+    const [laden, setLaden] = useState(true);
+    const [speichernBeruf, setSpeichernBeruf] = useState(null);
+
+    const ladeBerufe = useCallback(() => {
+        client.get(`/standorte/${standortId}/lehrberufe`)
+            .then(r => setBerufe(r.data))
+            .catch(console.error)
+            .finally(() => setLaden(false));
+    }, [standortId]);
+
+    useEffect(() => { ladeBerufe(); }, [ladeBerufe]);
+
+    async function speichern(beruf, felder) {
+        setSpeichernBeruf(beruf);
+        const aktuell = berufe.find(b => b.beruf === beruf);
+        try {
+            const r = await client.put(`/standorte/${standortId}/lehrberufe/${encodeURIComponent(beruf)}`, {
+                aktiv: aktuell.aktiv, bewilligte_plaetze: aktuell.bewilligte_plaetze, total_plaetze: aktuell.total_plaetze,
+                ...felder,
+            });
+            setBerufe(prev => prev.map(b => b.beruf === beruf ? r.data : b));
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setSpeichernBeruf(null);
+        }
+    }
+
+    function setFeld(beruf, feld, value) {
+        setBerufe(prev => prev.map(b => b.beruf === beruf ? { ...b, [feld]: value } : b));
+    }
+
+    if (laden) return null;
+
+    return (
+        <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid rgba(0,0,0,.06)' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Lehrberufe</div>
+            {berufe.map(b => (
+                <div key={b.beruf} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
+                    <div
+                        onClick={() => speichern(b.beruf, { aktiv: !b.aktiv })}
+                        style={{
+                            width: 30, height: 17, borderRadius: 10, position: 'relative', cursor: 'pointer', flexShrink: 0,
+                            background: b.aktiv ? '#2563EB' : '#D1D5DB', transition: 'background .15s',
+                        }}
+                    >
+                        <div style={{
+                            position: 'absolute', top: 2, left: b.aktiv ? 15 : 2,
+                            width: 13, height: 13, borderRadius: '50%', background: '#fff',
+                            boxShadow: '0 1px 2px rgba(0,0,0,.2)', transition: 'left .15s',
+                        }} />
+                    </div>
+                    <span style={{ fontSize: 12, flex: 1, color: b.aktiv ? '#1A1917' : '#A09D97', minWidth: 0 }}>{b.beruf}</span>
+                    <input
+                        type="number" min="0" value={b.bewilligte_plaetze}
+                        onChange={e => setFeld(b.beruf, 'bewilligte_plaetze', parseInt(e.target.value) || 0)}
+                        onBlur={() => speichern(b.beruf, { bewilligte_plaetze: b.bewilligte_plaetze })}
+                        title="Bewilligte Plätze"
+                        style={{ width: 44, fontSize: 11.5, padding: '3px 5px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 4, fontFamily: 'inherit', textAlign: 'right' }}
+                    />
+                    <span style={{ fontSize: 10.5, color: '#A09D97' }}>/</span>
+                    <input
+                        type="number" min="0" value={b.total_plaetze}
+                        onChange={e => setFeld(b.beruf, 'total_plaetze', parseInt(e.target.value) || 0)}
+                        onBlur={() => speichern(b.beruf, { total_plaetze: b.total_plaetze })}
+                        title="Total Plätze (geplant)"
+                        style={{ width: 44, fontSize: 11.5, padding: '3px 5px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 4, fontFamily: 'inherit', textAlign: 'right' }}
+                    />
+                    {speichernBeruf === b.beruf && <span style={{ fontSize: 10, color: '#A09D97' }}>…</span>}
+                </div>
+            ))}
+        </div>
+    );
+}
 
 export default function Standorte() {
     const { benutzer } = useAuth();
@@ -12,6 +89,7 @@ export default function Standorte() {
     const [form, setForm] = useState({ name: '', kuerzel: '', adresse: '', plz: '', ort: '', telefon: '', email: '' });
     const [fehler, setFehler] = useState('');
     const istManagement = benutzer?.system_rolle === 'management';
+    const istManagementModus = ['leitungsteam', 'admin'].includes(benutzer?.system_rolle);
 
     useEffect(() => {
         laden && client.get('/standorte')
@@ -122,6 +200,7 @@ export default function Standorte() {
                                 )}
                             </div>
                         )}
+                        {istManagementModus && <LehrberufeAbschnitt standortId={s.standort_id} />}
                     </div>
                 ))}
             </div>
