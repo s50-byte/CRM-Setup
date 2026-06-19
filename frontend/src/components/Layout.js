@@ -85,7 +85,7 @@ function MgmtToggle({ aktiv, onToggle }) {
 }
 
 function istManagementPfad(pathname) {
-    return pathname.startsWith('/management') || pathname === '/gantt';
+    return pathname.startsWith('/management') || pathname === '/gantt' || pathname === '/standorte';
 }
 
 export default function Layout() {
