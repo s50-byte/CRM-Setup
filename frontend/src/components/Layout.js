@@ -35,7 +35,7 @@ const NAV = [
     { path: '/meine',     label: 'Meine Klienten',    icon: '♥' },
     { path: '/termine',   label: 'Kliententermine',    icon: '📅' },
     { section: 'Operativ' },
-    { path: '/intake',    label: 'Intake',             icon: '⋮' },
+    { path: '/intake',    label: 'Intake',             icon: '🔽' },
     { path: '/dossiers',  label: 'Klientendossiers',   icon: '📁' },
     { path: '/klientenbesprechung', label: 'Klientenbesprechung', icon: '💬' },
     { path: '/praesenz',  label: 'Präsenzkontrolle',   icon: '✓' },
