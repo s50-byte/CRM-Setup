@@ -8,28 +8,35 @@ const STATUS_LABELS = {
     backlog:       'Backlog',
 };
 
-const STATUS_FARBEN = {
-    offen:         { bg: '#F5F4F0', color: '#6B6860' },
-    implementiert: { bg: '#F0FDF4', color: '#15803D' },
-    out_of_scope:  { bg: '#FFF7ED', color: '#C2410C' },
-    backlog:       { bg: '#EEF3FE', color: '#1D4ED8' },
-};
+const GRUPPEN = [
+    {
+        key: 'backlog',
+        label: 'Backlog',
+        match: s => !s || s === 'offen' || s === 'backlog',
+        badgeBg: '#EEF3FE',
+        badgeColor: '#1D4ED8',
+    },
+    {
+        key: 'implementiert',
+        label: 'Implementiert',
+        match: s => s === 'implementiert',
+        badgeBg: '#F0FDF4',
+        badgeColor: '#15803D',
+    },
+    {
+        key: 'out_of_scope',
+        label: 'Out of Scope',
+        match: s => s === 'out_of_scope',
+        badgeBg: '#FFF7ED',
+        badgeColor: '#C2410C',
+    },
+];
 
-const TH = ({ children, right }) => (
-    <th style={{ textAlign: right ? 'right' : 'left', padding: '7px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap', background: '#F5F4F0' }}>
+const TH = ({ children }) => (
+    <th style={{ textAlign: 'left', padding: '7px 12px', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap', background: '#F5F4F0' }}>
         {children}
     </th>
 );
-
-function StatusBadge({ status }) {
-    const s = status || 'offen';
-    const f = STATUS_FARBEN[s] || STATUS_FARBEN.offen;
-    return (
-        <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 10, background: f.bg, color: f.color, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-            {STATUS_LABELS[s] || s}
-        </span>
-    );
-}
 
 function fmtDatum(d) {
     const dt = new Date(d);
@@ -55,7 +62,7 @@ export default function Feedback() {
     const [laden, setLaden] = useState(true);
     const [filterBenutzer, setFilterBenutzer] = useState('Alle');
     const [filterScreen, setFilterScreen] = useState('Alle');
-    const [filterStatus, setFilterStatus] = useState('Alle');
+    const [aufgeklappt, setAufgeklappt] = useState({ backlog: true, implementiert: true, out_of_scope: false });
     const [antModal, setAntModal] = useState(ANT_INIT);
 
     const laden_daten = useCallback(async () => {
@@ -78,8 +85,7 @@ export default function Feedback() {
     const gefiltert = feedbacks.filter(f => {
         const benutzer_ok = filterBenutzer === 'Alle' || f.full_name === filterBenutzer;
         const screen_ok = filterScreen === 'Alle' || f.screen === filterScreen;
-        const status_ok = filterStatus === 'Alle' || (f.status || 'offen') === filterStatus;
-        return benutzer_ok && screen_ok && status_ok;
+        return benutzer_ok && screen_ok;
     });
 
     function exportCsv() {
@@ -153,82 +159,106 @@ export default function Feedback() {
                         {screenListe.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <label style={{ fontSize: 11.5, fontWeight: 500, color: '#6B6860' }}>Status</label>
-                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
-                        <option value="Alle">Alle</option>
-                        {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                </div>
             </div>
 
             {laden ? (
                 <div style={{ color: '#6B6860', fontSize: 13, padding: '2rem' }}>Laden…</div>
             ) : (
-                <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                        <thead>
-                            <tr style={{ borderBottom: '1px solid rgba(0,0,0,.09)' }}>
-                                <TH>Datum/Zeit</TH>
-                                <TH>Benutzer</TH>
-                                <TH>Screen</TH>
-                                <TH>Notiz</TH>
-                                <TH>Status</TH>
-                                <TH>Antwort</TH>
-                                <TH right></TH>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {gefiltert.length === 0 && (
-                                <tr>
-                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#A09D97', fontSize: 12 }}>
-                                        Keine Feedback-Einträge gefunden
-                                    </td>
-                                </tr>
-                            )}
-                            {gefiltert.map(f => (
-                                <tr key={f.feedback_id} style={{ borderBottom: '1px solid rgba(0,0,0,.05)' }}>
-                                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: '#6B6860' }}>{fmtDatum(f.created_at)}</td>
-                                    <td style={{ padding: '9px 12px' }}>
-                                        <div style={{ fontWeight: 500, color: '#1A1917' }}>{f.full_name || '—'}</div>
-                                        {f.email && <div style={{ fontSize: 11, color: '#6B6860' }}>{f.email}</div>}
-                                    </td>
-                                    <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontSize: 11.5, color: '#1D4ED8' }}>{f.screen || '—'}</td>
-                                    <td style={{ padding: '9px 12px', color: '#1A1917', maxWidth: 280 }}>
-                                        <span title={f.notiz}>{f.notiz.length > 80 ? f.notiz.slice(0, 80) + '…' : f.notiz}</span>
-                                    </td>
-                                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
-                                        <StatusBadge status={f.status} />
-                                    </td>
-                                    <td style={{ padding: '9px 12px', color: '#6B6860', maxWidth: 220, fontSize: 12 }}>
-                                        {f.antwort
-                                            ? <span title={f.antwort}>{f.antwort.length > 60 ? f.antwort.slice(0, 60) + '…' : f.antwort}</span>
-                                            : <span style={{ color: '#A09D97' }}>—</span>
-                                        }
-                                    </td>
-                                    <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                        <button
-                                            onClick={() => setAntModal({
-                                                open: true, feedback: f,
-                                                status: f.status && f.status !== 'offen' ? f.status : 'implementiert',
-                                                antwort: f.antwort || '',
-                                                laden: false, fehler: '',
-                                            })}
-                                            style={{
-                                                padding: '4px 10px', fontSize: 12, cursor: 'pointer',
-                                                border: '1px solid rgba(0,0,0,.12)', borderRadius: 5,
-                                                background: (!f.status || f.status === 'offen') ? '#2563EB' : '#fff',
-                                                color: (!f.status || f.status === 'offen') ? '#fff' : '#1A1917',
-                                                fontFamily: 'inherit',
-                                            }}
-                                        >
-                                            {(!f.status || f.status === 'offen') ? 'Beantworten' : 'Bearbeiten'}
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {GRUPPEN.map(gruppe => {
+                        const eintraege = gefiltert
+                            .filter(f => gruppe.match(f.status))
+                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                        const istOffen = aufgeklappt[gruppe.key];
+
+                        return (
+                            <div key={gruppe.key} style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
+                                <div
+                                    onClick={() => setAufgeklappt(prev => ({ ...prev, [gruppe.key]: !prev[gruppe.key] }))}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 10, padding: '.75rem 1rem',
+                                        cursor: 'pointer', background: istOffen ? '#fff' : '#FAFAF9',
+                                        borderBottom: istOffen ? '1px solid rgba(0,0,0,.08)' : 'none',
+                                        userSelect: 'none',
+                                    }}
+                                >
+                                    <span style={{ fontSize: 10, color: '#6B6860', fontFamily: 'monospace', lineHeight: 1 }}>
+                                        {istOffen ? '▼' : '▶'}
+                                    </span>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1917' }}>{gruppe.label}</span>
+                                    <span style={{
+                                        fontSize: 10.5, fontWeight: 700, padding: '1px 8px', borderRadius: 10,
+                                        background: gruppe.badgeBg, color: gruppe.badgeColor,
+                                        minWidth: 22, textAlign: 'center',
+                                    }}>
+                                        {eintraege.length}
+                                    </span>
+                                </div>
+
+                                {istOffen && (
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '1px solid rgba(0,0,0,.07)' }}>
+                                                <TH>Datum</TH>
+                                                <TH>Benutzer</TH>
+                                                <TH>Screen</TH>
+                                                <TH>Feedback</TH>
+                                                <TH>Antwort</TH>
+                                                <TH />
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {eintraege.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={6} style={{ padding: '1.5rem', textAlign: 'center', color: '#A09D97', fontSize: 12 }}>
+                                                        Keine Einträge in dieser Gruppe
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {eintraege.map(f => (
+                                                <tr key={f.feedback_id} style={{ borderBottom: '1px solid rgba(0,0,0,.05)' }}>
+                                                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: '#6B6860' }}>{fmtDatum(f.created_at)}</td>
+                                                    <td style={{ padding: '9px 12px' }}>
+                                                        <div style={{ fontWeight: 500, color: '#1A1917' }}>{f.full_name || '—'}</div>
+                                                        {f.email && <div style={{ fontSize: 11, color: '#6B6860' }}>{f.email}</div>}
+                                                    </td>
+                                                    <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontSize: 11.5, color: '#1D4ED8' }}>{f.screen || '—'}</td>
+                                                    <td style={{ padding: '9px 12px', color: '#1A1917', maxWidth: 280 }}>
+                                                        <span title={f.notiz}>{f.notiz.length > 80 ? f.notiz.slice(0, 80) + '…' : f.notiz}</span>
+                                                    </td>
+                                                    <td style={{ padding: '9px 12px', color: '#6B6860', maxWidth: 220, fontSize: 12 }}>
+                                                        {f.antwort
+                                                            ? <span title={f.antwort}>{f.antwort.length > 60 ? f.antwort.slice(0, 60) + '…' : f.antwort}</span>
+                                                            : <span style={{ color: '#A09D97' }}>—</span>
+                                                        }
+                                                    </td>
+                                                    <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                        <button
+                                                            onClick={() => setAntModal({
+                                                                open: true, feedback: f,
+                                                                status: f.status && f.status !== 'offen' ? f.status : 'implementiert',
+                                                                antwort: f.antwort || '',
+                                                                laden: false, fehler: '',
+                                                            })}
+                                                            style={{
+                                                                padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+                                                                border: '1px solid rgba(0,0,0,.12)', borderRadius: 5,
+                                                                background: (!f.status || f.status === 'offen') ? '#2563EB' : '#fff',
+                                                                color: (!f.status || f.status === 'offen') ? '#fff' : '#1A1917',
+                                                                fontFamily: 'inherit',
+                                                            }}
+                                                        >
+                                                            {(!f.status || f.status === 'offen') ? 'Beantworten' : 'Bearbeiten'}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
@@ -239,7 +269,6 @@ export default function Feedback() {
                         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Feedback beantworten</div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            {/* Original-Feedback (readonly) */}
                             <div>
                                 <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>
                                     Feedback von {antModal.feedback?.full_name}
@@ -252,7 +281,6 @@ export default function Feedback() {
                                 )}
                             </div>
 
-                            {/* Status */}
                             <div>
                                 <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>
                                     Status
@@ -268,7 +296,6 @@ export default function Feedback() {
                                 </select>
                             </div>
 
-                            {/* Antwort */}
                             <div>
                                 <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>
                                     Antwort <span style={{ color: '#B91C1C' }}>*</span>
