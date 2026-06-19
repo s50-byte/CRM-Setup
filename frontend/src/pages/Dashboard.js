@@ -24,7 +24,7 @@ const STATUS_LABELS = {
     'feiertag': 'Feiertag', 'unfall': 'Unfall',
 };
 
-function MeldungKarte({ m, onAcknowledge, onTerminClick }) {
+function MeldungKarte({ m, onAcknowledge, onTerminClick, abgesagteTerminIds }) {
     const sl = s => STATUS_LABELS[s] || s || '—';
     return (
         <div style={{
@@ -70,18 +70,18 @@ function MeldungKarte({ m, onAcknowledge, onTerminClick }) {
                         );
                     }
                     if (a.typ === 'termin_einladung') {
+                        const abgesagt = abgesagteTerminIds?.has(a.termin_id);
                         return (
                             <div
                                 key={i}
-                                onClick={a.termin_id && onTerminClick ? () => onTerminClick(a.termin_id) : undefined}
-                                style={{ marginTop: 3, cursor: a.termin_id && onTerminClick ? 'pointer' : 'default' }}
+                                onClick={!abgesagt && a.termin_id && onTerminClick ? () => onTerminClick(a.termin_id) : undefined}
+                                style={{ marginTop: 3, cursor: !abgesagt && a.termin_id && onTerminClick ? 'pointer' : 'default', opacity: abgesagt ? 0.65 : 1 }}
                             >
-                                <div style={{ fontSize: 12, fontWeight: 600, color: a.termin_id && onTerminClick ? '#2563EB' : '#1A1917', textDecorationLine: a.termin_id && onTerminClick ? 'underline' : 'none', textDecorationColor: 'rgba(37,99,235,.3)' }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: abgesagt ? '#A09D97' : (a.termin_id && onTerminClick ? '#2563EB' : '#1A1917'), textDecorationLine: abgesagt ? 'line-through' : (a.termin_id && onTerminClick ? 'underline' : 'none'), textDecorationColor: 'rgba(37,99,235,.3)' }}>
                                     Neuer Termin: {a.termin_typ} am {new Date(a.datum).toLocaleDateString('de-CH')}
                                 </div>
-                                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>
-                                    Klient: {a.klient_name}
-                                </div>
+                                {abgesagt && <div style={{ fontSize: 10.5, color: '#B91C1C', marginTop: 1 }}>Termin wurde abgesagt</div>}
+                                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Klient: {a.klient_name}</div>
                             </div>
                         );
                     }
@@ -185,6 +185,13 @@ export default function Dashboard() {
         }
     }
 
+    const abgesagteTerminIds = new Set(
+        [...meldungen, ...fruehereMeldungen]
+            .flatMap(m => m.aenderungen || [])
+            .filter(a => a.typ === 'termin_absage' && a.termin_id)
+            .map(a => a.termin_id)
+    );
+
     const offeneTasks = tasks.filter(t => !t.erledigt);
     const heute = new Date().toISOString().slice(0, 10);
     const heuteTermine = termine.filter(t => t.datum === heute);
@@ -247,7 +254,7 @@ export default function Dashboard() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {meldungen.map(m => (
-                                <MeldungKarte key={m.meldung_id} m={m} onAcknowledge={acknowledge} onTerminClick={ladeTerminDetail} />
+                                <MeldungKarte key={m.meldung_id} m={m} onAcknowledge={acknowledge} onTerminClick={ladeTerminDetail} abgesagteTerminIds={abgesagteTerminIds} />
                             ))}
                         </div>
                     )}
@@ -279,7 +286,7 @@ export default function Dashboard() {
                         {frueherOffen && (
                             <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '520px', overflowY: 'auto' }}>
                                 {fruehereMeldungen.map(m => (
-                                    <MeldungKarte key={m.meldung_id} m={m} onTerminClick={ladeTerminDetail} />
+                                    <MeldungKarte key={m.meldung_id} m={m} onTerminClick={ladeTerminDetail} abgesagteTerminIds={abgesagteTerminIds} />
                                 ))}
                             </div>
                         )}

@@ -165,6 +165,7 @@ export default function DossierDetail() {
     const [verfuegungModal, setVerfuegungModal] = useState(false);
     const [gewaehlteVerfuegung, setGewaehlteVerfuegung] = useState(null);
     const [abgeschlosseneOffen, setAbgeschlosseneOffen] = useState(false);
+    const [vergangeneOffen, setVergangeneOffen] = useState(false);
 
     useEffect(() => {
         async function load() {
@@ -863,32 +864,53 @@ export default function DossierDetail() {
                             <span style={SECTION_HDR}>Termine</span>
                             <button onClick={() => setTerminModal(true)} style={{ fontSize: 11, padding: '3px 9px', cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5, background: '#fff', fontFamily: 'inherit', color: '#2563EB', fontWeight: 500 }}>+ Termin</button>
                         </div>
-                        {termine.length === 0 ? (
-                            <div style={{ fontSize: 12, color: '#6B6860' }}>Keine Termine</div>
-                        ) : termine.map(t => (
-                            <div
-                                key={t.termin_id}
-                                onClick={() => setDetailTermin(t)}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 7px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5, cursor: 'pointer' }}
-                                onMouseEnter={e => e.currentTarget.style.background = '#EEF3FE'}
-                                onMouseLeave={e => e.currentTarget.style.background = '#F5F4F0'}
-                            >
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 12, fontWeight: 500 }}>{t.typ}</div>
-                                    <div style={{ fontSize: 11, color: '#6B6860' }}>
-                                        {fmt(t.datum)}{t.zeit ? ` · ${t.zeit.slice(0, 5)}` : ''}
+                        {(() => {
+                            const heute = new Date().toISOString().slice(0, 10);
+                            const kommende = termine.filter(t => t.datum >= heute && t.status !== 'Abgesagt');
+                            const vergangene = termine.filter(t => t.datum < heute || t.status === 'Abgesagt');
+                            const renderTermin = t => (
+                                <div
+                                    key={t.termin_id}
+                                    onClick={() => setDetailTermin(t)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 7px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5, cursor: 'pointer' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#EEF3FE'}
+                                    onMouseLeave={e => e.currentTarget.style.background = '#F5F4F0'}
+                                >
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 500 }}>{t.typ}</div>
+                                        <div style={{ fontSize: 11, color: '#6B6860' }}>
+                                            {fmt(t.datum)}{t.zeit ? ` · ${t.zeit.slice(0, 5)}` : ''}
+                                        </div>
                                     </div>
+                                    {t.status && (() => {
+                                        const s = STATUS_STYLE[t.status] || { bg: '#F5F4F0', color: '#6B6860', border: 'rgba(0,0,0,.09)' };
+                                        return <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, fontFamily: 'monospace', background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>{t.status}</span>;
+                                    })()}
                                 </div>
-                                {t.status && (
-                                    <span style={{
-                                        fontSize: 10, padding: '2px 6px', borderRadius: 10, fontFamily: 'monospace',
-                                        background: t.status === 'erledigt' ? '#ECFDF5' : '#F5F4F0',
-                                        color: t.status === 'erledigt' ? '#15803D' : '#6B6860',
-                                        border: t.status === 'erledigt' ? '1px solid rgba(22,163,74,.15)' : '1px solid rgba(0,0,0,.09)',
-                                    }}>{t.status}</span>
-                                )}
-                            </div>
-                        ))}
+                            );
+                            if (termine.length === 0) return <div style={{ fontSize: 12, color: '#6B6860' }}>Keine Termine</div>;
+                            return (
+                                <>
+                                    {kommende.length === 0
+                                        ? <div style={{ fontSize: 12, color: '#6B6860', marginBottom: vergangene.length > 0 ? 8 : 0 }}>Keine kommenden Termine</div>
+                                        : kommende.map(renderTermin)
+                                    }
+                                    {vergangene.length > 0 && (
+                                        <div style={{ marginTop: kommende.length > 0 ? 6 : 0 }}>
+                                            <button onClick={() => setVergangeneOffen(o => !o)} style={{
+                                                width: '100%', textAlign: 'left', fontSize: 11, color: '#6B6860',
+                                                background: 'none', border: 'none', cursor: 'pointer', padding: '3px 0',
+                                                display: 'flex', justifyContent: 'space-between', fontFamily: 'inherit'
+                                            }}>
+                                                <span>Vergangene &amp; Abgesagte ({vergangene.length})</span>
+                                                <span>{vergangeneOffen ? '▴' : '▾'}</span>
+                                            </button>
+                                            {vergangeneOffen && <div style={{ marginTop: 5 }}>{vergangene.map(renderTermin)}</div>}
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
 
                     {/* Verfügungen */}

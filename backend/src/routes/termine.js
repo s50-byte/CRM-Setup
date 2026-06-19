@@ -93,29 +93,25 @@ router.post('/', auth, async (req, res) => {
                     `INSERT INTO termin_user (termin_id, user_id) VALUES ($1, $2)`,
                     [termin_id, user_id]
                 );
-                if (user_id !== req.user.user_id) {
-                    try {
-                        await dbClient.query(
-                            `INSERT INTO dashboard_meldung (empfaenger_id, datum, aenderungen, erstellt_von)
-                             VALUES ($1, CURRENT_DATE, $2::jsonb, $3)`,
-                            [
-                                user_id,
-                                JSON.stringify([{
-                                    typ: 'termin_einladung',
-                                    termin_id: termin_id,
-                                    termin_typ: typ,
-                                    datum: datum,
-                                    klient_name: klient_name,
-                                }]),
-                                req.user.user_id,
-                            ]
-                        );
-                        console.log('dashboard_meldung erstellt für user_id:', user_id);
-                    } catch (meldungErr) {
-                        console.error('Fehler beim Erstellen der dashboard_meldung für user_id:', user_id, meldungErr);
-                    }
-                } else {
-                    console.log('Kein Meldung für Ersteller selbst (user_id:', user_id, ')');
+                try {
+                    await dbClient.query(
+                        `INSERT INTO dashboard_meldung (empfaenger_id, datum, aenderungen, erstellt_von)
+                         VALUES ($1, CURRENT_DATE, $2::jsonb, $3)`,
+                        [
+                            user_id,
+                            JSON.stringify([{
+                                typ: 'termin_einladung',
+                                termin_id: termin_id,
+                                termin_typ: typ,
+                                datum: datum,
+                                klient_name: klient_name,
+                            }]),
+                            req.user.user_id,
+                        ]
+                    );
+                    console.log('dashboard_meldung erstellt für user_id:', user_id);
+                } catch (meldungErr) {
+                    console.error('Fehler beim Erstellen der dashboard_meldung für user_id:', user_id, meldungErr);
                 }
             }
         } else {
