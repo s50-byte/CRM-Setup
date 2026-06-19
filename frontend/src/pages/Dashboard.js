@@ -152,6 +152,7 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const [tasks, setTasks] = useState([]);
     const [termine, setTermine] = useState([]);
+    const [meineTermine, setMeineTermine] = useState([]);
     const [dossiers, setDossiers] = useState([]);
     const [meldungen, setMeldungen] = useState([]);
     const [fruehereMeldungen, setFruehereMeldungen] = useState([]);
@@ -169,16 +170,17 @@ export default function Dashboard() {
     useEffect(() => {
         async function loadData() {
             try {
-                const [tasksRes, termineRes, dossiersRes, meldungenRes, frueherRes] = await Promise.all([
+                const [tasksRes, termineRes, meineTermineRes, dossiersRes, meldungenRes, frueherRes] = await Promise.all([
                     client.get('/tasks'),
                     client.get('/termine'),
+                    client.get('/termine?nur_teilnehmend=true'),
                     client.get('/dossiers?meine=true'),
                     client.get('/meldungen'),
                     client.get('/meldungen/alle?acknowledged=true'),
                 ]);
                 setTasks(tasksRes.data);
-                console.log('nächste termine:', termineRes.data);
                 setTermine(termineRes.data);
+                setMeineTermine(meineTermineRes.data);
                 setDossiers(dossiersRes.data);
                 setMeldungen(meldungenRes.data);
                 setFruehereMeldungen(frueherRes.data);
@@ -225,7 +227,7 @@ export default function Dashboard() {
     const offeneTasks = tasks.filter(t => !t.erledigt);
     const heute = new Date().toISOString().slice(0, 10);
     const heuteTermine = termine.filter(t => t.datum === heute);
-    const naechsteTermine = termine
+    const naechsteTermine = meineTermine
         .filter(t => t.datum >= heute && t.status !== 'Abgesagt')
         .sort((a, b) => a.datum.localeCompare(b.datum) || (a.zeit || '').localeCompare(b.zeit || ''));
     const baldAblaufend = dossiers.filter(d => {

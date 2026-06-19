@@ -5,10 +5,10 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-// GET /api/termine — Termine der eigenen Klienten (?klient_id=uuid für Filter)
+// GET /api/termine — Termine (?klient_id=uuid, ?nur_teilnehmend=true)
 router.get('/', auth, async (req, res) => {
     const klientFilter = req.query.klient_id || null;
-    console.log('GET /termine user_id:', req.user.user_id, 'klient_id:', klientFilter);
+    const nurTeilnehmend = req.query.nur_teilnehmend === 'true';
     try {
         const result = await db.query(
             `SELECT
@@ -29,26 +29,32 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN termin_user tu ON tu.termin_id = t.termin_id
              LEFT JOIN benutzer u ON u.user_id = tu.user_id
              WHERE ($1::uuid IS NULL OR t.klient_id = $1::uuid)
-               AND (
-                   $1::uuid IS NOT NULL
-                   OR EXISTS (
-                       SELECT 1 FROM dossier d
-                       JOIN klient_user ku ON ku.klient_id = d.klient_id
-                       WHERE d.klient_id = t.klient_id
-                         AND ku.user_id = $2
-                         AND ku.aktiv = TRUE
-                   )
-                   OR EXISTS (
+               AND CASE
+                   WHEN $3 THEN EXISTS (
                        SELECT 1 FROM termin_user tu2
                        WHERE tu2.termin_id = t.termin_id
                          AND tu2.user_id = $2
                    )
-               )
+                   ELSE (
+                       $1::uuid IS NOT NULL
+                       OR EXISTS (
+                           SELECT 1 FROM dossier d
+                           JOIN klient_user ku ON ku.klient_id = d.klient_id
+                           WHERE d.klient_id = t.klient_id
+                             AND ku.user_id = $2
+                             AND ku.aktiv = TRUE
+                       )
+                       OR EXISTS (
+                           SELECT 1 FROM termin_user tu2
+                           WHERE tu2.termin_id = t.termin_id
+                             AND tu2.user_id = $2
+                       )
+                   )
+               END
              GROUP BY t.termin_id, k.klient_id, k.nachname, k.vorname
              ORDER BY t.datum ASC, t.zeit ASC NULLS LAST`,
-            [klientFilter, req.user.user_id]
+            [klientFilter, req.user.user_id, nurTeilnehmend]
         );
-        console.log('GET /termine rows:', result.rows.length);
         res.json(result.rows);
     } catch (err) {
         console.error(err);
