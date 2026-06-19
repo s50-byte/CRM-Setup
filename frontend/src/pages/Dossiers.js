@@ -157,12 +157,13 @@ function DossierTabelle({ rows, sortField, sortDir, onSort, navigate, filterAkti
 export default function Dossiers() {
     const [dossiers, setDossiers] = useState([]);
     const [laden, setLaden] = useState(true);
-    const [suche, setSuche] = useState('');
+    const [filterKlient, setFilterKlient] = useState('');
     const [filterTyp, setFilterTyp] = useState('');
-    const [filterStandort, setFilterStandort] = useState('');
+    const [filterPhase, setFilterPhase] = useState('');
+    const [filterDatumVon, setFilterDatumVon] = useState('');
+    const [filterDatumBis, setFilterDatumBis] = useState('');
     const [filterPerson, setFilterPerson] = useState('');
-    const [filterStatus, setFilterStatus] = useState('');
-    const [filterLabel, setFilterLabel] = useState('');
+    const [filterStandort, setFilterStandort] = useState('');
     const [sortField, setSortField] = useState('');
     const [sortDir, setSortDir] = useState('asc');
     const [sortFieldInaktiv, setSortFieldInaktiv] = useState('');
@@ -188,27 +189,34 @@ export default function Dossiers() {
     };
 
     // Distinct-Listen aus geladenen Dossiers
+    const klientenListe = [...new Map(
+        dossiers.map(d => [d.klient_id, { klient_id: d.klient_id, name: `${d.nachname} ${d.vorname}` }])
+    ).values()].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    const phaseListe = [...new Set(dossiers.map(d => d.pipeline_status).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
     const standorte = [...new Set(dossiers.map(d => d.standort_kuerzel).filter(Boolean))].sort();
     const personenListe = [...new Map(
         dossiers.flatMap(d => d.zugewiesen || []).map(u => [u.user_id, u])
     ).values()].sort((a, b) => a.full_name.localeCompare(b.full_name, 'de'));
 
-    const filterAktiv = !!(suche || filterTyp || filterStandort || filterPerson || filterStatus || filterLabel);
+    const filterAktiv = !!(filterKlient || filterTyp || filterPhase || filterDatumVon || filterDatumBis || filterPerson || filterStandort);
 
     function resetFilter() {
-        setSuche(''); setFilterTyp(''); setFilterStandort('');
-        setFilterPerson(''); setFilterStatus(''); setFilterLabel('');
+        setFilterKlient(''); setFilterTyp(''); setFilterPhase('');
+        setFilterDatumVon(''); setFilterDatumBis('');
+        setFilterPerson(''); setFilterStandort('');
     }
 
     const gefiltert = dossiers.filter(d => {
-        const name = `${d.nachname} ${d.vorname}`.toLowerCase();
-        if (suche && !name.includes(suche.toLowerCase())) return false;
+        if (filterKlient && d.klient_id !== filterKlient) return false;
         if (filterTyp && d.programm_name !== filterTyp) return false;
-        if (filterStandort && d.standort_kuerzel !== filterStandort) return false;
+        if (filterPhase && d.pipeline_status !== filterPhase) return false;
+        if (filterDatumVon && (!d.laufend_start_datum || d.laufend_start_datum < filterDatumVon)) return false;
+        if (filterDatumBis) {
+            const enddatum = berechneEnddatum(d.laufend_start_datum, d.avg_dauer_tage);
+            if (!enddatum || enddatum.toISOString().slice(0, 10) > filterDatumBis) return false;
+        }
         if (filterPerson && !(d.zugewiesen || []).some(u => u.user_id === filterPerson)) return false;
-        if (filterStatus === 'Aktiv' && d.status === 'inaktiv') return false;
-        if (filterStatus === 'Inaktiv' && d.status !== 'inaktiv') return false;
-        if (filterLabel && d.klient_label !== filterLabel) return false;
+        if (filterStandort && d.standort_kuerzel !== filterStandort) return false;
         return true;
     });
 
@@ -240,37 +248,40 @@ export default function Dossiers() {
             }}>
                 <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', flexShrink: 0 }}>Filter</span>
 
-                <input type="text" value={suche} onChange={e => setSuche(e.target.value)}
-                    placeholder="Name suchen…"
-                    style={{ ...SEL, width: 140, background: '#fff', border: '1px solid rgba(0,0,0,.12)', outline: 'none' }}
-                />
+                <select value={filterKlient} onChange={e => setFilterKlient(e.target.value)} style={{ ...SEL, maxWidth: 170 }}>
+                    <option value="">Alle Klienten</option>
+                    {klientenListe.map(k => <option key={k.klient_id} value={k.klient_id}>{k.name}</option>)}
+                </select>
 
                 <select value={filterTyp} onChange={e => setFilterTyp(e.target.value)} style={SEL}>
                     <option value="">Alle Programme</option>
                     {Object.keys(FARBEN).map(t => <option key={t}>{t}</option>)}
                 </select>
 
-                <select value={filterStandort} onChange={e => setFilterStandort(e.target.value)} style={SEL}>
-                    <option value="">Alle Standorte</option>
-                    {standorte.map(s => <option key={s}>{s}</option>)}
+                <select value={filterPhase} onChange={e => setFilterPhase(e.target.value)} style={SEL}>
+                    <option value="">Alle Phasen</option>
+                    {phaseListe.map(p => <option key={p}>{p}</option>)}
                 </select>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Von</span>
+                    <input type="date" value={filterDatumVon} onChange={e => setFilterDatumVon(e.target.value)}
+                        style={{ ...SEL, width: 130 }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0 }}>Bis</span>
+                    <input type="date" value={filterDatumBis} onChange={e => setFilterDatumBis(e.target.value)}
+                        style={{ ...SEL, width: 130 }} />
+                </div>
 
                 <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} style={{ ...SEL, maxWidth: 160 }}>
                     <option value="">Alle Personen</option>
                     {personenListe.map(u => <option key={u.user_id} value={u.user_id}>{u.full_name}</option>)}
                 </select>
 
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={SEL}>
-                    <option value="">Alle Status</option>
-                    <option value="Aktiv">Aktiv</option>
-                    <option value="Inaktiv">Inaktiv</option>
-                </select>
-
-                <select value={filterLabel} onChange={e => setFilterLabel(e.target.value)} style={SEL}>
-                    <option value="">Alle Labels</option>
-                    <option value="LE">LE</option>
-                    <option value="TN">TN</option>
-                    <option value="MA">MA</option>
+                <select value={filterStandort} onChange={e => setFilterStandort(e.target.value)} style={SEL}>
+                    <option value="">Alle Standorte</option>
+                    {standorte.map(s => <option key={s}>{s}</option>)}
                 </select>
 
                 {filterAktiv && (
