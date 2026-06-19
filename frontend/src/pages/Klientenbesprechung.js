@@ -279,6 +279,7 @@ function DetailKarte({ klient, besprochen, onMarkiereBesprochen, onEntferneBespr
 // ── Haupt-Komponente
 export default function Klientenbesprechung() {
     const [klienten, setKlienten] = useState([]);
+    const [alleStandorte, setAlleStandorte] = useState([]);
     const [laden, setLaden] = useState(true);
     const [phase, setPhase] = useState('filter');
     const [besprechungKlienten, setBesprechungKlienten] = useState([]);
@@ -297,10 +298,13 @@ export default function Klientenbesprechung() {
     const [sichtbarN, setSichtbarN] = useState(5);
 
     useEffect(() => {
-        client.get('/klientenbesprechung')
-            .then(r => setKlienten(r.data))
-            .catch(console.error)
-            .finally(() => setLaden(false));
+        Promise.all([
+            client.get('/klientenbesprechung'),
+            client.get('/standorte'),
+        ]).then(([kb, st]) => {
+            setKlienten(kb.data);
+            setAlleStandorte(st.data);
+        }).catch(console.error).finally(() => setLaden(false));
     }, []);
 
     useEffect(() => {
@@ -316,10 +320,7 @@ export default function Klientenbesprechung() {
         return () => window.removeEventListener('resize', berechne);
     }, []);
 
-    // Dropdown-Optionen aus geladenen Daten ableiten
-    const standorte = [...new Map(
-        klienten.filter(k => k.standort_id).map(k => [k.standort_id, { id: k.standort_id, name: k.standort_name }])
-    ).values()].sort((a, b) => a.name.localeCompare(b.name));
+    // Dropdown-Optionen
 
     const abteilungen = [...new Set(klienten.map(k => k.abteilung).filter(Boolean))].sort();
     const gruppen = [...new Set(klienten.map(k => k.gruppe).filter(Boolean))].sort();
@@ -433,15 +434,13 @@ export default function Klientenbesprechung() {
                     boxShadow: '0 1px 3px rgba(0,0,0,.07)',
                     display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end',
                 }}>
-                    {standorte.length > 0 && (
-                        <div>
-                            <div style={{ fontSize: 10, fontWeight: 600, color: '#6B6860', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>Standort</div>
-                            <select value={selStandort} onChange={e => setSelStandort(e.target.value)} style={INPUT_S}>
-                                <option value="">Alle Standorte</option>
-                                {standorte.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-                            </select>
-                        </div>
-                    )}
+                    <div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: '#6B6860', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>Standort</div>
+                        <select value={selStandort} onChange={e => setSelStandort(e.target.value)} style={INPUT_S}>
+                            <option value="">Alle Standorte</option>
+                            {alleStandorte.map(s => <option key={s.standort_id} value={String(s.standort_id)}>{s.name}</option>)}
+                        </select>
+                    </div>
                     {abteilungen.length > 0 && (
                         <div>
                             <div style={{ fontSize: 10, fontWeight: 600, color: '#6B6860', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>Abteilung</div>
