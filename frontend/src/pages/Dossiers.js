@@ -226,11 +226,6 @@ export default function Dossiers() {
                     <div style={{ fontSize: 19, fontWeight: 600 }}>Klientendossiers</div>
                     <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>Alle Klientinnen und Klienten — eine Akte pro Klient</div>
                 </div>
-                <button onClick={() => setAnfrageModal(true)} style={{
-                    padding: '7px 14px', fontSize: 13, fontWeight: 500,
-                    cursor: 'pointer', border: 'none', borderRadius: 6,
-                    background: '#2563EB', color: '#fff', fontFamily: 'inherit'
-                }}>+ Neue Anfrage</button>
             </div>
 
             <div style={{
