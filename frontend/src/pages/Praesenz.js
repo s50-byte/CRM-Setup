@@ -340,23 +340,8 @@ export default function Praesenz() {
                         {new Date(datum + 'T12:00:00').toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <select value={selAbteilung} onChange={e => { setSelAbteilung(e.target.value); speichereFilter(e.target.value, selStandort); }} style={INPUT_S}>
-                        <option value="">Alle Abteilungen</option>
-                        {ABTEILUNGEN.map(a => <option key={a} value={a}>{a}</option>)}
-                    </select>
-                    {alleStandorte.length > 0 && (
-                        <select value={selStandort} onChange={e => { setSelStandort(e.target.value); speichereFilter(selAbteilung, e.target.value); }} style={INPUT_S}>
-                            <option value="">Alle Standorte</option>
-                            {alleStandorte.map(s => <option key={s.standort_id} value={String(s.standort_id)}>{s.name}</option>)}
-                        </select>
-                    )}
+                <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
                     <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={INPUT_S} />
-                    <button onClick={zeigeMeldungenStand} style={{
-                        padding: '7px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                        border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff',
-                        fontFamily: 'inherit', whiteSpace: 'nowrap'
-                    }}>Meldungen senden & Stand anzeigen</button>
                 </div>
             </div>
 
@@ -376,12 +361,31 @@ export default function Praesenz() {
             </div>
 
             {/* Tabs */}
-            <div style={{ borderBottom: '1px solid rgba(0,0,0,.09)', marginBottom: '1rem' }}>
-                <button style={tabBtn(aktTab === 'tag')} onClick={() => setAktTab('tag')}>Heutiger Tag</button>
-                <button style={tabBtn(aktTab === 'verlauf')} onClick={() => {
-                    setAktTab('verlauf');
-                    if (!verlaufGeladen) ladeVerlauf();
-                }}>Verlauf</button>
+            <div style={{ borderBottom: '1px solid rgba(0,0,0,.09)', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div>
+                    <button style={tabBtn(aktTab === 'tag')} onClick={() => setAktTab('tag')}>Heutiger Tag</button>
+                    <button style={tabBtn(aktTab === 'verlauf')} onClick={() => {
+                        setAktTab('verlauf');
+                        if (!verlaufGeladen) ladeVerlauf();
+                    }}>Verlauf</button>
+                </div>
+                <div style={{ display: 'flex', gap: 7, alignItems: 'center', paddingBottom: 6 }}>
+                    <select value={selAbteilung} onChange={e => { setSelAbteilung(e.target.value); speichereFilter(e.target.value, selStandort); }} style={INPUT_S}>
+                        <option value="">Alle Abteilungen</option>
+                        {ABTEILUNGEN.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                    {alleStandorte.length > 0 && (
+                        <select value={selStandort} onChange={e => { setSelStandort(e.target.value); speichereFilter(selAbteilung, e.target.value); }} style={INPUT_S}>
+                            <option value="">Alle Standorte</option>
+                            {alleStandorte.map(s => <option key={s.standort_id} value={String(s.standort_id)}>{s.name}</option>)}
+                        </select>
+                    )}
+                    <button onClick={zeigeMeldungenStand} style={{
+                        padding: '5px 12px', fontSize: 12.5, fontWeight: 500, cursor: 'pointer',
+                        border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff',
+                        fontFamily: 'inherit', whiteSpace: 'nowrap'
+                    }}>Meldung senden</button>
+                </div>
             </div>
 
             {/* === Tab: Heutiger Tag === */}
