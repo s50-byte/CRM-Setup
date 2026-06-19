@@ -5,7 +5,7 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
-// GET /api/termine — Alle Termine (?klient_id=uuid für Filter)
+// GET /api/termine — Termine der eigenen Klienten (?klient_id=uuid für Filter)
 router.get('/', auth, async (req, res) => {
     const klientFilter = req.query.klient_id || null;
     try {
@@ -28,9 +28,15 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN termin_user tu ON tu.termin_id = t.termin_id
              LEFT JOIN benutzer u ON u.user_id = tu.user_id
              WHERE ($1::uuid IS NULL OR t.klient_id = $1::uuid)
+               AND EXISTS (
+                   SELECT 1 FROM klient_user ku
+                   WHERE ku.klient_id = t.klient_id
+                     AND ku.user_id = $2
+                     AND ku.aktiv = TRUE
+               )
              GROUP BY t.termin_id, k.klient_id, k.nachname, k.vorname
              ORDER BY t.datum ASC, t.zeit ASC NULLS LAST`,
-            [klientFilter]
+            [klientFilter, req.user.user_id]
         );
         res.json(result.rows);
     } catch (err) {

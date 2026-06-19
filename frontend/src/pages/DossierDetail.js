@@ -8,6 +8,7 @@ import DossierFelderModal from '../components/DossierFelderModal';
 import FerienModal from '../components/FerienModal';
 import VerfuegungModal from '../components/VerfuegungModal';
 import JournalModal from '../components/JournalModal';
+import NeuerTerminModal from '../components/NeuerTerminModal';
 
 
 const LABEL_FARBEN = {
@@ -135,6 +136,7 @@ export default function DossierDetail() {
     const [externeModal, setExterneModal] = useState(false);
     const [felderModal, setFelderModal] = useState(false);
     const [ferienModal, setFerienModal] = useState(false);
+    const [terminModal, setTerminModal] = useState(false);
 
     // Programmhistorie
     const [verlaufOffen, setVerlaufOffen] = useState(false);
@@ -398,6 +400,11 @@ export default function DossierDetail() {
                                 cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
                                 background: '#fff', fontFamily: 'inherit', color: '#1A1917'
                             }}>Ferien erfassen</button>
+                            <button onClick={() => setTerminModal(true)} style={{
+                                padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
+                                cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
+                                background: '#fff', fontFamily: 'inherit', color: '#1A1917'
+                            }}>+ Termin erfassen</button>
                             <button onClick={() => navigate(`/klienten/${dossier.klient_id}`)} style={{
                                 padding: '5px 12px', fontSize: 12, whiteSpace: 'nowrap',
                                 cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
@@ -1055,6 +1062,12 @@ export default function DossierDetail() {
                     setJournal(prev => [newEntry, ...prev]);
                     reloadDossier();
                 }}
+            />
+            <NeuerTerminModal
+                open={terminModal}
+                onClose={() => setTerminModal(false)}
+                klientId={dossier?.klient_id}
+                onSaved={() => setTerminModal(false)}
             />
 
         </div>
