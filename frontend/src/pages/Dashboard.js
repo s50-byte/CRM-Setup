@@ -230,7 +230,7 @@ export default function Dashboard() {
                             }}>{fruehereMeldungen.length}</span>
                         </div>
                         {frueherOffen && (
-                            <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '520px', overflowY: 'auto' }}>
                                 {fruehereMeldungen.map(m => (
                                     <MeldungKarte key={m.meldung_id} m={m} />
                                 ))}
