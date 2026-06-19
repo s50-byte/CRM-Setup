@@ -138,14 +138,25 @@ export default function Termine() {
             }}>
                 <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', textTransform: 'uppercase', letterSpacing: '.06em', flexShrink: 0 }}>Filter</span>
 
-                {/* Freitext-Suche */}
-                <input
-                    type="text"
-                    placeholder="Klient oder Notiz…"
-                    value={suche}
-                    onChange={e => setSuche(e.target.value)}
-                    style={{ ...filterStyle, width: 160, background: '#fff', border: '1px solid rgba(0,0,0,.12)' }}
-                />
+                {/* Datum von/bis */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: '#A09D97' }}>Von</span>
+                    <input
+                        type="date"
+                        value={filterDatumVon}
+                        onChange={e => setFilterDatumVon(e.target.value)}
+                        style={{ ...filterStyle, width: 130 }}
+                    />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: '#A09D97' }}>Bis</span>
+                    <input
+                        type="date"
+                        value={filterDatumBis}
+                        onChange={e => setFilterDatumBis(e.target.value)}
+                        style={{ ...filterStyle, width: 130 }}
+                    />
+                </div>
 
                 {/* Typ */}
                 <select value={filterTyp} onChange={e => setFilterTyp(e.target.value)} style={filterStyle}>
@@ -171,25 +182,14 @@ export default function Termine() {
                     {STATUSWERTE.map(s => <option key={s}>{s}</option>)}
                 </select>
 
-                {/* Datum von/bis */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 11, color: '#A09D97' }}>Von</span>
-                    <input
-                        type="date"
-                        value={filterDatumVon}
-                        onChange={e => setFilterDatumVon(e.target.value)}
-                        style={{ ...filterStyle, width: 130 }}
-                    />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 11, color: '#A09D97' }}>Bis</span>
-                    <input
-                        type="date"
-                        value={filterDatumBis}
-                        onChange={e => setFilterDatumBis(e.target.value)}
-                        style={{ ...filterStyle, width: 130 }}
-                    />
-                </div>
+                {/* Freitext-Suche */}
+                <input
+                    type="text"
+                    placeholder="Klient oder Notiz…"
+                    value={suche}
+                    onChange={e => setSuche(e.target.value)}
+                    style={{ ...filterStyle, width: 160, background: '#fff', border: '1px solid rgba(0,0,0,.12)' }}
+                />
 
                 {/* Reset */}
                 {filterAktiv && (
