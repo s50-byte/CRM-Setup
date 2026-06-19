@@ -48,9 +48,22 @@ router.get('/', auth, async (req, res) => {
                  WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv' LIMIT 1) AS verfuegung_betrag,
                 (SELECT v2.verrechnungsart FROM verfuegung v2
                  WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv' LIMIT 1) AS verrechnungsart,
-                (SELECT COALESCE(ROUND(SUM(vp2.soll_stunden), 1), 0)
+                (SELECT COALESCE(ROUND(SUM(
+                     CASE vp2.verrechnungsart
+                         WHEN 'monatspauschale' THEN
+                             CASE WHEN COALESCE(l2.tarif, 0) > 0
+                                 THEN COALESCE(vp2.betrag, 0) / l2.tarif * GREATEST(1, COALESCE(
+                                      (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
+                                     + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int, 1))
+                                 ELSE 0 END
+                         WHEN 'fallpauschale' THEN
+                             CASE WHEN COALESCE(l2.tarif, 0) > 0 THEN COALESCE(vp2.betrag, 0) / l2.tarif ELSE 0 END
+                         ELSE COALESCE(vp2.soll_stunden, 0)
+                     END
+                 ), 1), 0)
                  FROM verfuegung_position vp2
                  JOIN verfuegung v2 ON v2.verfuegung_id = vp2.verfuegung_id
+                 JOIN leistung l2 ON l2.leistung_id = vp2.leistung_id
                  WHERE v2.dossier_id = d.dossier_id AND v2.status = 'aktiv') AS soll_total,
                 (SELECT COALESCE(ROUND(SUM(j.dauer_minuten) FILTER (WHERE j.verrechenbar = TRUE) / 60.0, 1), 0)
                  FROM journal_eintrag j WHERE j.klient_id = k.klient_id) AS ist_verrechenbar,

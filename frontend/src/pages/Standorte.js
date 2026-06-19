@@ -46,12 +46,24 @@ function LehrberufeAbschnitt({ standortId, bearbeitbar }) {
         return (
             <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid rgba(0,0,0,.06)' }}>
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.5rem' }}>Ausbildungsberufe</div>
-                {aktiveBerufe.map(b => (
-                    <div key={b.beruf} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 12 }}>
-                        <span style={{ flex: 1, color: '#1A1917', minWidth: 0 }}>{b.beruf}</span>
-                        <span style={{ color: '#6B6860', fontFamily: 'monospace' }}>Bewilligt: {b.bewilligte_plaetze} · Total: {b.total_plaetze}</span>
-                    </div>
-                ))}
+                <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr>
+                            <th style={{ textAlign: 'left', color: '#A09D97', fontWeight: 600, fontSize: 10.5, paddingBottom: 4 }}>Beruf</th>
+                            <th style={{ textAlign: 'right', color: '#A09D97', fontWeight: 600, fontSize: 10.5, paddingBottom: 4 }}>Bewilligt</th>
+                            <th style={{ textAlign: 'right', color: '#A09D97', fontWeight: 600, fontSize: 10.5, paddingBottom: 4, paddingLeft: 12 }}>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {aktiveBerufe.map(b => (
+                            <tr key={b.beruf}>
+                                <td style={{ padding: '2px 0', color: '#1A1917' }}>{b.beruf}</td>
+                                <td style={{ padding: '2px 0', textAlign: 'right', color: '#374151', fontFamily: 'monospace' }}>{b.bewilligte_plaetze}</td>
+                                <td style={{ padding: '2px 0', textAlign: 'right', color: '#374151', fontFamily: 'monospace', paddingLeft: 12 }}>{b.total_plaetze}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         );
     }

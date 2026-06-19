@@ -132,9 +132,23 @@ router.get('/:id', auth, async (req, res) => {
                      FROM journal_eintrag WHERE klient_id = d.klient_id) AS ist_nicht_verrechenbar,
                     (SELECT COALESCE(ROUND(SUM(dauer_minuten) / 60.0, 1), 0)
                      FROM journal_eintrag WHERE klient_id = d.klient_id) AS ist_total,
-                    (SELECT COALESCE(ROUND(SUM(vp.soll_stunden), 1), 0)
+                    (SELECT COALESCE(ROUND(SUM(
+                         CASE vp.verrechnungsart
+                             WHEN 'monatspauschale' THEN
+                                 CASE WHEN COALESCE(l.tarif, 0) > 0
+                                     THEN COALESCE(vp.betrag, 0) / l.tarif * GREATEST(1, COALESCE(
+                                          (EXTRACT(YEAR FROM age(pv_l.geplantes_enddatum, pv_l.start_datum)) * 12
+                                         + EXTRACT(MONTH FROM age(pv_l.geplantes_enddatum, pv_l.start_datum)))::int, 1))
+                                     ELSE 0 END
+                             WHEN 'fallpauschale' THEN
+                                 CASE WHEN COALESCE(l.tarif, 0) > 0 THEN COALESCE(vp.betrag, 0) / l.tarif ELSE 0 END
+                             ELSE COALESCE(vp.soll_stunden, 0)
+                         END
+                     ), 1), 0)
                      FROM verfuegung_position vp
                      JOIN verfuegung v ON v.verfuegung_id = vp.verfuegung_id
+                     JOIN leistung l ON l.leistung_id = vp.leistung_id
+                     LEFT JOIN programm_verlauf pv_l ON pv_l.dossier_id = d.dossier_id AND pv_l.status = 'Laufend'
                      WHERE v.dossier_id = d.dossier_id AND v.status = 'aktiv') AS soll_total,
                     ag.person_id AS arbeitgeber_id,
                     ag.vorname AS arbeitgeber_vorname,

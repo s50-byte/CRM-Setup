@@ -46,12 +46,8 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
     const [bemerkung, setBemerkung] = useState('');
     const [positionen, setPositionen] = useState([]);
     const [leistungen, setLeistungen] = useState([]);
-    const [programme, setProgramme] = useState([]);
-    const [programmId, setProgrammId] = useState('');
     const [fehler, setFehler] = useState('');
     const [laden, setLaden] = useState(false);
-
-    const zeigtProgrammWahl = !dossier?.akt_programm_id;
 
     const dauerMonate = (() => {
         if (!dossier?.programm_verlauf) return 1;
@@ -64,14 +60,10 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
     useEffect(() => {
         if (!open) return;
         client.get('/leistungen').then(r => setLeistungen(r.data)).catch(console.error);
-        if (zeigtProgrammWahl) {
-            client.get('/programme').then(r => setProgramme(r.data)).catch(console.error);
-        }
         setNummer(verfuegung?.nummer || '');
         setDatum(verfuegung?.datum ? verfuegung.datum.slice(0, 10) : '');
         setStatus(verfuegung?.status || 'aktiv');
         setBemerkung(verfuegung?.bemerkung || '');
-        setProgrammId('');
         setFehler('');
         setAktTab('verfuegung');
         setPositionen(
@@ -120,11 +112,6 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
             setAktTab('verfuegung');
             return;
         }
-        if (zeigtProgrammWahl && !programmId) {
-            setFehler('Programm ist erforderlich, um den Start zu erfassen.');
-            setAktTab('verfuegung');
-            return;
-        }
         setLaden(true);
         setFehler('');
         try {
@@ -134,7 +121,6 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                 datum: datum || null,
                 bemerkung: bemerkung.trim() || null,
                 status,
-                ...(zeigtProgrammWahl ? { programm_id: programmId } : {}),
             };
             let verfuegungId;
             if (verfuegung) {
@@ -191,7 +177,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
             <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,.09)', marginBottom: 16, marginTop: -4 }}>
                 {[
                     { key: 'verfuegung', label: 'Verfügung' },
-                    { key: 'positionen', label: `Positionen${positionen.length > 0 ? ` (${positionen.length})` : ''}` },
+                    { key: 'positionen', label: `Tarife${positionen.length > 0 ? ` (${positionen.length})` : ''}` },
                 ].map(tab => (
                     <button key={tab.key} onClick={() => setAktTab(tab.key)} style={{
                         padding: '8px 16px', fontSize: 12.5, fontWeight: aktTab === tab.key ? 600 : 400,
@@ -215,20 +201,6 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                             placeholder="z.B. VFG-2026-001" style={inputStyle}
                         />
                     </div>
-                    {zeigtProgrammWahl && (
-                        <div>
-                            <FieldLabel required>Programm</FieldLabel>
-                            <select value={programmId} onChange={e => setProgrammId(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
-                                <option value="">— Programm wählen —</option>
-                                {programme.map(p => (
-                                    <option key={p.programm_id} value={p.programm_id}>{p.name}</option>
-                                ))}
-                            </select>
-                            <div style={{ fontSize: 11, color: '#6B6860', marginTop: 4 }}>
-                                Dossier hat noch kein Programm — Auswahl startet es.
-                            </div>
-                        </div>
-                    )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                         <div>
                             <FieldLabel>Datum</FieldLabel>
@@ -296,24 +268,28 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                                                 <option value="stundenpauschale">Stundenpauschale</option>
                                             </select>
                                             {zeigt_betrag && (
-                                                <div style={{ position: 'relative' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', overflow: 'hidden' }}>
+                                                    <span style={{ padding: '5px 7px', fontSize: 12, color: '#6B6860', background: '#F5F4F0', borderRight: '1px solid rgba(0,0,0,.09)', flexShrink: 0 }}>CHF</span>
                                                     <input
                                                         type="number" min="0" step="0.01"
                                                         value={pos.betrag}
                                                         onChange={e => updatePosition(pos._key, 'betrag', e.target.value)}
-                                                        placeholder="Betrag CHF"
-                                                        style={{ fontSize: 12.5, padding: '5px 8px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box', textAlign: 'right' }}
+                                                        placeholder="0.00"
+                                                        style={{ fontSize: 12.5, padding: '5px 8px', border: 'none', background: 'transparent', fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box', textAlign: 'right' }}
                                                     />
                                                 </div>
                                             )}
                                             {zeigt_stunden && (
-                                                <input
-                                                    type="number" min="0" step="0.5"
-                                                    value={pos.soll_stunden}
-                                                    onChange={e => updatePosition(pos._key, 'soll_stunden', e.target.value)}
-                                                    placeholder="SOLL-Stunden"
-                                                    style={{ fontSize: 12.5, padding: '5px 8px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', textAlign: 'right' }}
-                                                />
+                                                <div style={{ display: 'flex', alignItems: 'center', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff', overflow: 'hidden' }}>
+                                                    <input
+                                                        type="number" min="0" step="0.5"
+                                                        value={pos.soll_stunden}
+                                                        onChange={e => updatePosition(pos._key, 'soll_stunden', e.target.value)}
+                                                        placeholder="0"
+                                                        style={{ fontSize: 12.5, padding: '5px 8px', border: 'none', background: 'transparent', fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box', textAlign: 'right' }}
+                                                    />
+                                                    <span style={{ padding: '5px 7px', fontSize: 12, color: '#6B6860', background: '#F5F4F0', borderLeft: '1px solid rgba(0,0,0,.09)', flexShrink: 0 }}>h</span>
+                                                </div>
                                             )}
                                         </div>
                                         {/* SOLL-Vorschau */}
