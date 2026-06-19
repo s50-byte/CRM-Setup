@@ -25,11 +25,11 @@ const SEL = { fontSize: 12, padding: '4px 9px', border: '1px solid rgba(0,0,0,.0
 
 const COLS = [
     { label: 'Name',                 field: 'nachname' },
-    { label: 'Standort',             field: 'standort_kuerzel' },
     { label: 'Programm',             field: 'programm_name' },
     { label: 'Phase',                field: 'pipeline_status' },
-    { label: 'Laufzeit',             field: null },
+    { label: 'Label',                field: 'klient_label' },
     { label: 'Zugewiesene Personen', field: null },
+    { label: 'Standort',             field: 'standort_kuerzel' },
     { label: '',                     field: null },
     { label: '',                     field: null },
 ];
@@ -100,9 +100,6 @@ function DossierTabelle({ rows, sortField, sortDir, onSort, navigate, filterAkti
                                 }} title={istInaktiv ? 'Inaktiv' : 'Aktiv'} />
                                 {d.nachname} {d.vorname}
                             </td>
-                            <td style={{ padding: '8px 12px', fontSize: 11.5, color: '#6B6860' }}>
-                                {d.standort_kuerzel || '—'}
-                            </td>
                             <td style={{ padding: '8px 12px' }}>
                                 {d.programm_name ? (
                                     <span style={{
@@ -119,19 +116,14 @@ function DossierTabelle({ rows, sortField, sortDir, onSort, navigate, filterAkti
                                     border: `1px solid ${ps.color}33`, fontFamily: 'monospace'
                                 }}>{d.phase_label || d.pipeline_status}</span>
                             </td>
-                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5, whiteSpace: 'nowrap' }}>
-                                {(() => {
-                                    const fmt = d => new Date(d).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                                    const enddatum = berechneEnddatum(d.laufend_start_datum, d.avg_dauer_tage);
-                                    if (!d.laufend_start_datum && !enddatum) return '—';
-                                    const start = d.laufend_start_datum ? fmt(d.laufend_start_datum) : '?';
-                                    const ende = enddatum ? fmt(enddatum) : '?';
-                                    const color = tage !== null && tage < 14 ? '#B91C1C' : tage !== null && tage < 28 ? '#B45309' : undefined;
-                                    return <span style={color ? { color, fontWeight: 600 } : {}}>{start} – {ende}</span>;
-                                })()}
+                            <td style={{ padding: '8px 12px', fontSize: 11.5, color: '#6B6860', fontFamily: 'monospace' }}>
+                                {d.klient_label || '—'}
                             </td>
                             <td style={{ padding: '8px 12px', fontSize: 11.5 }}>
                                 {(d.zugewiesen || []).map(u => u.full_name).join(', ') || '—'}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontSize: 11.5, color: '#6B6860' }}>
+                                {d.standort_kuerzel || '—'}
                             </td>
                             <td style={{ padding: '8px 12px', width: 28, textAlign: 'center' }}>
                                 {tage !== null && tage < 28 && (
