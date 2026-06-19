@@ -10,9 +10,16 @@ const STATUS_LABELS = {
 
 const GRUPPEN = [
     {
+        key: 'offen',
+        label: 'Neu / Offen',
+        match: s => !s || s === 'offen',
+        badgeBg: '#FEF2F2',
+        badgeColor: '#B91C1C',
+    },
+    {
         key: 'backlog',
         label: 'Backlog',
-        match: s => !s || s === 'offen' || s === 'backlog',
+        match: s => s === 'backlog',
         badgeBg: '#EEF3FE',
         badgeColor: '#1D4ED8',
     },
@@ -62,7 +69,7 @@ export default function Feedback() {
     const [laden, setLaden] = useState(true);
     const [filterBenutzer, setFilterBenutzer] = useState('Alle');
     const [filterScreen, setFilterScreen] = useState('Alle');
-    const [aufgeklappt, setAufgeklappt] = useState({ backlog: true, implementiert: true, out_of_scope: false });
+    const [aufgeklappt, setAufgeklappt] = useState({ offen: true, backlog: true, implementiert: true, out_of_scope: false });
     const [antModal, setAntModal] = useState(ANT_INIT);
 
     const laden_daten = useCallback(async () => {
