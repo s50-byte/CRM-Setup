@@ -333,15 +333,10 @@ export default function Praesenz() {
     return (
         <div>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-                <div>
-                    <div style={{ fontSize: 19, fontWeight: 600 }}>Präsenzkontrolle</div>
-                    <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>
-                        {new Date(datum + 'T12:00:00').toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                    </div>
-                </div>
-                <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                    <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={INPUT_S} />
+            <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: 19, fontWeight: 600 }}>Präsenzkontrolle</div>
+                <div style={{ fontSize: 12, color: '#6B6860', marginTop: 2 }}>
+                    {new Date(datum + 'T12:00:00').toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
             </div>
 
@@ -361,15 +356,13 @@ export default function Praesenz() {
             </div>
 
             {/* Tabs */}
-            <div style={{ borderBottom: '1px solid rgba(0,0,0,.09)', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <div>
-                    <button style={tabBtn(aktTab === 'tag')} onClick={() => setAktTab('tag')}>Heutiger Tag</button>
-                    <button style={tabBtn(aktTab === 'verlauf')} onClick={() => {
-                        setAktTab('verlauf');
-                        if (!verlaufGeladen) ladeVerlauf();
-                    }}>Verlauf</button>
-                </div>
-                <div style={{ display: 'flex', gap: 7, alignItems: 'center', paddingBottom: 6 }}>
+            <div style={{ borderBottom: '1px solid rgba(0,0,0,.09)', marginBottom: '1rem', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+                <button style={tabBtn(aktTab === 'tag')} onClick={() => setAktTab('tag')}>Heutiger Tag</button>
+                <button style={tabBtn(aktTab === 'verlauf')} onClick={() => {
+                    setAktTab('verlauf');
+                    if (!verlaufGeladen) ladeVerlauf();
+                }}>Verlauf</button>
+                <div style={{ display: 'flex', gap: 7, alignItems: 'center', paddingBottom: 6, marginLeft: 8 }}>
                     <select value={selAbteilung} onChange={e => { setSelAbteilung(e.target.value); speichereFilter(e.target.value, selStandort); }} style={INPUT_S}>
                         <option value="">Alle Abteilungen</option>
                         {ABTEILUNGEN.map(a => <option key={a} value={a}>{a}</option>)}
