@@ -147,12 +147,7 @@ export default function Vorlagen() {
         setVorschauLaden(true);
         setVorschauOffen(true);
         try {
-            let r;
-            if (ausgewaehlt === 'neu') {
-                r = await client.post('/vorlagen/vorschau', { inhalt: form.inhalt });
-            } else {
-                r = await client.post(`/vorlagen/${ausgewaehlt}/vorschau`, {});
-            }
+            const r = await client.post('/vorlagen/vorschau', { inhalt: form.inhalt });
             setVorschauText(r.data.vorschau);
         } catch (err) {
             console.error(err);
