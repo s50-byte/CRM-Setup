@@ -28,7 +28,7 @@ const PLATZHALTER = [
     { key: 'datum_heute',       label: 'Datum heute' },
 ];
 
-const LEER = { name: '', beschreibung: '', inhalt: '', typ: 'brief' };
+const LEER = { name: '', beschreibung: '', inhalt: '', typ: 'brief', leistung_ids: [] };
 
 const S = {
     input: {
@@ -47,6 +47,7 @@ const S = {
 
 export default function Vorlagen() {
     const [vorlagen, setVorlagen] = useState([]);
+    const [leistungen, setLeistungen] = useState([]);
     const [laden, setLaden] = useState(true);
     const [ausgewaehlt, setAusgewaehlt] = useState(null); // vorlage_id or 'neu'
     const [form, setForm] = useState(LEER);
@@ -62,7 +63,10 @@ export default function Vorlagen() {
     }
 
     useEffect(() => {
-        ladeVorlagen().catch(console.error).finally(() => setLaden(false));
+        Promise.all([
+            ladeVorlagen(),
+            client.get('/leistungen').then(r => setLeistungen(r.data)),
+        ]).catch(console.error).finally(() => setLaden(false));
     }, []);
 
     function oeffneNeu() {
@@ -85,6 +89,7 @@ export default function Vorlagen() {
                 beschreibung: r.data.beschreibung || '',
                 inhalt: r.data.inhalt || '',
                 typ: r.data.typ || 'brief',
+                leistung_ids: r.data.leistung_ids || [],
             });
         } catch (err) {
             console.error('Vorlage laden:', err);
@@ -247,6 +252,42 @@ export default function Vorlagen() {
                                 placeholder="Kurze Beschreibung (optional)"
                                 style={S.input}
                             />
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                            <label style={S.label}>Zugeordnete Massnahmen (Tarife)</label>
+                            <div style={{
+                                border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
+                                background: '#fff', maxHeight: 120, overflowY: 'auto', padding: '4px 0',
+                            }}>
+                                {leistungen.length === 0
+                                    ? <div style={{ padding: '6px 10px', fontSize: 12, color: '#A09D97' }}>Keine Leistungen vorhanden</div>
+                                    : leistungen.map(l => {
+                                        const checked = form.leistung_ids.includes(l.leistung_id);
+                                        return (
+                                            <label key={l.leistung_id} style={{
+                                                display: 'flex', alignItems: 'center', gap: 8,
+                                                padding: '4px 10px', cursor: 'pointer', fontSize: 12.5,
+                                                background: checked ? '#EEF3FE' : 'transparent',
+                                            }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={() => {
+                                                        const ids = checked
+                                                            ? form.leistung_ids.filter(id => id !== l.leistung_id)
+                                                            : [...form.leistung_ids, l.leistung_id];
+                                                        setForm(f => ({ ...f, leistung_ids: ids }));
+                                                    }}
+                                                    style={{ accentColor: '#2563EB', flexShrink: 0 }}
+                                                />
+                                                <span style={{ fontFamily: 'monospace', color: '#2563EB', fontSize: 11 }}>{l.tarifnr}</span>
+                                                <span style={{ color: '#1A1917' }}>{l.bezeichnung}</span>
+                                            </label>
+                                        );
+                                    })
+                                }
+                            </div>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 12, alignItems: 'start' }}>

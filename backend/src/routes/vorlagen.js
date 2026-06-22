@@ -103,22 +103,36 @@ router.get('/', auth, async (req, res) => {
 // GET /api/vorlagen/:id
 router.get('/:id', auth, async (req, res) => {
     try {
-        const result = await db.query(
-            `SELECT * FROM dokument_vorlage WHERE vorlage_id = $1::uuid`,
-            [req.params.id]
-        );
-        if (!result.rows.length) return res.status(404).json({ error: 'Nicht gefunden' });
-        res.json(result.rows[0]);
+        const [vorlageRes, leistungRes] = await Promise.all([
+            db.query(`SELECT * FROM dokument_vorlage WHERE vorlage_id = $1::uuid`, [req.params.id]),
+            db.query(`SELECT leistung_id FROM vorlage_leistung WHERE vorlage_id = $1::uuid`, [req.params.id]),
+        ]);
+        if (!vorlageRes.rows.length) return res.status(404).json({ error: 'Nicht gefunden' });
+        res.json({
+            ...vorlageRes.rows[0],
+            leistung_ids: leistungRes.rows.map(r => r.leistung_id),
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden der Vorlage' });
     }
 });
 
+async function syncLeistungen(vorlage_id, leistung_ids) {
+    await db.query(`DELETE FROM vorlage_leistung WHERE vorlage_id = $1::uuid`, [vorlage_id]);
+    if (leistung_ids?.length) {
+        const vals = leistung_ids.map((_, i) => `($1::uuid, $${i + 2}::uuid)`).join(', ');
+        await db.query(
+            `INSERT INTO vorlage_leistung (vorlage_id, leistung_id) VALUES ${vals}`,
+            [vorlage_id, ...leistung_ids]
+        );
+    }
+}
+
 // POST /api/vorlagen
 router.post('/', auth, nurManagement, async (req, res) => {
     console.log('POST /vorlagen user:', req.user?.system_rolle, req.user?.user_id);
-    const { name, beschreibung, inhalt, typ } = req.body;
+    const { name, beschreibung, inhalt, typ, leistung_ids } = req.body;
     if (!name || !inhalt) return res.status(400).json({ error: 'Name und Inhalt erforderlich' });
     try {
         const result = await db.query(
@@ -127,7 +141,9 @@ router.post('/', auth, nurManagement, async (req, res) => {
              RETURNING *`,
             [name, beschreibung || null, inhalt, typ || 'brief']
         );
-        res.status(201).json(result.rows[0]);
+        const vorlage = result.rows[0];
+        await syncLeistungen(vorlage.vorlage_id, leistung_ids);
+        res.status(201).json({ ...vorlage, leistung_ids: leistung_ids || [] });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Erstellen der Vorlage' });
@@ -136,7 +152,7 @@ router.post('/', auth, nurManagement, async (req, res) => {
 
 // PUT /api/vorlagen/:id
 router.put('/:id', auth, nurManagement, async (req, res) => {
-    const { name, beschreibung, inhalt, typ } = req.body;
+    const { name, beschreibung, inhalt, typ, leistung_ids } = req.body;
     if (!name || !inhalt) return res.status(400).json({ error: 'Name und Inhalt erforderlich' });
     try {
         const result = await db.query(
@@ -147,7 +163,8 @@ router.put('/:id', auth, nurManagement, async (req, res) => {
             [name, beschreibung || null, inhalt, typ || 'brief', req.params.id]
         );
         if (!result.rows.length) return res.status(404).json({ error: 'Nicht gefunden' });
-        res.json(result.rows[0]);
+        await syncLeistungen(req.params.id, leistung_ids);
+        res.json({ ...result.rows[0], leistung_ids: leistung_ids || [] });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Speichern der Vorlage' });
