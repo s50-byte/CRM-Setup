@@ -53,18 +53,30 @@ export default function DokumentErstellenModal({ open, onClose, dossierId, klien
         setGewaehlteVorlage(v);
         setTitel(v.name);
         setInhalt('');
+        setFehler('');
         setVorschauLaden(true);
+        let vorlagenInhalt = '';
         try {
             const detail = await client.get(`/vorlagen/${vorlage_id}`);
-            const vorlagenInhalt = detail.data.inhalt || '';
+            vorlagenInhalt = detail.data.inhalt || '';
+            console.log('[DokumentErstellen] vorlage detail:', detail.data);
+            console.log('[DokumentErstellen] vorlagenInhalt:', vorlagenInhalt);
+        } catch (err) {
+            console.error('[DokumentErstellen] GET vorlage fehlgeschlagen:', err);
+            setFehler('Vorlage konnte nicht geladen werden: ' + (err.response?.data?.error || err.message));
+            setVorschauLaden(false);
+            return;
+        }
+        try {
             const vorschau = await client.post('/vorlagen/vorschau', {
                 inhalt: vorlagenInhalt,
                 klient_id: klientId || undefined,
             });
+            console.log('[DokumentErstellen] vorschau response:', vorschau.data);
             setInhalt(vorschau.data.vorschau || vorlagenInhalt);
         } catch (err) {
-            console.error(err);
-            setFehler('Vorlage konnte nicht geladen werden: ' + (err.response?.data?.error || err.message));
+            console.error('[DokumentErstellen] POST vorschau fehlgeschlagen:', err);
+            setInhalt(vorlagenInhalt);
         } finally {
             setVorschauLaden(false);
         }

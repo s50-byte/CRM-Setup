@@ -199,17 +199,16 @@ router.delete('/:id', auth, nurManagement, async (req, res) => {
 router.post('/vorschau', auth, async (req, res) => {
     const { inhalt, klient_id } = req.body;
     if (!inhalt) return res.status(400).json({ error: 'inhalt erforderlich' });
-    try {
-        let daten = BEISPIEL_DATEN;
-        if (klient_id) {
+    let daten = BEISPIEL_DATEN;
+    if (klient_id) {
+        try {
             const echte = await ladeDatenFuerKlient(klient_id);
             if (echte) daten = echte;
+        } catch (e) {
+            console.error('ladeDatenFuerKlient fehlgeschlagen, Fallback auf Beispieldaten:', e.message);
         }
-        res.json({ vorschau: fuelleVorlage(inhalt, daten) });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Fehler bei der Vorschau' });
     }
+    res.json({ vorschau: fuelleVorlage(inhalt, daten) });
 });
 
 // POST /api/vorlagen/:id/vorschau
