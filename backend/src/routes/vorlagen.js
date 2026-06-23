@@ -213,7 +213,6 @@ router.post('/vorschau', auth, async (req, res) => {
 
 // POST /api/vorlagen/:id/vorschau
 router.post('/:id/vorschau', auth, async (req, res) => {
-    console.log('POST /vorlagen/:id/vorschau body:', req.body, 'id:', req.params.id);
     const { klient_id } = req.body;
     try {
         const vorlagenRes = await db.query(
@@ -225,8 +224,12 @@ router.post('/:id/vorschau', auth, async (req, res) => {
 
         let daten = BEISPIEL_DATEN;
         if (klient_id) {
-            const echte = await ladeDatenFuerKlient(klient_id);
-            if (echte) daten = echte;
+            try {
+                const echte = await ladeDatenFuerKlient(klient_id);
+                if (echte) daten = echte;
+            } catch (e) {
+                console.error('ladeDatenFuerKlient fehlgeschlagen, Fallback auf Beispieldaten:', e.message);
+            }
         }
         res.json({ vorschau: fuelleVorlage(inhalt, daten) });
     } catch (err) {

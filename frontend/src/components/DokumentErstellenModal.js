@@ -55,31 +55,25 @@ export default function DokumentErstellenModal({ open, onClose, dossierId, klien
         setInhalt('');
         setFehler('');
         setVorschauLaden(true);
-        let vorlagenInhalt = '';
+        let text = '';
         try {
-            const detail = await client.get(`/vorlagen/${vorlage_id}`);
-            vorlagenInhalt = detail.data.inhalt || '';
-            console.log('[DokumentErstellen] vorlage detail:', detail.data);
-            console.log('[DokumentErstellen] vorlagenInhalt:', vorlagenInhalt);
-        } catch (err) {
-            console.error('[DokumentErstellen] GET vorlage fehlgeschlagen:', err);
-            setFehler('Vorlage konnte nicht geladen werden: ' + (err.response?.data?.error || err.message));
-            setVorschauLaden(false);
-            return;
-        }
-        try {
-            const vorschau = await client.post('/vorlagen/vorschau', {
-                inhalt: vorlagenInhalt,
+            const r = await client.post(`/vorlagen/${vorlage_id}/vorschau`, {
                 klient_id: klientId || undefined,
             });
-            console.log('[DokumentErstellen] vorschau response:', vorschau.data);
-            setInhalt(vorschau.data.vorschau || vorlagenInhalt);
+            text = r.data?.vorschau || '';
+            console.log('[DokumentErstellen] vorschau geladen, Länge:', text.length);
         } catch (err) {
-            console.error('[DokumentErstellen] POST vorschau fehlgeschlagen:', err);
-            setInhalt(vorlagenInhalt);
-        } finally {
-            setVorschauLaden(false);
+            console.error('[DokumentErstellen] Vorschau fehlgeschlagen:', err);
+            try {
+                const r2 = await client.get(`/vorlagen/${vorlage_id}`);
+                text = r2.data?.inhalt || '';
+                console.log('[DokumentErstellen] Fallback GET inhalt, Länge:', text.length);
+            } catch {
+                setFehler('Vorlage konnte nicht geladen werden');
+            }
         }
+        setInhalt(text);
+        setVorschauLaden(false);
     }
 
     async function handleSpeichern() {
