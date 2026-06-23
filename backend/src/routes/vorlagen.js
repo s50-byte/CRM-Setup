@@ -43,7 +43,7 @@ const BEISPIEL_DATEN = {
 async function ladeDatenFuerKlient(klient_id) {
     const res = await db.query(
         `SELECT
-            k.vorname, k.nachname, k.adresse, k.plz, k.ort, k.ahv_nr,
+            k.vorname, k.nachname, k.adresse, k.plz, k.ort, k.ahv_nummer AS ahv_nr,
             TO_CHAR(k.geburtsdatum, 'DD.MM.YYYY') AS geburtsdatum,
             d.abteilung,
             p.name  AS programm,
