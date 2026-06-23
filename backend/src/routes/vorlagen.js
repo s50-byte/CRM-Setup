@@ -43,22 +43,19 @@ const BEISPIEL_DATEN = {
 async function ladeDatenFuerKlient(klient_id) {
     const res = await db.query(
         `SELECT
-            k.vorname, k.nachname, k.adresse, k.plz, k.ort, k.ahv_nummer AS ahv_nr,
+            k.vorname, k.nachname, k.adresse, k.plz, k.ort,
+            k.ahv_nummer AS ahv_nr,
+            k.anrede,
             TO_CHAR(k.geburtsdatum, 'DD.MM.YYYY') AS geburtsdatum,
             d.abteilung,
             p.name  AS programm,
             ph.label AS phase,
             st.name AS standort,
-            TO_CHAR(pv.start_datum, 'DD.MM.YYYY')          AS startdatum,
-            TO_CHAR(pv.geplantes_enddatum, 'DD.MM.YYYY')   AS enddatum,
-            v.verfuegung_nummer,
-            d.zuweisende_stelle,
-            bf.full_name AS klientenfuehrung,
-            CASE
-                WHEN k.geschlecht = 'w' THEN 'Frau'
-                WHEN k.geschlecht = 'm' THEN 'Herr'
-                ELSE ''
-            END AS anrede
+            TO_CHAR(pv.start_datum, 'DD.MM.YYYY')        AS startdatum,
+            TO_CHAR(pv.geplantes_enddatum, 'DD.MM.YYYY') AS enddatum,
+            v.nummer AS verfuegung_nummer,
+            COALESCE(zp.firma, NULLIF(TRIM(COALESCE(zp.vorname,'') || ' ' || COALESCE(zp.nachname,'')), '')) AS zuweisende_stelle,
+            bf.full_name AS klientenfuehrung
         FROM klient k
         LEFT JOIN dossier d ON d.klient_id = k.klient_id
         LEFT JOIN programm p ON p.programm_id = d.akt_programm_id
@@ -66,6 +63,7 @@ async function ladeDatenFuerKlient(klient_id) {
         LEFT JOIN standort st ON st.standort_id = d.standort_id
         LEFT JOIN programm_verlauf pv ON pv.dossier_id = d.dossier_id AND pv.status = 'Laufend'
         LEFT JOIN verfuegung v ON v.dossier_id = d.dossier_id AND v.status = 'aktiv'
+        LEFT JOIN externe_person zp ON zp.person_id = d.zuweisende_person_id
         LEFT JOIN LATERAL (
             SELECT bf2.full_name FROM klient_user ku
             JOIN benutzer bf2 ON bf2.user_id = ku.user_id
