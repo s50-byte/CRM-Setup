@@ -122,7 +122,7 @@ router.get('/', auth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
     try {
         const dossier = await db.query(
-            `SELECT d.*, k.*, p.name AS programm_name, p.farbe_hex, p.avg_dauer_tage,
+            `SELECT d.*, k.*, p.name AS programm_name, p.farbe_hex, p.avg_dauer_tage, p.leistung_id AS programm_leistung_id,
                     ph.label AS phase_label,
                     st.name AS standort_name, st.kuerzel AS standort_kuerzel,
                     lv.pensum_pct,
@@ -708,6 +708,47 @@ router.put('/:id/phase/:phase_id/kriterien/:kriterium_id', auth, async (req, res
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Aktualisieren des Kriteriums' });
+    }
+});
+
+// GET /api/dossiers/:id/dokumente
+router.get('/:id/dokumente', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT d.dok_id, d.titel, d.inhalt, d.created_at, d.updated_at,
+                    v.name AS vorlage_name,
+                    u.full_name AS erstellt_von_name
+             FROM dossier_dokument d
+             LEFT JOIN dokument_vorlage v ON v.vorlage_id = d.vorlage_id
+             LEFT JOIN benutzer u ON u.user_id = d.erstellt_von
+             WHERE d.dossier_id = $1::uuid
+             ORDER BY d.created_at DESC`,
+            [req.params.id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der Dokumente' });
+    }
+});
+
+// POST /api/dossiers/:id/dokumente
+router.post('/:id/dokumente', auth, async (req, res) => {
+    const { vorlage_id, titel, inhalt } = req.body;
+    if (!titel?.trim() || !inhalt?.trim()) {
+        return res.status(400).json({ error: 'Titel und Inhalt erforderlich' });
+    }
+    try {
+        const result = await db.query(
+            `INSERT INTO dossier_dokument (dossier_id, vorlage_id, titel, inhalt, erstellt_von)
+             VALUES ($1::uuid, $2, $3, $4, $5)
+             RETURNING *`,
+            [req.params.id, vorlage_id || null, titel.trim(), inhalt.trim(), req.user.user_id]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Erstellen des Dokuments' });
     }
 });
 

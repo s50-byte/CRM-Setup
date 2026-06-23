@@ -9,6 +9,8 @@ import FerienModal from '../components/FerienModal';
 import VerfuegungModal from '../components/VerfuegungModal';
 import JournalModal from '../components/JournalModal';
 import NeuerTerminModal from '../components/NeuerTerminModal';
+import DokumentErstellenModal from '../components/DokumentErstellenModal';
+import DokumentEditorModal from '../components/DokumentEditorModal';
 
 
 const LABEL_FARBEN = {
@@ -167,6 +169,12 @@ export default function DossierDetail() {
     const [abgeschlosseneOffen, setAbgeschlosseneOffen] = useState(false);
     const [vergangeneOffen, setVergangeneOffen] = useState(false);
 
+    // Dokumente
+    const [dokumente, setDokumente] = useState([]);
+    const [dokumentErstellenModal, setDokumentErstellenModal] = useState(false);
+    const [dokumentEditorModal, setDokumentEditorModal] = useState(false);
+    const [gewaehltesDokument, setGewaehltesDokument] = useState(null);
+
     useEffect(() => {
         async function load() {
             try {
@@ -202,6 +210,14 @@ export default function DossierDetail() {
     useEffect(() => {
         client.get(`/verfuegungen/${id}`).then(r => setVerfuegungen(r.data)).catch(console.error);
     }, [id]);
+
+    useEffect(() => {
+        client.get(`/dossiers/${id}/dokumente`).then(r => setDokumente(r.data)).catch(console.error);
+    }, [id]);
+
+    function loadDokumente() {
+        client.get(`/dossiers/${id}/dokumente`).then(r => setDokumente(r.data)).catch(console.error);
+    }
 
     async function addKommentar() {
         if (!kommentar.trim()) return;
@@ -1020,6 +1036,35 @@ export default function DossierDetail() {
                         )}
                     </div>
 
+                    {/* Dokumente */}
+                    <div style={{ ...CARD, padding: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>
+                            <span style={SECTION_HDR}>Dokumente</span>
+                            <button onClick={() => setDokumentErstellenModal(true)} style={{ fontSize: 11, padding: '3px 9px', cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 5, background: '#fff', fontFamily: 'inherit', color: '#2563EB', fontWeight: 500 }}>+ Hinzufügen</button>
+                        </div>
+                        {dokumente.length === 0 ? (
+                            <div style={{ fontSize: 12, color: '#6B6860' }}>Noch keine Dokumente</div>
+                        ) : dokumente.map(dok => (
+                            <div
+                                key={dok.dok_id}
+                                onClick={() => { setGewaehltesDokument(dok); setDokumentEditorModal(true); }}
+                                style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 8px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5, cursor: 'pointer' }}
+                                onMouseEnter={e => e.currentTarget.style.background = '#EEF3FE'}
+                                onMouseLeave={e => e.currentTarget.style.background = '#F5F4F0'}
+                            >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dok.titel}</div>
+                                    <div style={{ fontSize: 10.5, color: '#A09D97', marginTop: 1 }}>
+                                        {dok.vorlage_name && <span>{dok.vorlage_name} · </span>}
+                                        {new Date(dok.created_at).toLocaleDateString('de-CH')}
+                                        {dok.erstellt_von_name && <span> · {dok.erstellt_von_name}</span>}
+                                    </div>
+                                </div>
+                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0, marginTop: 2 }}>✎</span>
+                            </div>
+                        ))}
+                    </div>
+
                     {/* Klientendaten kompakt */}
                     <div style={{ ...CARD, padding: '1rem' }}>
                         <div style={{ ...SECTION_HDR, marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(0,0,0,.05)' }}>Klientendaten</div>
@@ -1148,6 +1193,22 @@ export default function DossierDetail() {
                 klientId={dossier?.klient_id}
                 dossierZuweisungen={zugewiesen}
                 onSaved={() => { setTerminModal(false); loadTermine(); }}
+            />
+
+            <DokumentErstellenModal
+                open={dokumentErstellenModal}
+                onClose={() => setDokumentErstellenModal(false)}
+                dossierId={id}
+                klientId={dossier?.klient_id}
+                leistungId={dossier?.programm_leistung_id}
+                onSaved={() => { setDokumentErstellenModal(false); loadDokumente(); }}
+            />
+
+            <DokumentEditorModal
+                open={dokumentEditorModal}
+                onClose={() => setDokumentEditorModal(false)}
+                dokument={gewaehltesDokument}
+                onSaved={() => { setDokumentEditorModal(false); loadDokumente(); }}
             />
 
             {detailTermin && (

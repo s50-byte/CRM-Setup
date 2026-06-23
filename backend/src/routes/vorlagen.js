@@ -84,15 +84,25 @@ async function ladeDatenFuerKlient(klient_id) {
     };
 }
 
-// GET /api/vorlagen
+// GET /api/vorlagen — optional ?leistung_id= Filter
 router.get('/', auth, async (req, res) => {
     try {
-        const result = await db.query(
-            `SELECT vorlage_id, name, beschreibung, typ, aktiv, created_at, updated_at
-             FROM dokument_vorlage
-             WHERE aktiv = TRUE
-             ORDER BY name`
-        );
+        const { leistung_id } = req.query;
+        const result = leistung_id
+            ? await db.query(
+                `SELECT v.vorlage_id, v.name, v.beschreibung, v.typ, v.aktiv, v.created_at, v.updated_at
+                 FROM dokument_vorlage v
+                 JOIN vorlage_leistung vl ON vl.vorlage_id = v.vorlage_id
+                 WHERE v.aktiv = TRUE AND vl.leistung_id = $1::uuid
+                 ORDER BY v.name`,
+                [leistung_id]
+            )
+            : await db.query(
+                `SELECT vorlage_id, name, beschreibung, typ, aktiv, created_at, updated_at
+                 FROM dokument_vorlage
+                 WHERE aktiv = TRUE
+                 ORDER BY name`
+            );
         res.json(result.rows);
     } catch (err) {
         console.error(err);

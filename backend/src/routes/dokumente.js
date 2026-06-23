@@ -57,6 +57,49 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
+// GET /api/dokumente/:dok_id — einzelnes Dossier-Dokument
+router.get('/:dok_id', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT d.dok_id, d.titel, d.inhalt, d.created_at, d.updated_at,
+                    v.name AS vorlage_name,
+                    u.full_name AS erstellt_von_name
+             FROM dossier_dokument d
+             LEFT JOIN dokument_vorlage v ON v.vorlage_id = d.vorlage_id
+             LEFT JOIN benutzer u ON u.user_id = d.erstellt_von
+             WHERE d.dok_id = $1::uuid`,
+            [req.params.dok_id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Nicht gefunden' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden' });
+    }
+});
+
+// PUT /api/dokumente/:dok_id — Dossier-Dokument bearbeiten
+router.put('/:dok_id', auth, async (req, res) => {
+    const { titel, inhalt } = req.body;
+    if (!titel?.trim() || !inhalt?.trim()) {
+        return res.status(400).json({ error: 'Titel und Inhalt erforderlich' });
+    }
+    try {
+        const result = await db.query(
+            `UPDATE dossier_dokument
+             SET titel = $1, inhalt = $2, updated_at = NOW()
+             WHERE dok_id = $3::uuid
+             RETURNING *`,
+            [titel.trim(), inhalt.trim(), req.params.dok_id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Nicht gefunden' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern' });
+    }
+});
+
 // DELETE /api/dokumente/:id
 router.delete('/:id', auth, async (req, res) => {
     try {
