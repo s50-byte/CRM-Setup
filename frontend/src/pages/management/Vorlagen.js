@@ -79,7 +79,7 @@ export default function Vorlagen() {
     async function oeffneBearbeiten(v) {
         console.log('Vorlage öffnen:', v);
         setAusgewaehlt(v.vorlage_id);
-        setForm({ name: v.name || '', beschreibung: v.beschreibung || '', inhalt: '', typ: v.typ || 'brief' });
+        setForm({ name: v.name || '', beschreibung: v.beschreibung || '', inhalt: '', typ: v.typ || 'brief', leistung_ids: [] });
         setVorschauOffen(false);
         setVorschauText('');
         try {
