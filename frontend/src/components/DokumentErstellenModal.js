@@ -57,11 +57,12 @@ export default function DokumentErstellenModal({ open, onClose, dossierId, klien
         setVorschauLaden(true);
         let text = '';
         try {
+            console.log('[DokumentErstellen] POST vorschau — vorlage_id:', vorlage_id, '| klientId:', klientId);
             const r = await client.post(`/vorlagen/${vorlage_id}/vorschau`, {
                 klient_id: klientId || undefined,
             });
             text = r.data?.vorschau || '';
-            console.log('[DokumentErstellen] vorschau geladen, Länge:', text.length);
+            console.log('[DokumentErstellen] vorschau geladen, Länge:', text.length, '| Anfang:', text.slice(0, 60));
         } catch (err) {
             console.error('[DokumentErstellen] Vorschau fehlgeschlagen:', err);
             try {
