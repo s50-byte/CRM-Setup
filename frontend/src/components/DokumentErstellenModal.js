@@ -31,8 +31,15 @@ export default function DokumentErstellenModal({ open, onClose, dossierId, klien
         setTitel('');
         setInhalt('');
         setFehler('');
-        const url = leistungId ? `/vorlagen?leistung_id=${leistungId}` : '/vorlagen';
-        client.get(url).then(r => setVorlagen(r.data)).catch(console.error);
+        async function ladeVorlagen() {
+            if (leistungId) {
+                const r = await client.get(`/vorlagen?leistung_id=${leistungId}`);
+                if (r.data.length > 0) { setVorlagen(r.data); return; }
+            }
+            const r = await client.get('/vorlagen');
+            setVorlagen(r.data);
+        }
+        ladeVorlagen().catch(console.error);
     }, [open, leistungId]);
 
     async function waehleVorlage(vorlage_id) {
@@ -57,6 +64,7 @@ export default function DokumentErstellenModal({ open, onClose, dossierId, klien
             setInhalt(vorschau.data.vorschau || vorlagenInhalt);
         } catch (err) {
             console.error(err);
+            setFehler('Vorlage konnte nicht geladen werden: ' + (err.response?.data?.error || err.message));
         } finally {
             setVorschauLaden(false);
         }
