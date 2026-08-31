@@ -259,7 +259,52 @@ export default function Programme() {
         } finally { setBusy(false); }
     }
 
-    async function produkteblattSpeichern(programm, url) {
+    // Datei hochladen und am Programm verknuepfen. Der Download laeuft ueber das
+    // Backend, damit die Datei nicht ohne Anmeldung erreichbar ist.
+    async function produkteblattHochladen(programm, datei) {
+        if (!datei) return;
+        setBusy(true);
+        setFehler('');
+        try {
+            const daten = new FormData();
+            daten.append('datei', datei);
+            const r = await client.post('/dateien', daten);
+            await produkteblattSpeichern(programm, { produkteblatt_datei_id: r.data.datei_id });
+        } catch (err) {
+            setFehler(err.response?.data?.error || 'Produkteblatt konnte nicht hochgeladen werden');
+        } finally { setBusy(false); }
+    }
+
+    async function produkteblattEntfernen(programm) {
+        setBusy(true);
+        setFehler('');
+        try {
+            await produkteblattSpeichern(programm, { produkteblatt_datei_id: null });
+            if (programm.produkteblatt_datei_id) {
+                await client.delete(`/dateien/${programm.produkteblatt_datei_id}`);
+            }
+        } catch (err) {
+            setFehler(err.response?.data?.error || 'Produkteblatt konnte nicht entfernt werden');
+        } finally { setBusy(false); }
+    }
+
+    async function produkteblattOeffnen(datei_id, dateiname) {
+        try {
+            const r = await client.get(`/dateien/${datei_id}`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(r.data);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = dateiname || 'produkteblatt';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch {
+            setFehler('Produkteblatt konnte nicht geladen werden');
+        }
+    }
+
+    async function produkteblattSpeichern(programm, zusatz) {
         setBusy(true);
         try {
             // PUT /programme/:id erwartet die Pflichtfelder mit, sonst 400.
@@ -269,7 +314,7 @@ export default function Programme() {
                 monatspreis: programm.monatspreis ?? programm.tarif_pro_tag ?? 0,
                 avg_dauer_monate: programm.avg_dauer_monate,
                 aufwand_h_monat: programm.aufwand_h_monat,
-                produkteblatt_url: url || null,
+                ...zusatz,
             });
             await ladeProgramme();
         } catch (err) {
@@ -583,28 +628,44 @@ export default function Programme() {
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                                                                     <div style={{ width: 12, height: 12, borderRadius: 4, background: p.farbe_hex, flexShrink: 0 }} />
                                                                     <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{p.name}</div>
-                                                                    {!editierbar && p.produkteblatt_url && (
-                                                                        <a
-                                                                            href={p.produkteblatt_url}
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                            style={{ fontSize: 12, color: '#2563EB', textDecoration: 'none', flexShrink: 0 }}
-                                                                        >📄 Produkteblatt SVA</a>
+                                                                    {!editierbar && p.produkteblatt_datei_id && (
+                                                                        <button
+                                                                            onClick={() => produkteblattOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
+                                                                            style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, padding: 0 }}
+                                                                        >📄 {p.produkteblatt_dateiname || 'Produkteblatt SVA'}</button>
                                                                     )}
                                                                 </div>
 
                                                                 {editierbar && (
-                                                                    <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 14 }}>
+                                                                    <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
                                                                         <span style={{ fontSize: 11.5, color: '#6B6860', flexShrink: 0 }}>Produkteblatt SVA</span>
-                                                                        <input
-                                                                            defaultValue={p.produkteblatt_url || ''}
-                                                                            onBlur={e => {
-                                                                                const wert = e.target.value.trim();
-                                                                                if (wert !== (p.produkteblatt_url || '')) produkteblattSpeichern(p, wert);
-                                                                            }}
-                                                                            placeholder="https://… (Link zum PDF)"
-                                                                            style={{ ...INPUT_S, flex: 1 }}
-                                                                        />
+                                                                        {p.produkteblatt_datei_id ? (
+                                                                            <>
+                                                                                <button
+                                                                                    onClick={() => produkteblattOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
+                                                                                    style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+                                                                                >📄 {p.produkteblatt_dateiname}</button>
+                                                                                <button
+                                                                                    onClick={() => produkteblattEntfernen(p)}
+                                                                                    disabled={busy}
+                                                                                    style={{ ...BTN_ADD, border: '1px solid rgba(220,38,38,.25)', background: '#FEF2F2', color: '#B91C1C' }}
+                                                                                >Entfernen</button>
+                                                                            </>
+                                                                        ) : (
+                                                                            <label style={{ ...BTN_ADD, cursor: 'pointer' }}>
+                                                                                Datei wählen…
+                                                                                <input
+                                                                                    type="file"
+                                                                                    accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
+                                                                                    onChange={e => {
+                                                                                        produkteblattHochladen(p, e.target.files?.[0]);
+                                                                                        e.target.value = '';
+                                                                                    }}
+                                                                                    style={{ display: 'none' }}
+                                                                                />
+                                                                            </label>
+                                                                        )}
+                                                                        <span style={{ fontSize: 10.5, color: '#A09D97' }}>PDF, JPG, PNG, DOCX, XLSX · max. 20 MB</span>
                                                                     </div>
                                                                 )}
 

@@ -30,6 +30,7 @@ app.use('/api/reporting',    require('./src/routes/reporting'));
 app.use('/api/feedback',     require('./src/routes/feedback'));
 app.use('/api/klientenbesprechung', require('./src/routes/klientenbesprechung'));
 app.use('/api/vorlagen',     require('./src/routes/vorlagen'));
+app.use('/api/dateien',      require('./src/routes/dateien'));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -39,6 +40,8 @@ app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ error: 'Interner Serverfehler' });
 });
+
+require('./src/dateiablage').pruefen();
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

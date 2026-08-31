@@ -4,7 +4,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
-const { hatSpalte } = require('../schema-flags');
+const { hatSpalte, hatTabelle } = require('../schema-flags');
 
 // Wer Programme, Phasen und Kriterien pflegen darf. Die Werte 'teamleitung' und
 // 'management' sind historisch und kommen im Bestand nicht mehr vor – sie bleiben
@@ -103,11 +103,16 @@ async function ladePhasenUndRollen(progRows) {
 // GET /api/programme — Alle Programme (flach oder gruppiert via ?grouped=true)
 router.get('/', auth, async (req, res) => {
     try {
+        // Der Join auf datei existiert erst nach add-dateien.sql.
+        const pbDateiDa = await hatTabelle('datei')
+            && await hatSpalte('programm', 'produkteblatt_datei_id');
         const result = await db.query(
             `SELECT p.*,
+                ${pbDateiDa ? 'pb.dateiname AS produkteblatt_dateiname,' : 'NULL::varchar AS produkteblatt_dateiname,'}
                 l.tarifziffer, l.tarif, l.entschaedigungsart
              FROM programm p
              LEFT JOIN leistung l ON l.leistung_id = p.leistung_id
+             ${pbDateiDa ? 'LEFT JOIN datei pb ON pb.datei_id = p.produkteblatt_datei_id' : ''}
              WHERE p.aktiv = TRUE
              ORDER BY p.gruppe NULLS LAST, p.name`
         );
@@ -183,10 +188,18 @@ router.put('/:id', auth, async (req, res) => {
     if (!PROGRAMM_PFLEGE_ROLLEN.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
-    const { name, farbe_hex, monatspreis, avg_dauer_monate, aufwand_h_monat, produkteblatt_url } = req.body;
+    const { name, farbe_hex, monatspreis, avg_dauer_monate, aufwand_h_monat,
+            produkteblatt_url, produkteblatt_datei_id } = req.body;
     if (!name || !monatspreis) return res.status(400).json({ error: 'Name und Monatspreis erforderlich' });
     try {
         const pbDa = await hatSpalte('programm', 'produkteblatt_url');
+        const pbDateiDa = await hatSpalte('programm', 'produkteblatt_datei_id');
+        if (produkteblatt_datei_id !== undefined && pbDateiDa) {
+            await db.query(
+                `UPDATE programm SET produkteblatt_datei_id = $1 WHERE programm_id = $2`,
+                [produkteblatt_datei_id || null, req.params.id]
+            );
+        }
         const basis = [name, farbe_hex || '#2563EB', monatspreis, avg_dauer_monate || null,
                        monatspreis, (avg_dauer_monate || 1) * 30, aufwand_h_monat || 10];
         await db.query(
