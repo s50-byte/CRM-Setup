@@ -21,7 +21,10 @@ Datei muss zuerst auf crm-db.
 2. Diese beiden Befehle ausgeben, damit ich sie ausführe:
 
        scp backend/<migration>.sql 192.168.130.11:/tmp/
-       ssh -t 192.168.130.11 'sudo -u postgres psql -d iv_crm -f /tmp/<migration>.sql'
+       ssh -t 192.168.130.11 'sudo -u postgres psql -P pager=off -d iv_crm -f /tmp/<migration>.sql'
+
+   `-P pager=off` verhindert, dass psql die Ausgabe in `less` schiebt – ein
+   wartender Pager sieht aus wie ein haengendes Skript.
 
    `ssh -t` ist Pflicht – `sudo` auf crm-db verlangt ein Passwort und scheitert
    ohne Terminal mit `sudo: a terminal is required to read the password`.
@@ -40,3 +43,8 @@ Weiteres:
   bestehende Seiten zwischen Deployment und Migration 500er.
 - Der Schema-Check ist gecacht: nach dem Einspielen einer Migration
   `pm2 restart iv-crm-backend`, damit die neuen Felder genutzt werden.
+- Jede Migration beginnt mit `\set ON_ERROR_STOP on` und `SET lock_timeout =
+  '15s';`. Ohne das wartet ein Skript unbegrenzt, wenn eine andere offene
+  Transaktion dieselben Tabellen haelt – und eine vergessene psql-Sitzung mit
+  offener Transaktion blockiert jeden weiteren Versuch stumm. Bei Verdacht:
+  `SELECT pid FROM pg_stat_activity WHERE datname='iv_crm' AND usename='postgres'`.
