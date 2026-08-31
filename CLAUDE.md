@@ -20,6 +20,12 @@ deutsch – neuer Code folgt dem (kein Umbenennen auf Englisch).
 - Repo: github.com/s50-byte/CRM-Setup (PAT ist in der Remote-URL hinterlegt)
 - Immer aus `/home/simon/iv-crm` arbeiten, nie aus einem Unterverzeichnis.
 
+Simon sitzt auf **crm-app**. Bei jedem Befehl, den er ausführen soll, dazusagen,
+auf welcher Maschine er läuft – oder den Sprung gleich einbauen
+(`ssh -t 192.168.130.11 '…'`). Ohne Angabe wird auf crm-app ausgeführt und
+scheitert, wenn es auf crm-db gehört. Dasselbe gilt für Dateien: `/tmp` ist auf
+jeder Maschine ein anderes.
+
 ## Deployment (kritisch)
 
 Frontend-Änderungen werden erst sichtbar nach:
