@@ -47,7 +47,12 @@ Wichtig: Den Benutzer `postgres` gibt es nur auf crm-db, nicht auf crm-app. Die
 `sudo: unknown user postgres`. Ab `/home/simon/iv-crm`:
 
     scp backend/<migration>.sql 192.168.130.11:/tmp/
-    ssh 192.168.130.11 'sudo -u postgres psql -d iv_crm -f /tmp/<migration>.sql'
+    ssh -t 192.168.130.11 'sudo -u postgres psql -d iv_crm -f /tmp/<migration>.sql'
+
+`ssh -t` ist nötig: `sudo` auf crm-db verlangt ein Passwort und braucht dafür ein
+Terminal, sonst kommt `sudo: a terminal is required to read the password`.
+Mehrere Migrationen in einem Rutsch: weitere `-f <datei>` anhängen, dann wird das
+Passwort nur einmal abgefragt.
 
 Führe Migrationen nicht selbst aus – lege die `.sql`-Datei an, kopiere sie nach
 crm-db und gib mir den exakten Befehl.

@@ -21,7 +21,11 @@ Datei muss zuerst auf crm-db.
 2. Diese beiden Befehle ausgeben, damit ich sie ausführe:
 
        scp backend/<migration>.sql 192.168.130.11:/tmp/
-       ssh 192.168.130.11 'sudo -u postgres psql -d iv_crm -f /tmp/<migration>.sql'
+       ssh -t 192.168.130.11 'sudo -u postgres psql -d iv_crm -f /tmp/<migration>.sql'
+
+   `ssh -t` ist Pflicht – `sudo` auf crm-db verlangt ein Passwort und scheitert
+   ohne Terminal mit `sudo: a terminal is required to read the password`.
+   Mehrere Migrationen: weitere `-f <datei>` an denselben Aufruf anhängen.
 
 Weiteres:
 
