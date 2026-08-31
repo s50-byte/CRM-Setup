@@ -19,19 +19,30 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
     const [laden, setLaden] = useState(false);
     const [fehler, setFehler] = useState('');
 
+    // Zugewiesene ohne die eigene Person – fuer die gibt es die Checkbox "Ich nehme teil".
+    const zugewieseneOhneMich = (dossierZuweisungen || [])
+        .filter(b => b.user_id !== currentUser?.user_id);
+
+    // Bleibt dabei niemand uebrig – etwa weil nur die eigene Person zugewiesen ist
+    // oder ueberhaupt niemand –, waere die Auswahl leer (Feedback 23.06.2026).
+    // In dem Fall alle Benutzer anbieten statt einer toten Liste.
+    const nurZugewiesene = zugewieseneOhneMich.length > 0;
+
     useEffect(() => {
         if (!open) return;
         setDropdownOffen(false);
         if (!klientId) {
             client.get('/klienten').then(r => setKlienten(r.data)).catch(console.error);
         }
-        if (!dossierZuweisungen) {
+        if (!nurZugewiesene) {
             client.get('/benutzer').then(r => setBenutzer(r.data)).catch(console.error);
         }
         if (klientId) setForm(prev => ({ ...prev, klient_id: klientId }));
-    }, [open, klientId, dossierZuweisungen]);
+    }, [open, klientId, nurZugewiesene]);
 
-    const personenListe = (dossierZuweisungen || benutzer).filter(b => b.user_id !== currentUser?.user_id);
+    const personenListe = nurZugewiesene
+        ? zugewieseneOhneMich
+        : benutzer.filter(b => b.user_id !== currentUser?.user_id);
 
     function set(field, value) {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -138,8 +149,13 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
                                 borderRadius: 7, boxShadow: '0 4px 14px rgba(0,0,0,.12)',
                                 maxHeight: 200, overflowY: 'auto',
                             }}>
+                                {!nurZugewiesene && dossierZuweisungen && personenListe.length > 0 && (
+                                    <div style={{ padding: '7px 12px', fontSize: 11, color: '#92400E', background: '#FFFBEB', borderBottom: '1px solid rgba(217,119,6,.15)' }}>
+                                        Dem Dossier ist niemand sonst zugewiesen – Auswahl aus allen Mitarbeitenden.
+                                    </div>
+                                )}
                                 {personenListe.length === 0 ? (
-                                    <div style={{ padding: '10px 12px', fontSize: 12, color: '#A09D97' }}>Lädt…</div>
+                                    <div style={{ padding: '10px 12px', fontSize: 12, color: '#A09D97' }}>Keine Personen verfügbar</div>
                                 ) : personenListe.map(b => {
                                     const sel = teilnehmende.includes(b.user_id);
                                     return (

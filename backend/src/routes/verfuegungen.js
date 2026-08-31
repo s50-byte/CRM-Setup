@@ -239,6 +239,40 @@ router.delete('/:id', auth, async (req, res) => {
     }
 });
 
+// Startet das Programm eines Dossiers anhand der Leistung einer Verfuegungsposition.
+//
+// POST /verfuegungen kennt zwar einen programm_id-Parameter, aber die Oberflaeche
+// schickt ihn nicht mit – das Programm wurde darum nie gestartet ("Verfuegungen
+// werden nicht mehr als Programme erkannt", Feedback 23.06.2026). Die Zuordnung
+// steckt ohnehin in den Positionen: programm.leistung_id verweist eindeutig auf
+// die Leistung, jede Leistung gehoert zu hoechstens einem Programm.
+//
+// Nur eine aktive Verfuegung startet ein Programm, und nur wenn noch keines laeuft.
+async function programmAusPositionStarten(verfuegung_id, leistung_id) {
+    const r = await db.query(
+        `SELECT v.dossier_id, v.datum, p.programm_id
+         FROM verfuegung v
+         JOIN dossier d ON d.dossier_id = v.dossier_id
+         JOIN programm p ON p.leistung_id = $2
+         WHERE v.verfuegung_id = $1
+           AND v.status = 'aktiv'
+           AND d.akt_programm_id IS NULL`,
+        [verfuegung_id, leistung_id]
+    );
+    if (!r.rows.length) return;
+    const { dossier_id, datum, programm_id } = r.rows[0];
+
+    await db.query(
+        `UPDATE dossier SET akt_programm_id = $1, updated_at = NOW() WHERE dossier_id = $2`,
+        [programm_id, dossier_id]
+    );
+    await db.query(
+        `INSERT INTO programm_verlauf (dossier_id, programm_id, status, start_datum)
+         VALUES ($1, $2, 'Laufend', COALESCE($3, CURRENT_DATE))`,
+        [dossier_id, programm_id, datum || null]
+    );
+}
+
 // POST /api/verfuegungen/:id/positionen
 router.post('/:id/positionen', auth, async (req, res) => {
     const { leistung_id, soll_stunden, reihenfolge, verrechnungsart, betrag } = req.body;
@@ -249,6 +283,7 @@ router.post('/:id/positionen', auth, async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
             [req.params.id, leistung_id, soll_stunden || 0, reihenfolge || 0, verrechnungsart || null, betrag || null]
         );
+        await programmAusPositionStarten(req.params.id, leistung_id);
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err);
