@@ -75,10 +75,10 @@ nicht pauschal einlesen.
   ein fehlgeschlagener Lookup wird zum Fehler, ein unbekannter Klient zu einer
   sichtbaren Warnung im Modal.
 - Backlog: Etappe 3 (Serienbrief-Multi), Dark Mode
-- Offen im Vorlagen-Kontext: `{klientenfuehrung}` bleibt `—`, solange keine
-  Zuweisung mit `rolle_im_fall = 'Klientenführung'` existiert (z. B. nur
-  „Fachperson"). Produktentscheid nötig, ob ersatzweise eine andere aktive
-  Zuweisung gezogen werden soll.
+- Entschieden: `{klientenfuehrung}` zieht ausschliesslich eine Zuweisung mit
+  `rolle_im_fall = 'Klientenführung'`. Klientenführung ist eine eigenständige
+  Rolle – „Fachperson" ist etwas anderes und darf nicht ersatzweise einspringen.
+  Fehlt die Zuweisung, bleibt der Platzhalter korrekterweise `—`.
 
 Was tatsächlich ansteht, steht im Tool unter Management → Feedback (Status
 `offen` / `backlog`), nicht hier – dieser Abschnitt ist nur eine Momentaufnahme.

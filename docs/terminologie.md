@@ -80,5 +80,12 @@ Davon zu unterscheiden ist die **Rolle im Fall** (`klient_user.rolle_im_fall`,
 z. B. `Klientenführung`) – sie sagt, wer für einen konkreten Klienten zuständig
 ist, und hat mit Berechtigungen nichts zu tun.
 
+Die Rollen im Fall sind fachlich eigenständig und nicht gegeneinander
+austauschbar: **Klientenführung** ist die Fallführung, **Fachperson** eine
+andere Funktion am selben Fall. Wo die Klientenführung gefragt ist – etwa beim
+Platzhalter `{klientenfuehrung}` – wird ausschliesslich eine aktive Zuweisung
+mit `rolle_im_fall = 'Klientenführung'` gezogen. Ist keine hinterlegt, bleibt
+das Feld leer; ersatzweise eine andere Rolle einzusetzen wäre fachlich falsch.
+
 **Managementmodus** ist kein Recht, sondern ein Ansichtsschalter: er blendet die
 Management-Navigation ein und wird im `localStorage` gehalten.
