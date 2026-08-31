@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
+import { ROLLEN_EIGENES_PROFIL } from '../constants/rollen';
 
 const CARD = {
     background: '#fff', border: '1px solid rgba(0,0,0,.09)',
@@ -39,7 +40,7 @@ function Toggle({ label, checked, onChange }) {
     );
 }
 
-const ROLLEN_LISTE = ['Klientenführung', 'Job Coach', 'Fachperson', 'Intake'];
+const ROLLEN_LISTE = ROLLEN_EIGENES_PROFIL;
 const ABTEILUNGEN_LISTE = ['Admin 1', 'Admin 2', 'Admin 3', 'Beratung & Coaching', 'BI IT', 'Logistik', 'Restwert', 'Telefonservice', 'Wäscheservice'];
 const BEREICH_LISTE = [
     { value: 'BM', label: 'Berufsmassnahmen' },

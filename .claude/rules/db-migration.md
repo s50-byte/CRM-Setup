@@ -10,14 +10,18 @@ paths: ["migrations/**", "**/*.sql", "backend/*.sql"]
 (192.168.130.11) als `postgres` aus `/tmp` (peer auth + Rechte auf dem
 Home-Verzeichnis).
 
-**Migration nicht selbst als `crm_user` ausführen.** Stattdessen:
+**Den Benutzer `postgres` gibt es nur auf crm-db, nicht auf crm-app.** Ein
+`sudo -u postgres …` auf crm-app scheitert mit `unknown user postgres`. Die
+Datei muss zuerst auf crm-db.
+
+**Migration nicht selbst ausführen.** Stattdessen:
 
 1. `.sql`-Datei im Repo anlegen (`backend/add-*.sql` bzw. `backend/update-*.sql`,
    Namensschema der bestehenden Dateien übernehmen).
-2. Datei nach `/tmp` kopieren.
-3. Diesen exakten Befehl ausgeben, damit ich ihn ausführe:
+2. Diese beiden Befehle ausgeben, damit ich sie ausführe:
 
-       sudo -u postgres psql -d iv_crm -f /tmp/<migration>.sql
+       scp backend/<migration>.sql 192.168.130.11:/tmp/
+       ssh 192.168.130.11 'sudo -u postgres psql -d iv_crm -f /tmp/<migration>.sql'
 
 Weiteres:
 
@@ -26,5 +30,9 @@ Weiteres:
 - Enum-Erweiterungen per `ALTER TYPE ... ADD VALUE` gehören in die Migration,
   nicht in `schema.sql` – `schema.sql` ist der historische Ausgangs-Dump und
   wird nicht nachgeführt.
-- Backend-Code, der auf die neue Struktur baut, erst nach der Migration
-  deployen (`pm2 restart iv-crm-backend`).
+- Code darf die Migration nicht voraussetzen: Code und Datenbank werden getrennt
+  deployed. Neue Spalten/Tabellen über `backend/src/schema-flags.js` abfragen
+  (`hatSpalte` / `hatTabelle`) und das SQL entsprechend bauen, sonst liefern
+  bestehende Seiten zwischen Deployment und Migration 500er.
+- Der Schema-Check ist gecacht: nach dem Einspielen einer Migration
+  `pm2 restart iv-crm-backend`, damit die neuen Felder genutzt werden.

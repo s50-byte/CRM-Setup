@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
+import { ROLLEN_FILTER as ROLLEN_FILTER_OPTS } from '../../constants/rollen';
 
 function AuslastungBar({ pct }) {
     const color = pct === null ? '#A09D97' : pct >= 80 ? '#16A34A' : pct >= 60 ? '#D97706' : '#DC2626';
@@ -21,7 +22,7 @@ const TH = ({ children, right }) => (
     </th>
 );
 
-const ROLLEN_FILTER = ['Alle', 'Klientenführung', 'Job Coach', 'Fachperson'];
+const ROLLEN_FILTER = ROLLEN_FILTER_OPTS;
 
 function freiFarbe(frei) {
     return frei < 0 ? '#B91C1C' : frei === 0 ? '#D97706' : '#15803D';

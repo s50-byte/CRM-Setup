@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
 import Modal from '../components/Modal';
+import { FALLROLLEN } from '../constants/rollen';
 
 const UEBERSICHT = '__uebersicht__';
 
-const ROLLEN = ['Klientenführung', 'Job Coach', 'Fachperson'];
+const ROLLEN = FALLROLLEN;
 
 const CARD = {
     background: '#fff',

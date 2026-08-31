@@ -8,10 +8,15 @@ const auth = require('../middleware/auth');
 
 const MANAGEMENT_ROLLEN = ['leitungsteam', 'admin'];
 
+// Richtwert fuer die Kapazitaet je Fallrolle. Abteilungs- und Bereichsleitung
+// fuehren neben der Leitungsaufgabe nur wenige Faelle (Feedback 06.07.2026) –
+// der Wert ist eine Annahme und pro Person im Benutzerdialog ueberschreibbar.
 const DEFAULT_MAX_KLIENTEN = {
     'Klientenführung': 15,
     'Job Coach': 20,
     'Fachperson': 10,
+    'Abteilungsleitung': 8,
+    'Bereichsleitung': 5,
     'Teamleitung': 8,
     'Management': 5,
 };

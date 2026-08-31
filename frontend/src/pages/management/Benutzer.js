@@ -2,14 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import BenutzerModal from '../../components/BenutzerModal';
+import { ROLLE_FARBE } from '../../constants/rollen';
 
-const ROLLEN_FARBEN = {
-    'Klientenführung': { bg: '#EEF3FE', color: '#1D4ED8' },
-    'Job Coach':       { bg: '#F0FDF4', color: '#15803D' },
-    'Fachperson':      { bg: '#F5F3FF', color: '#5B21B6' },
-    'Teamleitung':     { bg: '#FFF7ED', color: '#C2410C' },
-    'Management':      { bg: '#FDF4FF', color: '#7E22CE' },
-};
+const ROLLEN_FARBEN = ROLLE_FARBE;
 
 const SYSTEM_ROLLEN = [
     { value: 'kader',        label: 'Kader' },

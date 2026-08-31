@@ -38,13 +38,19 @@ Bundles mit in den Commit.
 
 ## Datenbank-Migrationen
 
-`crm_user` hat keine Owner-Rechte. Migrationen werden manuell auf crm-db als
-`postgres` ausgeführt, aus `/tmp` (peer auth + Home-Verzeichnis-Rechte):
+`crm_user` hat keine Owner-Rechte. Migrationen werden manuell **auf crm-db**
+(192.168.130.11) als `postgres` ausgeführt, aus `/tmp` (peer auth +
+Home-Verzeichnis-Rechte).
 
-    sudo -u postgres psql -d iv_crm -f /tmp/<migration>.sql
+Wichtig: Den Benutzer `postgres` gibt es nur auf crm-db, nicht auf crm-app. Die
+`.sql`-Datei muss also zuerst dorthin – sonst kommt
+`sudo: unknown user postgres`. Ab `/home/simon/iv-crm`:
 
-Führe Migrationen nicht selbst als `crm_user` aus – lege die `.sql`-Datei an und
-gib mir den exakten Befehl.
+    scp backend/<migration>.sql 192.168.130.11:/tmp/
+    ssh 192.168.130.11 'sudo -u postgres psql -d iv_crm -f /tmp/<migration>.sql'
+
+Führe Migrationen nicht selbst aus – lege die `.sql`-Datei an, kopiere sie nach
+crm-db und gib mir den exakten Befehl.
 
 Ablage: Migrationen liegen als `backend/add-*.sql` / `backend/update-*.sql`
 (kein Migrations-Runner, keine Versionstabelle – Reihenfolge ergibt sich aus dem
@@ -59,11 +65,9 @@ Laufzeit (gecacht), ob eine Spalte oder Tabelle existiert, und baut das SQL
 entsprechend. Nach dem Einspielen einer Migration braucht es darum einen
 PM2-Restart, damit die neuen Felder genutzt werden.
 
-Aktuell noch nicht eingespielt:
-
-    sudo -u postgres psql -d iv_crm -f /tmp/add-notfallkontakte.sql
-    sudo -u postgres psql -d iv_crm -f /tmp/add-kriterium-verantwortlich.sql
-    sudo -u postgres psql -d iv_crm -f /tmp/add-programm-produkteblatt.sql
+Aktuell noch nicht eingespielt: `add-notfallkontakte.sql`,
+`add-kriterium-verantwortlich.sql`, `add-programm-produkteblatt.sql`
+(alle in `backend/`, Ablauf siehe oben).
 
 ## Arbeitsweise
 
@@ -93,9 +97,10 @@ nicht pauschal einlesen.
   Benachrichtigungszähler in der Navigation, Verantwortliche je Kriterium,
   Intake-Hinweis, Intake-Anfragen aus der Klientenliste, +41-Vorwahl,
   Produkteblatt-Link am Programm.
-- Zurückgestellt: Rollen AL/BL im Profil – unklar wofür AL und BL stehen und ob
-  sie Fallrollen (`klient_user.rolle_im_fall`, wirken auf die Auslastung) oder
-  nur beschreibend sind.
+- Fallrollen Abteilungsleitung (AL) und Bereichsleitung (BL) ergänzt. Sie sind
+  gleichrangige Fallrollen ohne besondere Systemrechte. Die Liste stand an sieben
+  Stellen dupliziert und liegt jetzt zentral in
+  `frontend/src/constants/rollen.js` – neue Fallrollen nur noch dort ergänzen.
 - Backlog: Etappe 3 (Serienbrief-Multi), Dark Mode
 - Entschieden: `{klientenfuehrung}` zieht ausschliesslich eine Zuweisung mit
   `rolle_im_fall = 'Klientenführung'`. Klientenführung ist eine eigenständige

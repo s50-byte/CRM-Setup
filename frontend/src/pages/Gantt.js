@@ -2,16 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { ROLLEN_FILTER, ROLLE_FARBE } from '../constants/rollen';
 
 const ERLAUBTE_ROLLEN = ['kader', 'leitungsteam', 'management', 'teamleitung'];
 
-const ROLLEN_OPTS = ['Alle', 'Klientenführung', 'Job Coach', 'Fachperson'];
+const ROLLEN_OPTS = ROLLEN_FILTER;
 
-const ROLLE_FARBEN = {
-    'Klientenführung': '#2563EB',
-    'Job Coach':       '#16A34A',
-    'Fachperson':      '#7C3AED',
-};
+const ROLLE_FARBEN = Object.fromEntries(
+    Object.entries(ROLLE_FARBE).map(([r, f]) => [r, f.linie])
+);
 
 const LABEL_FARBEN = {
     'LE': { bg: '#ECFDF5', color: '#15803D' },

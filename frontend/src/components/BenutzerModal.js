@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import client from '../api/client';
 import Modal from './Modal';
+import { FALLROLLEN } from '../constants/rollen';
 
 const SYSTEM_ROLLEN = [
     { value: 'kader',        label: 'Kader' },
     { value: 'leitungsteam', label: 'Leitungsteam' },
 ];
 
-const ROLLEN_LISTE = ['Klientenführung', 'Job Coach', 'Fachperson'];
+const ROLLEN_LISTE = FALLROLLEN;
 
 function FieldLabel({ children, required }) {
     return (

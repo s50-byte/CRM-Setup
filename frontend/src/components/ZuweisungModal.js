@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import client from '../api/client';
+import { ROLLEN_ZUWEISUNG } from '../constants/rollen';
 
-const ROLLEN = ['Klientenführung', 'Job Coach', 'Fachperson', 'Stellvertretung'];
+const ROLLEN = ROLLEN_ZUWEISUNG;
 
 let _seq = 1;
 const uid = () => String(_seq++);
