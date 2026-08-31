@@ -15,7 +15,11 @@ const crypto = require('crypto');
 
 // Konfigurierbar, damit die Daten auf eine eigene Platte umziehen koennen,
 // ohne dass Code angefasst wird.
-const WURZEL = process.env.DATEI_ABLAGE_PFAD || '/var/lib/iv-crm/dateien';
+// Liegt auf der Datenplatte (/mnt/data), nicht im Wurzeldateisystem und nicht
+// unter /var/www. Faellt die Platte weg, soll der Upload scheitern und nicht
+// unbemerkt ins darunterliegende Verzeichnis laufen – darum prueft pruefen()
+// beim Start auf einen eigenen Mountpoint.
+const WURZEL = process.env.DATEI_ABLAGE_PFAD || '/mnt/data/iv-crm/dateien';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -84,12 +88,22 @@ async function pruefen() {
     try {
         await fsp.mkdir(WURZEL, { recursive: true });
         await fsp.access(WURZEL, fs.constants.W_OK);
-        console.log('✓ Dateiablage bereit:', WURZEL);
-        return true;
     } catch (err) {
         console.error('❌ Dateiablage nicht beschreibbar:', WURZEL, '—', err.message);
         return false;
     }
+    // Ist die Datenplatte wirklich gemountet? Ohne diese Pruefung wuerde nach
+    // einem Neustart ohne Mount stillschweigend ins Wurzeldateisystem
+    // geschrieben – die Dateien waeren „da", laegen aber am falschen Ort.
+    try {
+        const hier = await fsp.stat(WURZEL);
+        const oben = await fsp.stat(path.parse(path.resolve(WURZEL)).root);
+        if (hier.dev === oben.dev) {
+            console.warn('⚠ Dateiablage liegt im Wurzeldateisystem, nicht auf der Datenplatte:', WURZEL);
+        }
+    } catch { /* Mountpruefung ist nur ein Hinweis, kein Ausschlusskriterium */ }
+    console.log('✓ Dateiablage bereit:', WURZEL);
+    return true;
 }
 
 module.exports = {
