@@ -101,11 +101,17 @@ nicht pauschal einlesen.
   stille Fallback ist entfernt: Beispieldaten gibt es nur noch ohne `klient_id`,
   ein fehlgeschlagener Lookup wird zum Fehler, ein unbekannter Klient zu einer
   sichtbaren Warnung im Modal.
-- Backlog aus dem Feedback abgearbeitet (31.08.2026): User-Reaktivierung,
-  mehrere Notfallkontakte, Präsenz-Meldungen nur noch bei Meldenswertem,
+- Backlog aus dem Feedback abgearbeitet und von Simon getestet (31.08.2026):
+  User-Reaktivierung, mehrere Notfallkontakte, Präsenz-Meldungen,
   Benachrichtigungszähler in der Navigation, Verantwortliche je Kriterium,
   Intake-Hinweis, Intake-Anfragen aus der Klientenliste, +41-Vorwahl,
-  Produkteblatt-Link am Programm.
+  Fallrollen AL/BL. Alle dgok. Die Feedback-Einträge stehen noch auf `backlog` –
+  das Beantworten löst eine Rückmeldung an die Melder aus und macht Simon selbst.
+- Präsenz-Meldungen: die Präsenzseite legt beim Öffnen für jeden Klienten ohne
+  Eintrag automatisch `anwesend` an. Solche Aufrufe tragen `automatisch: true`
+  und lösen keine Meldung aus; jeder von Hand gesetzte Status meldet. Empfänger
+  ist die Klientenführung (ersatzweise die übrigen aktiven Zuweisungen, wenn
+  keine gesetzt ist) – auch dann, wenn sie selbst erfasst hat.
 - Fallrollen Abteilungsleitung (AL) und Bereichsleitung (BL) ergänzt. Sie sind
   gleichrangige Fallrollen ohne besondere Systemrechte. Die Liste stand an sieben
   Stellen dupliziert und liegt jetzt zentral in
