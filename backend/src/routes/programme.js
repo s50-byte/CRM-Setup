@@ -243,10 +243,14 @@ router.post('/:id/phasen', auth, async (req, res) => {
         // haetten neue Phasen keinen Tarifbezug und fielen beim Aufloesen des
         // Katalogs hinten runter.
         const tarifDa = await hatSpalte('phase', 'leistung_id');
-        const count = await db.query(
-            `SELECT COUNT(*) FROM phase WHERE programm_id = $1`, [req.params.id]
+        // MAX+1 statt COUNT: auf (programm_id, reihenfolge) liegt ein UNIQUE, und
+        // die bestehenden Phasen beginnen bei 1, nicht bei 0. Mit COUNT kollidierte
+        // jede zweite Phase mit der ersten – Phasen liessen sich so nie ergaenzen.
+        const naechste = await db.query(
+            `SELECT COALESCE(MAX(reihenfolge) + 1, 0) AS n FROM phase WHERE programm_id = $1`,
+            [req.params.id]
         );
-        const reihenfolge = parseInt(count.rows[0].count);
+        const reihenfolge = parseInt(naechste.rows[0].n, 10);
         const result = await db.query(
             tarifDa
                 ? `INSERT INTO phase (programm_id, label, reihenfolge, avg_dauer_tage, leistung_id)
@@ -263,16 +267,75 @@ router.post('/:id/phasen', auth, async (req, res) => {
     }
 });
 
-// PUT /api/programme/:id/phasen/:phase_id — Phase umbenennen
+// PUT /api/programme/:id/phasen/:phase_id — Phase aendern (Bezeichnung, Solldauer)
 router.put('/:id/phasen/:phase_id', auth, async (req, res) => {
-    const { label } = req.body;
-    if (!label?.trim()) return res.status(400).json({ error: 'Label erforderlich' });
+    if (!PROGRAMM_PFLEGE_ROLLEN.includes(req.user.system_rolle)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+    const { label, avg_dauer_tage } = req.body;
+    if (label !== undefined && !label?.trim()) {
+        return res.status(400).json({ error: 'Bezeichnung darf nicht leer sein' });
+    }
+    // Die Solldauer ist die Grundlage fuer die Erstverteilung auf dem Zeitstrahl.
+    // 0 oder negativ ergibt keine Phase – eine Phase dauert mindestens einen Tag.
+    const dauer = avg_dauer_tage === undefined || avg_dauer_tage === null || avg_dauer_tage === ''
+        ? undefined
+        : parseInt(avg_dauer_tage, 10);
+    if (dauer !== undefined && (Number.isNaN(dauer) || dauer < 1)) {
+        return res.status(400).json({ error: 'Solldauer muss mindestens 1 Tag sein' });
+    }
     try {
-        await db.query(`UPDATE phase SET label = $1 WHERE phase_id = $2`, [label.trim(), req.params.phase_id]);
-        res.json({ message: 'Phase umbenannt' });
+        const r = await db.query(
+            `UPDATE phase SET
+                label = COALESCE($1, label),
+                avg_dauer_tage = COALESCE($2, avg_dauer_tage)
+             WHERE phase_id = $3
+             RETURNING phase_id, label, reihenfolge, avg_dauer_tage`,
+            [label?.trim() ?? null, dauer ?? null, req.params.phase_id]
+        );
+        if (!r.rows.length) return res.status(404).json({ error: 'Phase nicht gefunden' });
+        res.json(r.rows[0]);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Fehler beim Umbenennen' });
+        res.status(500).json({ error: 'Fehler beim Speichern der Phase' });
+    }
+});
+
+// PUT /api/programme/:id/phasen-reihenfolge — Reihenfolge der Phasen setzen
+// Erwartet { phase_ids: [...] } in der gewuenschten Abfolge.
+router.put('/:id/phasen-reihenfolge', auth, async (req, res) => {
+    if (!PROGRAMM_PFLEGE_ROLLEN.includes(req.user.system_rolle)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+    const { phase_ids } = req.body;
+    if (!Array.isArray(phase_ids) || phase_ids.length === 0) {
+        return res.status(400).json({ error: 'phase_ids erforderlich' });
+    }
+    const pgClient = await db.connect();
+    try {
+        await pgClient.query('BEGIN');
+        // Zweistufig: die Spalte haengt an einem UNIQUE (programm_id, reihenfolge),
+        // ein direktes Umnummerieren kollidiert unterwegs mit sich selbst.
+        for (let i = 0; i < phase_ids.length; i++) {
+            await pgClient.query(
+                `UPDATE phase SET reihenfolge = $1 WHERE phase_id = $2 AND programm_id = $3`,
+                [-(i + 1), phase_ids[i], req.params.id]
+            );
+        }
+        for (let i = 0; i < phase_ids.length; i++) {
+            await pgClient.query(
+                `UPDATE phase SET reihenfolge = $1 WHERE phase_id = $2 AND programm_id = $3`,
+                [i, phase_ids[i], req.params.id]
+            );
+        }
+        await pgClient.query('COMMIT');
+        res.json({ ok: true });
+    } catch (err) {
+        await pgClient.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Sortieren der Phasen' });
+    } finally {
+        pgClient.release();
     }
 });
 
@@ -317,10 +380,11 @@ router.post('/phasen/:phase_id/kriterien', auth, async (req, res) => {
     if (!text?.trim()) return res.status(400).json({ error: 'Text erforderlich' });
     try {
         const vwDa = await hatSpalte('kriterium', 'verantwortlich_user_id');
-        const count = await db.query(
-            `SELECT COUNT(*) FROM kriterium WHERE phase_id = $1`, [req.params.phase_id]
+        const naechste = await db.query(
+            `SELECT COALESCE(MAX(reihenfolge) + 1, 0) AS n FROM kriterium WHERE phase_id = $1`,
+            [req.params.phase_id]
         );
-        const reihenfolge = parseInt(count.rows[0].count);
+        const reihenfolge = parseInt(naechste.rows[0].n, 10);
         const result = await db.query(
             vwDa
                 ? `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge, verantwortlich_user_id)

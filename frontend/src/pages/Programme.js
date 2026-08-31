@@ -6,7 +6,20 @@ import { FALLROLLEN } from '../constants/rollen';
 
 const UEBERSICHT = '__uebersicht__';
 
+const BTN_SORT = {
+    border: 'none', background: 'none', cursor: 'pointer', padding: 0,
+    fontSize: 7, lineHeight: 1, color: '#6B6860', fontFamily: 'inherit',
+};
+
 const ROLLEN = FALLROLLEN;
+
+// Kriteriumstypen aus dem Enum kriterium_typ. Der Typ sagt, woran ein Kriterium
+// als erfuellt gilt – das braucht spaeter die Pruefung beim Phasenwechsel.
+const KRITERIUM_TYPEN = [
+    { wert: 'doc',    label: 'Dokument' },
+    { wert: 'person', label: 'Person' },
+    { wert: 'date',   label: 'Termin' },
+];
 
 const CARD = {
     background: '#fff',
@@ -193,8 +206,11 @@ export default function Programme() {
         setBusy(true);
         setFehler('');
         try {
-            const r = await client.post(`/programme/${programm_id}/phasen`, { label: text });
-            setNeuePhaseForm(prev => ({ ...prev, [programm_id]: { open: false, text: '' } }));
+            const r = await client.post(`/programme/${programm_id}/phasen`, {
+                label: text,
+                avg_dauer_tage: neuePhaseForm[programm_id]?.tage || null,
+            });
+            setNeuePhaseForm(prev => ({ ...prev, [programm_id]: { open: false, text: '', tage: '' } }));
             await ladeProgramme();
             if (r.data?.phase_id) {
                 setActivePhase(prev => ({ ...prev, [programm_id]: r.data.phase_id }));
@@ -202,6 +218,34 @@ export default function Programme() {
             }
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Hinzufügen der Phase');
+        } finally { setBusy(false); }
+    }
+
+    async function phaseSolldauer(programm_id, phase_id, tage) {
+        const wert = String(tage).trim();
+        if (!wert) return;
+        setFehler('');
+        try {
+            await client.put(`/programme/${programm_id}/phasen/${phase_id}`, { avg_dauer_tage: wert });
+            await ladeProgramme();
+        } catch (err) {
+            setFehler(err.response?.data?.error || 'Solldauer konnte nicht gespeichert werden');
+        }
+    }
+
+    async function phaseVerschieben(programm_id, phasen, phase_id, richtung) {
+        const ids = phasen.map(ph => ph.phase_id);
+        const i = ids.indexOf(phase_id);
+        const j = i + richtung;
+        if (i < 0 || j < 0 || j >= ids.length) return;
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+        setBusy(true);
+        setFehler('');
+        try {
+            await client.put(`/programme/${programm_id}/phasen-reihenfolge`, { phase_ids: ids });
+            await ladeProgramme();
+        } catch (err) {
+            setFehler(err.response?.data?.error || 'Reihenfolge konnte nicht gespeichert werden');
         } finally { setBusy(false); }
     }
 
@@ -226,6 +270,7 @@ export default function Programme() {
         try {
             await client.post(`/programme/phasen/${phase_id}/kriterien`, {
                 text,
+                typ: form.typ || null,
                 pflicht: form.pflicht || false,
                 verantwortlich_user_id: form.verantwortlich_user_id || null,
             });
@@ -500,6 +545,28 @@ export default function Programme() {
                                                                                 } : undefined}
                                                                             >{ph.label}</span>
                                                                         )}
+                                                                        <span style={{
+                                                                            fontSize: 10.5, fontFamily: 'monospace', flexShrink: 0,
+                                                                            color: ph.avg_dauer_tage ? '#6B6860' : '#C9C6C0',
+                                                                        }} title="Solldauer">
+                                                                            {ph.avg_dauer_tage ? `${ph.avg_dauer_tage} T` : '— T'}
+                                                                        </span>
+                                                                        {editierbar && (
+                                                                            <span style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                                                                                <button
+                                                                                    onClick={() => phaseVerschieben(p.programm_id, phasen, ph.phase_id, -1)}
+                                                                                    disabled={busy || i === 0}
+                                                                                    title="Nach oben"
+                                                                                    style={{ ...BTN_SORT, opacity: i === 0 ? .25 : 1 }}
+                                                                                >▲</button>
+                                                                                <button
+                                                                                    onClick={() => phaseVerschieben(p.programm_id, phasen, ph.phase_id, 1)}
+                                                                                    disabled={busy || i === phasen.length - 1}
+                                                                                    title="Nach unten"
+                                                                                    style={{ ...BTN_SORT, opacity: i === phasen.length - 1 ? .25 : 1 }}
+                                                                                >▼</button>
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 );
                                                             })}
@@ -518,6 +585,14 @@ export default function Programme() {
                                                                         }}
                                                                         placeholder="Phasenname…"
                                                                         style={{ ...INPUT_S, flex: 1, fontSize: 11.5 }}
+                                                                    />
+                                                                    <input
+                                                                        value={neuePhaseForm[p.programm_id]?.tage || ''}
+                                                                        onChange={e => setNeuePhaseForm(prev => ({ ...prev, [p.programm_id]: { ...prev[p.programm_id], tage: e.target.value.replace(/\D/g, '') } }))}
+                                                                        onKeyDown={e => { if (e.key === 'Enter') phaseHinzufuegen(p.programm_id); }}
+                                                                        placeholder="Tage"
+                                                                        title="Solldauer in Tagen"
+                                                                        style={{ ...INPUT_S, width: 48, fontSize: 11.5, textAlign: 'right' }}
                                                                     />
                                                                     <button onClick={() => phaseHinzufuegen(p.programm_id)} disabled={busy} style={{ ...BTN_ADD, padding: '3px 10px' }}>+</button>
                                                                 </div>
@@ -651,8 +726,30 @@ export default function Programme() {
                                                         {activePhasId !== UEBERSICHT && (
                                                             activePhaseObj ? (
                                                                 <>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                                                                         <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{activePhaseObj.label}</div>
+                                                                        {editierbar ? (
+                                                                            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#6B6860', flexShrink: 0 }}>
+                                                                                Solldauer
+                                                                                <input
+                                                                                    key={activePhaseObj.phase_id + ':' + (activePhaseObj.avg_dauer_tage ?? '')}
+                                                                                    defaultValue={activePhaseObj.avg_dauer_tage ?? ''}
+                                                                                    onBlur={e => {
+                                                                                        const wert = e.target.value.replace(/\D/g, '');
+                                                                                        if (wert && wert !== String(activePhaseObj.avg_dauer_tage ?? '')) {
+                                                                                            phaseSolldauer(p.programm_id, activePhaseObj.phase_id, wert);
+                                                                                        }
+                                                                                    }}
+                                                                                    onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                                                                                    style={{ ...INPUT_S, width: 52, fontSize: 11.5, textAlign: 'right' }}
+                                                                                />
+                                                                                Tage
+                                                                            </label>
+                                                                        ) : activePhaseObj.avg_dauer_tage ? (
+                                                                            <span style={{ fontSize: 11.5, color: '#6B6860', flexShrink: 0 }}>
+                                                                                Solldauer {activePhaseObj.avg_dauer_tage} Tage
+                                                                            </span>
+                                                                        ) : null}
                                                                         {editierbar && (
                                                                             <>
                                                                                 <button style={BTN_ADD} onClick={() => setRenamePhase({ phase_id: activePhaseObj.phase_id, label: activePhaseObj.label })}>
@@ -677,6 +774,12 @@ export default function Programme() {
                                                                         {(activePhaseObj.kriterien || []).map(k => (
                                                                             <div key={k.kriterium_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
                                                                                 <span style={{ flex: 1, fontSize: 12.5 }}>{k.text}</span>
+                                                                                {k.typ && (
+                                                                                    <span style={{
+                                                                                        fontSize: 10, padding: '1px 6px', borderRadius: 8, flexShrink: 0,
+                                                                                        background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.09)',
+                                                                                    }}>{KRITERIUM_TYPEN.find(t => t.wert === k.typ)?.label || k.typ}</span>
+                                                                                )}
                                                                                 <span style={{
                                                                                     fontSize: 10, padding: '1px 6px', borderRadius: 8, fontFamily: 'monospace', flexShrink: 0,
                                                                                     background: k.pflicht ? '#FEF2F2' : '#F5F4F0',
@@ -719,6 +822,16 @@ export default function Programme() {
                                                                                     />
                                                                                     Pflicht
                                                                                 </label>
+                                                                                <select
+                                                                                    value={neuerKForm[activePhaseObj.phase_id]?.typ || ''}
+                                                                                    onChange={e => setNeuerKForm(prev => ({ ...prev, [activePhaseObj.phase_id]: { ...prev[activePhaseObj.phase_id], typ: e.target.value } }))}
+                                                                                    style={{ ...INPUT_S, width: 110, flexShrink: 0 }}
+                                                                                >
+                                                                                    <option value="">— Typ —</option>
+                                                                                    {KRITERIUM_TYPEN.map(t => (
+                                                                                        <option key={t.wert} value={t.wert}>{t.label}</option>
+                                                                                    ))}
+                                                                                </select>
                                                                                 <select
                                                                                     value={neuerKForm[activePhaseObj.phase_id]?.verantwortlich_user_id || ''}
                                                                                     onChange={e => setNeuerKForm(prev => ({ ...prev, [activePhaseObj.phase_id]: { ...prev[activePhaseObj.phase_id], verantwortlich_user_id: e.target.value } }))}
