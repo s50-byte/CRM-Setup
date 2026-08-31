@@ -19,6 +19,19 @@ function fuelleVorlage(inhalt, daten) {
     });
 }
 
+// Liefert die Daten für die Platzhalter.
+// Beispieldaten NUR, wenn gar kein Klient angefragt wurde – ein fehlgeschlagener
+// Lookup darf nicht still zu Beispieldaten werden, sonst sieht eine kaputte
+// Query wie eine funktionierende Vorschau aus.
+async function ladeVorschauDaten(klient_id) {
+    if (!klient_id) return { daten: BEISPIEL_DATEN, warnung: null };
+    const echte = await ladeDatenFuerKlient(klient_id);
+    if (!echte) {
+        return { daten: BEISPIEL_DATEN, warnung: 'Klient nicht gefunden – Vorschau zeigt Beispieldaten.' };
+    }
+    return { daten: echte, warnung: null };
+}
+
 const BEISPIEL_DATEN = {
     anrede:            'Herr',
     vorname:           'Max',
@@ -197,16 +210,13 @@ router.delete('/:id', auth, nurManagement, async (req, res) => {
 router.post('/vorschau', auth, async (req, res) => {
     const { inhalt, klient_id } = req.body;
     if (!inhalt) return res.status(400).json({ error: 'inhalt erforderlich' });
-    let daten = BEISPIEL_DATEN;
-    if (klient_id) {
-        try {
-            const echte = await ladeDatenFuerKlient(klient_id);
-            if (echte) daten = echte;
-        } catch (e) {
-            console.error('ladeDatenFuerKlient fehlgeschlagen, Fallback auf Beispieldaten:', e.message);
-        }
+    try {
+        const { daten, warnung } = await ladeVorschauDaten(klient_id);
+        res.json({ vorschau: fuelleVorlage(inhalt, daten), warnung });
+    } catch (err) {
+        console.error('[vorschau] Klientendaten konnten nicht geladen werden:', err.message);
+        res.status(500).json({ error: 'Klientendaten konnten nicht geladen werden' });
     }
-    res.json({ vorschau: fuelleVorlage(inhalt, daten) });
 });
 
 // POST /api/vorlagen/:id/vorschau
@@ -221,19 +231,9 @@ router.post('/:id/vorschau', auth, async (req, res) => {
         if (!vorlagenRes.rows.length) return res.status(404).json({ error: 'Nicht gefunden' });
         const inhalt = vorlagenRes.rows[0].inhalt;
 
-        let daten = BEISPIEL_DATEN;
-        if (klient_id) {
-            try {
-                const echte = await ladeDatenFuerKlient(klient_id);
-                console.log('[vorschau] ladeDatenFuerKlient:', echte ? `OK — ${echte.vorname} ${echte.nachname}` : 'null (kein Treffer)');
-                if (echte) daten = echte;
-            } catch (e) {
-                console.error('[vorschau] ladeDatenFuerKlient Fehler → Fallback Beispieldaten:', e.message);
-            }
-        } else {
-            console.log('[vorschau] kein klient_id → Beispieldaten');
-        }
-        res.json({ vorschau: fuelleVorlage(inhalt, daten) });
+        const { daten, warnung } = await ladeVorschauDaten(klient_id);
+        if (warnung) console.warn('[vorschau]', warnung, '| klient_id:', klient_id);
+        res.json({ vorschau: fuelleVorlage(inhalt, daten), warnung });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler bei der Vorschau' });

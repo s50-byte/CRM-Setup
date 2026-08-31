@@ -67,9 +67,21 @@ nicht pauschal einlesen.
 
 - Etappe 2a (n:m `dokument_vorlage` <-> `leistung` via `vorlage_leistung`) implementiert
 - Etappe 2b (`DokumentErstellenModal`, `DokumentEditorModal` im Dossier) implementiert
-- Offener Bug: `POST /api/vorlagen/:id/vorschau` liefert Beispieldaten statt echter
-  Klientendaten, weil `klient_id` vom Modal nicht korrekt ans Backend übergeben wird
+- Vorschau-Bug (Beispieldaten statt Klientendaten) erledigt. Ursache war **nicht**
+  die `klient_id` – die kam immer korrekt an. Die SQL in `ladeDatenFuerKlient()`
+  lief auf falsche Spaltennamen (`k.ahv_nr`, `v.verfuegung_nummer`), und ein
+  `catch` schaltete still auf `BEISPIEL_DATEN` um. Spalten sind korrigiert, der
+  stille Fallback ist entfernt: Beispieldaten gibt es nur noch ohne `klient_id`,
+  ein fehlgeschlagener Lookup wird zum Fehler, ein unbekannter Klient zu einer
+  sichtbaren Warnung im Modal.
 - Backlog: Etappe 3 (Serienbrief-Multi), Dark Mode
+- Offen im Vorlagen-Kontext: `{klientenfuehrung}` bleibt `—`, solange keine
+  Zuweisung mit `rolle_im_fall = 'Klientenführung'` existiert (z. B. nur
+  „Fachperson"). Produktentscheid nötig, ob ersatzweise eine andere aktive
+  Zuweisung gezogen werden soll.
+
+Was tatsächlich ansteht, steht im Tool unter Management → Feedback (Status
+`offen` / `backlog`), nicht hier – dieser Abschnitt ist nur eine Momentaufnahme.
 
 ## Befehle
 

@@ -24,6 +24,7 @@ export default function DokumentErstellenModal({ open, onClose, dossierId, klien
     const [vorschauLaden, setVorschauLaden] = useState(false);
     const [speichern, setSpeichern] = useState(false);
     const [fehler, setFehler] = useState('');
+    const [warnung, setWarnung] = useState('');
 
     useEffect(() => {
         if (!open) return;
@@ -31,6 +32,7 @@ export default function DokumentErstellenModal({ open, onClose, dossierId, klien
         setTitel('');
         setInhalt('');
         setFehler('');
+        setWarnung('');
         async function ladeVorlagen() {
             if (leistungId) {
                 const r = await client.get(`/vorlagen?leistung_id=${leistungId}`);
@@ -48,27 +50,29 @@ export default function DokumentErstellenModal({ open, onClose, dossierId, klien
             setGewaehlteVorlage(null);
             setTitel('');
             setInhalt('');
+            setWarnung('');
             return;
         }
         setGewaehlteVorlage(v);
         setTitel(v.name);
         setInhalt('');
         setFehler('');
+        setWarnung('');
         setVorschauLaden(true);
         let text = '';
         try {
-            console.log('[DokumentErstellen] POST vorschau — vorlage_id:', vorlage_id, '| klientId:', klientId);
             const r = await client.post(`/vorlagen/${vorlage_id}/vorschau`, {
                 klient_id: klientId || undefined,
             });
             text = r.data?.vorschau || '';
-            console.log('[DokumentErstellen] vorschau geladen, Länge:', text.length, '| Anfang:', text.slice(0, 60));
+            if (r.data?.warnung) setWarnung(r.data.warnung);
         } catch (err) {
-            console.error('[DokumentErstellen] Vorschau fehlgeschlagen:', err);
+            // Ohne gefüllte Vorschau lieber den Rohtext zeigen als gar nichts –
+            // aber sichtbar machen, dass die Platzhalter nicht ersetzt wurden.
             try {
                 const r2 = await client.get(`/vorlagen/${vorlage_id}`);
                 text = r2.data?.inhalt || '';
-                console.log('[DokumentErstellen] Fallback GET inhalt, Länge:', text.length);
+                setWarnung('Klientendaten konnten nicht geladen werden – Platzhalter sind nicht ersetzt.');
             } catch {
                 setFehler('Vorlage konnte nicht geladen werden');
             }
@@ -113,6 +117,10 @@ export default function DokumentErstellenModal({ open, onClose, dossierId, klien
 
                 {fehler && (
                     <div style={{ background: '#FEF2F2', border: '1px solid rgba(220,38,38,.2)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#B91C1C' }}>{fehler}</div>
+                )}
+
+                {warnung && !fehler && (
+                    <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#92400E' }}>{warnung}</div>
                 )}
 
                 <div>
