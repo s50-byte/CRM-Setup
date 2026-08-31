@@ -44,13 +44,18 @@ router.post('/', auth, (req, res) => {
         if (!req.file) return res.status(400).json({ error: 'Keine Datei erhalten' });
         if (!await tabelleDa(res)) return;
 
+        // multer liefert den Dateinamen latin1-dekodiert (busboy defParamCharset).
+        // Ohne Rueckwandlung wird aus "Abklärung" ein "AbklÃ¤rung" – bei deutschen
+        // Dateinamen also fast immer.
+        const originalname = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+
         try {
             const { ablage: wo, schluessel } = await ablage.speichern(req.file.buffer, req.file.mimetype);
             const r = await db.query(
                 `INSERT INTO datei (ablage, schluessel, dateiname, mime_typ, groesse_bytes, hochgeladen_von)
                  VALUES ($1, $2, $3, $4, $5, $6)
                  RETURNING datei_id, dateiname, mime_typ, groesse_bytes, created_at`,
-                [wo, schluessel, req.file.originalname.slice(0, 255), req.file.mimetype,
+                [wo, schluessel, originalname.slice(0, 255), req.file.mimetype,
                  req.file.size, req.user.user_id]
             );
             res.status(201).json(r.rows[0]);
