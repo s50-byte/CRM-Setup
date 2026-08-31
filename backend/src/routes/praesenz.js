@@ -210,13 +210,26 @@ router.post('/', auth, async (req, res) => {
 
             const meldenswert = !ROUTINE_STATI.includes(status) || kommentarGeaendert;
 
+            // Die Meldung geht an die Klientenführung – sie führt den Fall. Nur wenn
+            // keine gesetzt ist, gehen die uebrigen aktiven Zuweisungen leer aus und
+            // werden ersatzweise benachrichtigt. Vorher ging jede Meldung an alle
+            // Zugewiesenen, weshalb sie nach einem Wechsel der Klientenführung bei
+            // der falschen Person landete (Feedback 31.08.2026).
             const kaderResult = meldenswert
                 ? await db.query(
                     `SELECT ku.user_id, k.nachname, k.vorname
                      FROM klient_user ku
                      JOIN klient k ON k.klient_id = ku.klient_id
                      WHERE ku.klient_id = $1 AND ku.aktiv = TRUE
-                       AND ku.user_id <> $2`,
+                       AND ku.user_id <> $2
+                       AND (
+                            ku.rolle_im_fall = 'Klientenführung'
+                            OR NOT EXISTS (
+                                SELECT 1 FROM klient_user kf
+                                WHERE kf.klient_id = $1 AND kf.aktiv = TRUE
+                                  AND kf.rolle_im_fall = 'Klientenführung'
+                            )
+                       )`,
                     [klient_id, req.user.user_id]
                 )
                 : { rows: [] };

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import FerienModal from '../components/FerienModal';
+import { telefonFokus, telefonBlur } from '../utils/telefon';
 
 const FARBEN = {
     'Erstmalige berufliche Abklärung': '#EA580C',
@@ -24,7 +25,9 @@ const CARD = {
     borderRadius: 10, padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,.07)'
 };
 
-function FRow({ label, name, type, form, onChange }) {
+function FRow({ label, name, type, form, onChange, telefon }) {
+    // telefon: Feld bekommt die +41-Vorbelegung (siehe utils/telefon.js)
+    const setzen = wert => onChange({ target: { name, value: wert } });
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
             <span style={{ color: '#6B6860' }}>{label}</span>
@@ -35,6 +38,8 @@ function FRow({ label, name, type, form, onChange }) {
                     ? (form[name] ? form[name].slice(0, 10) : '')
                     : (form[name] || '')}
                 onChange={onChange}
+                onFocus={telefon ? () => telefonFokus(form[name], setzen) : undefined}
+                onBlur={telefon ? () => telefonBlur(form[name], setzen) : undefined}
                 style={INPUT_STYLE}
             />
         </div>
@@ -312,7 +317,7 @@ export default function KlientDetail() {
                         </div>
                         <div style={CARD}>
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Kontaktdaten</div>
-                            <FRow label="Telefon" name="telefon" form={form} onChange={handleChange} />
+                            <FRow label="Telefon" name="telefon" form={form} onChange={handleChange} telefon />
                             <FRow label="E-Mail"  name="email"   form={form} onChange={handleChange} />
                             {klient.auftraggeber && (
                                 <div style={{ marginTop: 12 }}>
@@ -363,7 +368,19 @@ export default function KlientDetail() {
                                                     const wert = e.target.value;
                                                     setNotfallkontakte(l => l.map(x => x.kontakt_id === k.kontakt_id ? { ...x, [feld]: wert } : x));
                                                 }}
-                                                onBlur={() => nkSpeichern(k)}
+                                                onFocus={feld === 'telefon'
+                                                    ? () => telefonFokus(k.telefon, v => setNotfallkontakte(l => l.map(x => x.kontakt_id === k.kontakt_id ? { ...x, telefon: v } : x)))
+                                                    : undefined}
+                                                onBlur={() => {
+                                                    if (feld === 'telefon') {
+                                                        telefonBlur(k.telefon, v => {
+                                                            setNotfallkontakte(l => l.map(x => x.kontakt_id === k.kontakt_id ? { ...x, telefon: v } : x));
+                                                            nkSpeichern({ ...k, telefon: v });
+                                                        });
+                                                    } else {
+                                                        nkSpeichern(k);
+                                                    }
+                                                }}
                                                 style={INPUT_STYLE}
                                             />
                                         </div>
@@ -379,6 +396,8 @@ export default function KlientDetail() {
                                         <input
                                             value={nkNeu[feld]}
                                             onChange={e => setNkNeu(v => ({ ...v, [feld]: e.target.value }))}
+                                            onFocus={feld === 'telefon' ? () => telefonFokus(nkNeu.telefon, v => setNkNeu(x => ({ ...x, telefon: v }))) : undefined}
+                                            onBlur={feld === 'telefon' ? () => telefonBlur(nkNeu.telefon, v => setNkNeu(x => ({ ...x, telefon: v }))) : undefined}
                                             onKeyDown={e => { if (e.key === 'Enter') nkHinzufuegen(); }}
                                             style={INPUT_STYLE}
                                         />
@@ -400,7 +419,7 @@ export default function KlientDetail() {
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Gesetzlicher Vertreter</div>
                             <FRow label="Name"     name="vertreter_name"     form={form} onChange={handleChange} />
                             <FRow label="Funktion" name="vertreter_funktion" form={form} onChange={handleChange} />
-                            <FRow label="Telefon"  name="vertreter_telefon"  form={form} onChange={handleChange} />
+                            <FRow label="Telefon"  name="vertreter_telefon"  form={form} onChange={handleChange} telefon />
                         </div>
                     </div>
                     <SaveBar laden={speichern} gespeichert={gespeichert} onSpeichern={handleSpeichern} />

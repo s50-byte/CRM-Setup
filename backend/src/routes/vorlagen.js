@@ -81,6 +81,7 @@ async function ladeDatenFuerKlient(klient_id) {
             SELECT bf2.full_name FROM klient_user ku
             JOIN benutzer bf2 ON bf2.user_id = ku.user_id
             WHERE ku.klient_id = k.klient_id AND ku.rolle_im_fall = 'Klientenführung' AND ku.aktiv = TRUE
+            ORDER BY ku.zugewiesen_am DESC
             LIMIT 1
         ) bf ON true
         WHERE k.klient_id = $1::uuid
