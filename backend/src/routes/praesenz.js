@@ -7,6 +7,12 @@ const auth = require('../middleware/auth');
 
 // Dossiers, die das Intake noch nicht abgeschlossen haben (alte oder neue Buckets) oder
 // abgesagt wurden (status = 'inaktiv'), erscheinen nicht in der Präsenzkontrolle.
+// Stati, die im Tagesbetrieb erwartbar sind und darum keine Dashboard-Meldung
+// ausloesen. Gemeldet wird nur, was eine Reaktion braucht (krank, unentschuldigt,
+// verspaetet, unfall) oder wo jemand einen Kommentar hinterlassen hat.
+// Vorher erzeugte jede Erfassung eine Meldung – auch das taegliche "anwesend".
+const ROUTINE_STATI = ['anwesend', 'ferien', 'feiertag', 'schule', 'termin_extern'];
+
 const INTAKE_PENDING_FILTER = `d.status != 'inaktiv' AND NOT (d.pipeline_status IN ('Erstkontakt','vorabklaerung','berufsmassnahmen','integrationsmassnahmen','beratung_coaching','programmstart') AND d.intake_abgeschlossen = FALSE)`;
 
 // GET /api/praesenz/ferien?datum= — alle Klienten mit Ferien an einem Datum
@@ -202,13 +208,18 @@ router.post('/', auth, async (req, res) => {
                 );
             }
 
-            const kaderResult = await db.query(
-                `SELECT ku.user_id, k.nachname, k.vorname
-                 FROM klient_user ku
-                 JOIN klient k ON k.klient_id = ku.klient_id
-                 WHERE ku.klient_id = $1 AND ku.aktiv = TRUE`,
-                [klient_id]
-            );
+            const meldenswert = !ROUTINE_STATI.includes(status) || kommentarGeaendert;
+
+            const kaderResult = meldenswert
+                ? await db.query(
+                    `SELECT ku.user_id, k.nachname, k.vorname
+                     FROM klient_user ku
+                     JOIN klient k ON k.klient_id = ku.klient_id
+                     WHERE ku.klient_id = $1 AND ku.aktiv = TRUE
+                       AND ku.user_id <> $2`,
+                    [klient_id, req.user.user_id]
+                )
+                : { rows: [] };
 
             if (kaderResult.rows.length > 0) {
                 const klient = kaderResult.rows[0];

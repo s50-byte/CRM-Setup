@@ -23,9 +23,14 @@ API: `/api/tasks`
 ### Meine Klienten (`/meine`) und Klienten (`/klienten`)
 Dieselbe Seite in zwei Ausprägungen – gefiltert auf die eigene Zuständigkeit
 (`klient_user`) oder über den Gesamtbestand. Die Klientendetailseite hält
-Stammdaten, Notfall- und Vertretungskontakte sowie die Leistungsvereinbarung
-mit ihren Zielen.
-API: `/api/klienten`, `/api/klienten/meine`
+Stammdaten, beliebig viele Notfallkontakte, die Vertretung sowie die
+Leistungsvereinbarung mit ihren Zielen.
+
+Offene Intake-Anfragen sind in der Klientenliste standardmässig ausgeblendet –
+sie sind noch keine geführten Fälle. Der Schalter „Intake-Anfragen anzeigen"
+blendet sie mit dem Vermerk *Anfrage* ein.
+API: `/api/klienten` (`?intake=inkl`), `/api/klienten/meine`,
+`/api/klienten/:id/notfallkontakte`
 
 ### Intake (`/intake`)
 Neue Anfragen, die noch kein geführter Fall sind: Kanal (Telefon, E-Mail,
@@ -63,6 +68,12 @@ API: `/api/klientenbesprechung`
 Tageserfassung der Anwesenheit je Klient mit neun Status. Ein Tag wird
 abgeschlossen, Änderungen danach landen in `praesenz_historie`. Ferien werden
 separat geplant (`ferienplanung`) und wirken auf die Präsenz.
+
+Eine Dashboard-Meldung an die Zuständigen entsteht nur bei meldenswerten
+Erfassungen – krank, unentschuldigt, verspätet, Unfall oder ein Kommentar. Die
+routinemässigen Stati (anwesend, Ferien, Feiertag, Schule, externer Termin)
+lösen keine Meldung mehr aus, und wer selbst erfasst, bekommt keine Meldung über
+die eigene Eingabe.
 API: `/api/praesenz`
 
 ### Externe Kontakte (`/externe`)

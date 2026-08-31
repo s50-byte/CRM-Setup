@@ -4,6 +4,13 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { hatSpalte } = require('../schema-flags');
+
+// Wer Programme, Phasen und Kriterien pflegen darf. Die Werte 'teamleitung' und
+// 'management' sind historisch und kommen im Bestand nicht mehr vor – sie bleiben
+// zur Sicherheit drin, damit alte Konten nichts verlieren. Massgebend ist, dass
+// die Liste zur Bearbeiten-Freigabe im Frontend passt (kader/leitungsteam).
+const PROGRAMM_PFLEGE_ROLLEN = ['leitungsteam', 'admin', 'kader', 'teamleitung', 'management'];
 
 // Rollen-Tabellen anlegen (crm_user-owned, kein ALTER auf Fremdtabellen nötig)
 db.query(`
@@ -30,6 +37,7 @@ const GRUPPEN_META = {
 };
 
 async function ladePhasenUndRollen(progRows) {
+    const vwDa = await hatSpalte('kriterium', 'verantwortlich_user_id');
     for (const prog of progRows) {
         const phasen = await db.query(
             `SELECT
@@ -41,6 +49,8 @@ async function ladePhasenUndRollen(progRows) {
                             'text', k.text,
                             'typ', k.typ,
                             'pflicht', k.pflicht
+                            ${vwDa ? `, 'verantwortlich_user_id', k.verantwortlich_user_id,
+                              'verantwortlich_name', kv.full_name` : ''}
                         ) ORDER BY k.reihenfolge
                     ) FILTER (WHERE k.kriterium_id IS NOT NULL),
                     '[]'
@@ -57,6 +67,7 @@ async function ladePhasenUndRollen(progRows) {
                 ) AS task_vorlagen
              FROM phase ph
              LEFT JOIN kriterium k ON k.phase_id = ph.phase_id
+             ${vwDa ? 'LEFT JOIN benutzer kv ON kv.user_id = k.verantwortlich_user_id' : ''}
              LEFT JOIN phase_task_vorlage ptv ON ptv.phase_id = ph.phase_id
              WHERE ph.programm_id = $1
              GROUP BY ph.phase_id
@@ -147,7 +158,7 @@ router.get('/:id', auth, async (req, res) => {
 
 // POST /api/programme — Neues Programm (nur Teamleitung/Management)
 router.post('/', auth, async (req, res) => {
-    if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
+    if (!PROGRAMM_PFLEGE_ROLLEN.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
     const { name, farbe_hex, monatspreis, avg_dauer_monate, aufwand_h_monat } = req.body;
@@ -171,18 +182,25 @@ router.post('/', auth, async (req, res) => {
 
 // PUT /api/programme/:id — Programm bearbeiten
 router.put('/:id', auth, async (req, res) => {
-    if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
+    if (!PROGRAMM_PFLEGE_ROLLEN.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
-    const { name, farbe_hex, monatspreis, avg_dauer_monate, aufwand_h_monat } = req.body;
+    const { name, farbe_hex, monatspreis, avg_dauer_monate, aufwand_h_monat, produkteblatt_url } = req.body;
     if (!name || !monatspreis) return res.status(400).json({ error: 'Name und Monatspreis erforderlich' });
     try {
+        const pbDa = await hatSpalte('programm', 'produkteblatt_url');
+        const basis = [name, farbe_hex || '#2563EB', monatspreis, avg_dauer_monate || null,
+                       monatspreis, (avg_dauer_monate || 1) * 30, aufwand_h_monat || 10];
         await db.query(
-            `UPDATE programm SET name=$1, farbe_hex=$2, monatspreis=$3, avg_dauer_monate=$4,
-             tarif_pro_tag=$5, avg_dauer_tage=$6, aufwand_h_monat=$7
-             WHERE programm_id=$8`,
-            [name, farbe_hex || '#2563EB', monatspreis, avg_dauer_monate || null,
-             monatspreis, (avg_dauer_monate || 1) * 30, aufwand_h_monat || 10, req.params.id]
+            pbDa
+                ? `UPDATE programm SET name=$1, farbe_hex=$2, monatspreis=$3, avg_dauer_monate=$4,
+                   tarif_pro_tag=$5, avg_dauer_tage=$6, aufwand_h_monat=$7, produkteblatt_url=$8
+                   WHERE programm_id=$9`
+                : `UPDATE programm SET name=$1, farbe_hex=$2, monatspreis=$3, avg_dauer_monate=$4,
+                   tarif_pro_tag=$5, avg_dauer_tage=$6, aufwand_h_monat=$7
+                   WHERE programm_id=$8`,
+            pbDa ? [...basis, produkteblatt_url?.trim() || null, req.params.id]
+                 : [...basis, req.params.id]
         );
         res.json({ message: 'Programm aktualisiert' });
     } catch (err) {
@@ -193,7 +211,7 @@ router.put('/:id', auth, async (req, res) => {
 
 // PUT /api/programme/:id/rollen — Rollen für Programm setzen
 router.put('/:id/rollen', auth, async (req, res) => {
-    if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
+    if (!PROGRAMM_PFLEGE_ROLLEN.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
     const { rollen } = req.body;
@@ -251,7 +269,7 @@ router.put('/:id/phasen/:phase_id', auth, async (req, res) => {
 
 // PUT /api/programme/:id/phasen/:phase_id/rollen — Rollen für Phase setzen
 router.put('/:id/phasen/:phase_id/rollen', auth, async (req, res) => {
-    if (!['teamleitung', 'management'].includes(req.user.system_rolle)) {
+    if (!PROGRAMM_PFLEGE_ROLLEN.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
     const { rollen } = req.body;
@@ -286,23 +304,56 @@ router.delete('/phasen/:phase_id', auth, async (req, res) => {
 
 // POST /api/programme/phasen/:phase_id/kriterien — Kriterium hinzufügen
 router.post('/phasen/:phase_id/kriterien', auth, async (req, res) => {
-    const { text, typ, pflicht } = req.body;
-    console.log('[POST /phasen/' + req.params.phase_id + '/kriterien] body:', req.body);
+    const { text, typ, pflicht, verantwortlich_user_id } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'Text erforderlich' });
     try {
+        const vwDa = await hatSpalte('kriterium', 'verantwortlich_user_id');
         const count = await db.query(
             `SELECT COUNT(*) FROM kriterium WHERE phase_id = $1`, [req.params.phase_id]
         );
         const reihenfolge = parseInt(count.rows[0].count);
         const result = await db.query(
-            `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge)
-             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-            [req.params.phase_id, text.trim(), typ || null, pflicht || false, reihenfolge]
+            vwDa
+                ? `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge, verantwortlich_user_id)
+                   VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`
+                : `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge)
+                   VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            vwDa
+                ? [req.params.phase_id, text.trim(), typ || null, pflicht || false, reihenfolge,
+                   verantwortlich_user_id || null]
+                : [req.params.phase_id, text.trim(), typ || null, pflicht || false, reihenfolge]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Erstellen: ' + err.message });
+    }
+});
+
+// PUT /api/programme/kriterien/:kriterium_id — Kriterium aendern (inkl. Verantwortliche)
+router.put('/kriterien/:kriterium_id', auth, async (req, res) => {
+    const { text, typ, pflicht, verantwortlich_user_id } = req.body;
+    try {
+        if (!await hatSpalte('kriterium', 'verantwortlich_user_id')) {
+            return res.status(503).json({ error: 'Verantwortliche je Kriterium sind noch nicht migriert (add-kriterium-verantwortlich.sql)' });
+        }
+        const result = await db.query(
+            `UPDATE kriterium SET
+                text = COALESCE($1, text),
+                typ = COALESCE($2, typ),
+                pflicht = COALESCE($3, pflicht),
+                verantwortlich_user_id = $4
+             WHERE kriterium_id = $5
+             RETURNING *`,
+            [text?.trim() || null, typ || null,
+             typeof pflicht === 'boolean' ? pflicht : null,
+             verantwortlich_user_id || null, req.params.kriterium_id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Kriterium nicht gefunden' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern des Kriteriums' });
     }
 });
 

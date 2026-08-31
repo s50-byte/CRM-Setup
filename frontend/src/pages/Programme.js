@@ -110,6 +110,13 @@ export default function Programme() {
     const [dokForm, setDokForm] = useState({ dateiname: '', typ: 'Sonstiges' });
     const [fehler, setFehler] = useState('');
     const [busy, setBusy] = useState(false);
+    const [alleBenutzer, setAlleBenutzer] = useState([]);
+
+    useEffect(() => {
+        client.get('/benutzer')
+            .then(r => setAlleBenutzer(r.data || []))
+            .catch(() => setAlleBenutzer([]));
+    }, []);
 
     const allesProgramme = gruppen.flatMap(g => g.programme || []);
 
@@ -216,12 +223,48 @@ export default function Programme() {
         setBusy(true);
         setFehler('');
         try {
-            await client.post(`/programme/phasen/${phase_id}/kriterien`, { text, pflicht: form.pflicht || false });
+            await client.post(`/programme/phasen/${phase_id}/kriterien`, {
+                text,
+                pflicht: form.pflicht || false,
+                verantwortlich_user_id: form.verantwortlich_user_id || null,
+            });
             setNeuerKForm(prev => ({ ...prev, [phase_id]: { text: '', pflicht: false } }));
             await ladeProgramme();
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Hinzufügen des Kriteriums');
         } finally { setBusy(false); }
+    }
+
+    async function produkteblattSpeichern(programm, url) {
+        setBusy(true);
+        try {
+            // PUT /programme/:id erwartet die Pflichtfelder mit, sonst 400.
+            await client.put(`/programme/${programm.programm_id}`, {
+                name: programm.name,
+                farbe_hex: programm.farbe_hex,
+                monatspreis: programm.monatspreis ?? programm.tarif_pro_tag ?? 0,
+                avg_dauer_monate: programm.avg_dauer_monate,
+                aufwand_h_monat: programm.aufwand_h_monat,
+                produkteblatt_url: url || null,
+            });
+            await ladeProgramme();
+        } catch (err) {
+            setFehler(err.response?.data?.error || 'Produkteblatt konnte nicht gespeichert werden');
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function kriteriumVerantwortlich(kriterium_id, user_id) {
+        setBusy(true);
+        try {
+            await client.put(`/programme/kriterien/${kriterium_id}`, { verantwortlich_user_id: user_id || null });
+            await ladeProgramme();
+        } catch (err) {
+            setFehler(err.response?.data?.error || 'Fehler beim Zuweisen');
+        } finally {
+            setBusy(false);
+        }
     }
 
     async function kriteriumLoeschen(kriterium_id) {
@@ -500,7 +543,30 @@ export default function Programme() {
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                                                                     <div style={{ width: 12, height: 12, borderRadius: 4, background: p.farbe_hex, flexShrink: 0 }} />
                                                                     <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{p.name}</div>
+                                                                    {!editierbar && p.produkteblatt_url && (
+                                                                        <a
+                                                                            href={p.produkteblatt_url}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            style={{ fontSize: 12, color: '#2563EB', textDecoration: 'none', flexShrink: 0 }}
+                                                                        >📄 Produkteblatt SVA</a>
+                                                                    )}
                                                                 </div>
+
+                                                                {editierbar && (
+                                                                    <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 14 }}>
+                                                                        <span style={{ fontSize: 11.5, color: '#6B6860', flexShrink: 0 }}>Produkteblatt SVA</span>
+                                                                        <input
+                                                                            defaultValue={p.produkteblatt_url || ''}
+                                                                            onBlur={e => {
+                                                                                const wert = e.target.value.trim();
+                                                                                if (wert !== (p.produkteblatt_url || '')) produkteblattSpeichern(p, wert);
+                                                                            }}
+                                                                            placeholder="https://… (Link zum PDF)"
+                                                                            style={{ ...INPUT_S, flex: 1 }}
+                                                                        />
+                                                                    </div>
+                                                                )}
 
                                                                 {/* Leistungs-Infos */}
                                                                 {(p.tarifziffer || p.tarif || p.entschaedigungsart) && (
@@ -616,6 +682,20 @@ export default function Programme() {
                                                                                     color: k.pflicht ? '#B91C1C' : '#A09D97',
                                                                                     border: `1px solid ${k.pflicht ? 'rgba(220,38,38,.15)' : 'rgba(0,0,0,.09)'}`,
                                                                                 }}>{k.pflicht ? 'Pflicht' : 'Optional'}</span>
+                                                                                {editierbar ? (
+                                                                                    <select
+                                                                                        value={k.verantwortlich_user_id || ''}
+                                                                                        onChange={e => kriteriumVerantwortlich(k.kriterium_id, e.target.value)}
+                                                                                        style={{ ...INPUT_S, width: 150, flexShrink: 0 }}
+                                                                                    >
+                                                                                        <option value="">— ohne Verantwortliche —</option>
+                                                                                        {alleBenutzer.map(b => (
+                                                                                            <option key={b.user_id} value={b.user_id}>{b.full_name}</option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                ) : k.verantwortlich_name && (
+                                                                                    <span style={{ fontSize: 11, color: '#6B6860', flexShrink: 0 }}>👤 {k.verantwortlich_name}</span>
+                                                                                )}
                                                                                 {editierbar && (
                                                                                     <button style={BTN_DEL_SM} onClick={() => kriteriumLoeschen(k.kriterium_id)}>×</button>
                                                                                 )}
@@ -638,6 +718,16 @@ export default function Programme() {
                                                                                     />
                                                                                     Pflicht
                                                                                 </label>
+                                                                                <select
+                                                                                    value={neuerKForm[activePhaseObj.phase_id]?.verantwortlich_user_id || ''}
+                                                                                    onChange={e => setNeuerKForm(prev => ({ ...prev, [activePhaseObj.phase_id]: { ...prev[activePhaseObj.phase_id], verantwortlich_user_id: e.target.value } }))}
+                                                                                    style={{ ...INPUT_S, width: 150, flexShrink: 0 }}
+                                                                                >
+                                                                                    <option value="">— Verantwortliche —</option>
+                                                                                    {alleBenutzer.map(b => (
+                                                                                        <option key={b.user_id} value={b.user_id}>{b.full_name}</option>
+                                                                                    ))}
+                                                                                </select>
                                                                                 <button
                                                                                     onClick={() => kriteriumHinzufuegen(activePhaseObj.phase_id)}
                                                                                     disabled={busy || !(neuerKForm[activePhaseObj.phase_id]?.text || '').trim()}

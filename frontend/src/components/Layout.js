@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import FeedbackModal from './FeedbackModal';
+import client from '../api/client';
 import Dashboard from '../pages/Dashboard';
 import Klienten from '../pages/Klienten';
 import Externe from '../pages/Externe';
@@ -97,6 +98,18 @@ export default function Layout() {
     const location = useLocation();
     const istManagementUser = MANAGEMENT_ROLLEN.includes(benutzer?.system_rolle);
     const [feedbackOffen, setFeedbackOffen] = useState(false);
+    const [meldungenAnzahl, setMeldungenAnzahl] = useState(0);
+
+    // Ungelesene Meldungen fuer das Zaehler-Badge in der Navigation.
+    // Beim Seitenwechsel neu laden, damit der Zaehler nach dem Quittieren
+    // auf dem Dashboard wieder stimmt.
+    useEffect(() => {
+        let abgebrochen = false;
+        client.get('/meldungen')
+            .then(r => { if (!abgebrochen) setMeldungenAnzahl(r.data?.length || 0); })
+            .catch(() => { if (!abgebrochen) setMeldungenAnzahl(0); });
+        return () => { abgebrochen = true; };
+    }, [location.pathname]);
 
     function handleLogout() {
         logout();
@@ -222,7 +235,15 @@ export default function Layout() {
                             fontFamily: 'inherit'
                         }}>
                             <span style={{ fontSize: 14, opacity: active ? 1 : .75 }}>{item.icon}</span>
-                            {item.label}
+                            <span style={{ flex: 1 }}>{item.label}</span>
+                            {item.path === '/' && meldungenAnzahl > 0 && (
+                                <span style={{
+                                    minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9,
+                                    background: '#DC2626', color: '#fff', fontSize: 10.5, fontWeight: 600,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    marginRight: 4,
+                                }}>{meldungenAnzahl > 99 ? '99+' : meldungenAnzahl}</span>
+                            )}
                         </button>
                     );
                 })}

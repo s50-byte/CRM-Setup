@@ -28,13 +28,18 @@ export default function Klienten({ meine }) {
     const [sortDir, setSortDir] = useState('asc');
     const [klientModal, setKlientModal] = useState(false);
     const [anfrageModal, setAnfrageModal] = useState(false);
+    const [intakeZeigen, setIntakeZeigen] = useState(false);
 
     useEffect(() => {
-        client.get(meine ? '/klienten/meine' : '/klienten')
+        setLaden(true);
+        const pfad = meine
+            ? '/klienten/meine'
+            : `/klienten${intakeZeigen ? '?intake=inkl' : ''}`;
+        client.get(pfad)
             .then(r => setKlienten(r.data))
             .catch(console.error)
             .finally(() => setLaden(false));
-    }, [meine]);
+    }, [meine, intakeZeigen]);
 
     const handleSort = field => {
         if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -111,6 +116,16 @@ export default function Klienten({ meine }) {
                     <option value="">Alle Standorte</option>
                     {standorte.map(s => <option key={s}>{s}</option>)}
                 </select>
+                {!meine && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#6B6860', cursor: 'pointer', userSelect: 'none' }}>
+                        <input
+                            type="checkbox"
+                            checked={intakeZeigen}
+                            onChange={e => setIntakeZeigen(e.target.checked)}
+                        />
+                        Intake-Anfragen anzeigen
+                    </label>
+                )}
                 {hasFilter && (
                     <button onClick={() => { setSuche(''); setFilterProgramm(''); setFilterStandort(''); }} style={{
                         height: 28, padding: '0 9px', fontSize: 12, cursor: 'pointer',
@@ -144,7 +159,16 @@ export default function Klienten({ meine }) {
                                 onMouseOver={e => e.currentTarget.style.background = '#F5F4F0'}
                                 onMouseOut={e => e.currentTarget.style.background = ''}>
                                 <td style={{ padding: '8px 12px', fontWeight: 500, color: '#2563EB', cursor: 'pointer' }}
-                                    onClick={() => k.dossier_id && navigate(`/dossiers/${k.dossier_id}`)}>{k.nachname}</td>
+                                    onClick={() => k.dossier_id && navigate(`/dossiers/${k.dossier_id}`)}>
+                                    {k.nachname}
+                                    {k.intake_pending && (
+                                        <span style={{
+                                            marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 8,
+                                            background: '#FFFBEB', color: '#92400E',
+                                            border: '1px solid rgba(217,119,6,.2)', fontWeight: 500,
+                                        }}>Anfrage</span>
+                                    )}
+                                </td>
                                 <td style={{ padding: '8px 12px' }}>{k.vorname}</td>
                                 <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11.5 }}>
                                     {k.geburtsdatum ? new Date(k.geburtsdatum).toLocaleDateString('de-CH') : '—'}

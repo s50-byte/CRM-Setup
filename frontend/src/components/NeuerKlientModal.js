@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Modal from './Modal';
 import FormField, { inputStyle, rowStyle, btnRow, btnPrimary, btnSecondary } from './FormField';
 import client from '../api/client';
+import { telefonFokus, telefonBlur } from '../utils/telefon';
 
 export default function NeuerKlientModal({ open, onClose, onSaved }) {
     const [form, setForm] = useState({
@@ -74,7 +75,7 @@ export default function NeuerKlientModal({ open, onClose, onSaved }) {
             </div>
             <div style={rowStyle}>
                 <FormField label="Telefon">
-                    <input style={inputStyle} value={form.telefon} onChange={e => set('telefon', e.target.value)} placeholder="+41 79 XXX XX XX" />
+                    <input style={inputStyle} value={form.telefon} onChange={e => set('telefon', e.target.value)} onFocus={() => telefonFokus(form.telefon, v => set('telefon', v))} onBlur={() => telefonBlur(form.telefon, v => set('telefon', v))} placeholder="+41 79 XXX XX XX" />
                 </FormField>
                 <FormField label="E-Mail">
                     <input type="email" style={inputStyle} value={form.email} onChange={e => set('email', e.target.value)} placeholder="vorname@mail.ch" />
@@ -93,7 +94,7 @@ export default function NeuerKlientModal({ open, onClose, onSaved }) {
                 </FormField>
             </div>
             <FormField label="Telefon Notfall">
-                <input style={inputStyle} value={form.notfall_telefon} onChange={e => set('notfall_telefon', e.target.value)} placeholder="+41 79 XXX XX XX" />
+                <input style={inputStyle} value={form.notfall_telefon} onChange={e => set('notfall_telefon', e.target.value)} onFocus={() => telefonFokus(form.notfall_telefon, v => set('notfall_telefon', v))} onBlur={() => telefonBlur(form.notfall_telefon, v => set('notfall_telefon', v))} placeholder="+41 79 XXX XX XX" />
             </FormField>
 
             <div style={{ height: 1, background: 'rgba(0,0,0,.07)', margin: '12px 0' }} />
@@ -108,7 +109,7 @@ export default function NeuerKlientModal({ open, onClose, onSaved }) {
                 </FormField>
             </div>
             <FormField label="Telefon Vertreter">
-                <input style={inputStyle} value={form.vertreter_telefon} onChange={e => set('vertreter_telefon', e.target.value)} placeholder="+41 79 XXX XX XX" />
+                <input style={inputStyle} value={form.vertreter_telefon} onChange={e => set('vertreter_telefon', e.target.value)} onFocus={() => telefonFokus(form.vertreter_telefon, v => set('vertreter_telefon', v))} onBlur={() => telefonBlur(form.vertreter_telefon, v => set('vertreter_telefon', v))} placeholder="+41 79 XXX XX XX" />
             </FormField>
 
             <div style={btnRow}>

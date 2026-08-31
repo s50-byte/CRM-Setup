@@ -51,6 +51,20 @@ Ablage: Migrationen liegen als `backend/add-*.sql` / `backend/update-*.sql`
 Dateidatum). `schema.sql` im Root ist der Ausgangs-Dump und wird nicht
 nachgeführt. `backend/migrate.js` ist ein Einzelfall-Skript, kein Framework.
 
+### Offene Migrationen
+
+Code darf nie eine Migration voraussetzen, die noch nicht eingespielt ist – Code
+und Datenbank werden getrennt deployed. `backend/src/schema-flags.js` prüft zur
+Laufzeit (gecacht), ob eine Spalte oder Tabelle existiert, und baut das SQL
+entsprechend. Nach dem Einspielen einer Migration braucht es darum einen
+PM2-Restart, damit die neuen Felder genutzt werden.
+
+Aktuell noch nicht eingespielt:
+
+    sudo -u postgres psql -d iv_crm -f /tmp/add-notfallkontakte.sql
+    sudo -u postgres psql -d iv_crm -f /tmp/add-kriterium-verantwortlich.sql
+    sudo -u postgres psql -d iv_crm -f /tmp/add-programm-produkteblatt.sql
+
 ## Arbeitsweise
 
 - Ich melde Ergebnisse mit: `dgok` = deployed und getestet OK,
@@ -74,6 +88,14 @@ nicht pauschal einlesen.
   stille Fallback ist entfernt: Beispieldaten gibt es nur noch ohne `klient_id`,
   ein fehlgeschlagener Lookup wird zum Fehler, ein unbekannter Klient zu einer
   sichtbaren Warnung im Modal.
+- Backlog aus dem Feedback abgearbeitet (31.08.2026): User-Reaktivierung,
+  mehrere Notfallkontakte, Präsenz-Meldungen nur noch bei Meldenswertem,
+  Benachrichtigungszähler in der Navigation, Verantwortliche je Kriterium,
+  Intake-Hinweis, Intake-Anfragen aus der Klientenliste, +41-Vorwahl,
+  Produkteblatt-Link am Programm.
+- Zurückgestellt: Rollen AL/BL im Profil – unklar wofür AL und BL stehen und ob
+  sie Fallrollen (`klient_user.rolle_im_fall`, wirken auf die Auslastung) oder
+  nur beschreibend sind.
 - Backlog: Etappe 3 (Serienbrief-Multi), Dark Mode
 - Entschieden: `{klientenfuehrung}` zieht ausschliesslich eine Zuweisung mit
   `rolle_im_fall = 'Klientenführung'`. Klientenführung ist eine eigenständige

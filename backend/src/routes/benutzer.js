@@ -420,4 +420,19 @@ router.put('/:id/deaktivieren', auth, requireManagement, async (req, res) => {
     }
 });
 
+// PUT /api/benutzer/:id/aktivieren — Benutzer wieder aktivieren
+router.put('/:id/aktivieren', auth, requireManagement, async (req, res) => {
+    try {
+        const r = await db.query(
+            `UPDATE benutzer SET aktiv=TRUE, updated_at=NOW() WHERE user_id=$1 RETURNING user_id`,
+            [req.params.id]
+        );
+        if (r.rows.length === 0) return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+        res.json({ message: 'Benutzer aktiviert' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Aktivieren' });
+    }
+});
+
 module.exports = router;

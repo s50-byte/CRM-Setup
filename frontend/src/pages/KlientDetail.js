@@ -68,6 +68,10 @@ export default function KlientDetail() {
     const [lvSpeichern, setLvSpeichern] = useState(false);
     const [lvGespeichert, setLvGespeichert] = useState(false);
 
+    const [notfallkontakte, setNotfallkontakte] = useState([]);
+    const [nkNeu, setNkNeu] = useState({ name: '', beziehung: '', telefon: '' });
+    const [nkBusy, setNkBusy] = useState(false);
+
     const [ferien, setFerien] = useState([]);
     const [ferienLaden, setFerienLaden] = useState(false);
     const [ferienModal, setFerienModal] = useState(false);
@@ -93,6 +97,7 @@ export default function KlientDetail() {
         client.get(`/klienten/${id}`)
             .then(r => {
                 setKlient(r.data); setForm(r.data); initLvForm(r.data);
+                setNotfallkontakte(r.data.notfallkontakte || []);
                 setAnredeModus(['Herr', 'Frau'].includes(r.data.anrede) ? r.data.anrede : (r.data.anrede ? 'Andere' : ''));
             })
             .catch(console.error)
@@ -100,6 +105,37 @@ export default function KlientDetail() {
     }, [id]);
 
     const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+    async function nkHinzufuegen() {
+        if (!nkNeu.name.trim() || nkBusy) return;
+        setNkBusy(true);
+        try {
+            const r = await client.post(`/klienten/${id}/notfallkontakte`, nkNeu);
+            setNotfallkontakte(l => [...l, r.data]);
+            setNkNeu({ name: '', beziehung: '', telefon: '' });
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setNkBusy(false);
+        }
+    }
+
+    async function nkSpeichern(kontakt) {
+        try {
+            await client.put(`/klienten/${id}/notfallkontakte/${kontakt.kontakt_id}`, kontakt);
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function nkLoeschen(kontakt_id) {
+        try {
+            await client.delete(`/klienten/${id}/notfallkontakte/${kontakt_id}`);
+            setNotfallkontakte(l => l.filter(k => k.kontakt_id !== kontakt_id));
+        } catch (err) {
+            console.error(err);
+        }
+    }
 
     const handleSpeichern = async () => {
         setSpeichern(true);
@@ -303,10 +339,62 @@ export default function KlientDetail() {
                 <div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div style={CARD}>
-                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Notfallkontakt</div>
-                            <FRow label="Name"      name="notfall_name"      form={form} onChange={handleChange} />
-                            <FRow label="Beziehung" name="notfall_beziehung" form={form} onChange={handleChange} />
-                            <FRow label="Telefon"   name="notfall_telefon"   form={form} onChange={handleChange} />
+                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Notfallkontakte</div>
+
+                            {notfallkontakte.length === 0 && (
+                                <div style={{ fontSize: 12.5, color: '#A09D97', paddingBottom: '.5rem' }}>Noch kein Notfallkontakt erfasst</div>
+                            )}
+
+                            {notfallkontakte.map((k, i) => (
+                                <div key={k.kontakt_id} style={{ paddingBottom: '.6rem', marginBottom: '.6rem', borderBottom: i < notfallkontakte.length - 1 ? '1px solid rgba(0,0,0,.06)' : 'none' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                                        <span style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97' }}>Kontakt {i + 1}</span>
+                                        <button
+                                            onClick={() => nkLoeschen(k.kontakt_id)}
+                                            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11.5, color: '#B91C1C', fontFamily: 'inherit', padding: 0 }}
+                                        >Entfernen</button>
+                                    </div>
+                                    {[['Name', 'name'], ['Beziehung', 'beziehung'], ['Telefon', 'telefon']].map(([label, feld]) => (
+                                        <div key={feld} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)', alignItems: 'center', fontSize: 12.5 }}>
+                                            <span style={{ color: '#6B6860' }}>{label}</span>
+                                            <input
+                                                value={k[feld] || ''}
+                                                onChange={e => {
+                                                    const wert = e.target.value;
+                                                    setNotfallkontakte(l => l.map(x => x.kontakt_id === k.kontakt_id ? { ...x, [feld]: wert } : x));
+                                                }}
+                                                onBlur={() => nkSpeichern(k)}
+                                                style={INPUT_STYLE}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+
+                            <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid rgba(0,0,0,.08)' }}>
+                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#A09D97', marginBottom: 4 }}>Weiterer Kontakt</div>
+                                {[['Name', 'name'], ['Beziehung', 'beziehung'], ['Telefon', 'telefon']].map(([label, feld]) => (
+                                    <div key={feld} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', padding: '5px 0', alignItems: 'center', fontSize: 12.5 }}>
+                                        <span style={{ color: '#6B6860' }}>{label}</span>
+                                        <input
+                                            value={nkNeu[feld]}
+                                            onChange={e => setNkNeu(v => ({ ...v, [feld]: e.target.value }))}
+                                            onKeyDown={e => { if (e.key === 'Enter') nkHinzufuegen(); }}
+                                            style={INPUT_STYLE}
+                                        />
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={nkHinzufuegen}
+                                    disabled={!nkNeu.name.trim() || nkBusy}
+                                    style={{
+                                        marginTop: 8, padding: '5px 12px', fontSize: 12, fontFamily: 'inherit',
+                                        cursor: nkNeu.name.trim() ? 'pointer' : 'not-allowed',
+                                        border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, background: '#fff',
+                                        color: '#2563EB', fontWeight: 500, opacity: nkNeu.name.trim() ? 1 : .5,
+                                    }}
+                                >+ Hinzufügen</button>
+                            </div>
                         </div>
                         <div style={CARD}>
                             <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>Gesetzlicher Vertreter</div>

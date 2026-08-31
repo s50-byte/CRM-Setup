@@ -184,6 +184,20 @@ export default function BenutzerModal({ open, onClose, onSaved, benutzer }) {
         }
     };
 
+    // Aktivieren ist unkritisch und braucht darum keine Bestätigung.
+    const aktivieren = async () => {
+        setBusy(true);
+        try {
+            await client.put(`/benutzer/${benutzer.user_id}/aktivieren`);
+            onSaved();
+            onClose();
+        } catch (err) {
+            setFehler(err.response?.data?.error || 'Fehler beim Aktivieren');
+        } finally {
+            setBusy(false);
+        }
+    };
+
     return (
         <Modal open={open} onClose={onClose} title={istNeu ? 'Neuer Benutzer' : 'Benutzer bearbeiten'} width={600}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
@@ -270,7 +284,20 @@ export default function BenutzerModal({ open, onClose, onSaved, benutzer }) {
 
             <div style={{ marginTop: '1.125rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    {!istNeu && (
+                    {!istNeu && benutzer?.aktiv === false && (
+                        <button
+                            onClick={aktivieren}
+                            disabled={busy}
+                            style={{
+                                padding: '7px 14px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit',
+                                border: '1px solid rgba(21,128,61,.25)', borderRadius: 6,
+                                background: '#F0FDF4', color: '#15803D', fontWeight: 500,
+                            }}
+                        >
+                            Aktivieren
+                        </button>
+                    )}
+                    {!istNeu && benutzer?.aktiv !== false && (
                         <button
                             onClick={deaktivieren}
                             disabled={busy}

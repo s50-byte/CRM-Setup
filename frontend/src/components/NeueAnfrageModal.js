@@ -56,6 +56,14 @@ export default function NeueAnfrageModal({ open, onClose, onSaved }) {
 
     return (
         <Modal open={open} onClose={onClose} title="Neue Anfrage erfassen">
+            <div style={{
+                background: '#EEF3FE', border: '1px solid rgba(37,99,235,.18)',
+                borderRadius: 6, padding: '9px 12px', fontSize: 12,
+                color: '#1D4ED8', marginBottom: 12, lineHeight: 1.5
+            }}>
+                Die Anfrage wird im <strong>Intake</strong> abgelegt – nicht direkt als
+                Klient. Erst beim Überführen ins Dossier wird daraus ein geführter Fall.
+            </div>
             {fehler && (
                 <div style={{
                     background: '#FEF2F2', border: '1px solid rgba(220,38,38,.2)',

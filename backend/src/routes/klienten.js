@@ -4,6 +4,12 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { hatTabelle } = require('../schema-flags');
+
+// Ein Dossier gilt als reine Intake-Anfrage, solange der Intake nicht
+// abgeschlossen ist. Solche Datensaetze sind noch keine gefuehrten Klienten und
+// werden in der Klientenliste nur auf Wunsch angezeigt (Feedback 06.07.2026).
+const INTAKE_PENDING = `(d.intake_abgeschlossen IS NOT TRUE AND d.dossier_id IS NOT NULL)`;
 
 // GET /api/klienten — Alle Klienten
 router.get('/', auth, async (req, res) => {
@@ -20,7 +26,8 @@ router.get('/', auth, async (req, res) => {
                 d.dossier_id, d.auftraggeber, d.pipeline_status,
                 p.name AS programm_name, p.farbe_hex,
                 ph.label AS phase_label,
-                st.kuerzel AS standort_kuerzel, st.name AS standort_name
+                st.kuerzel AS standort_kuerzel, st.name AS standort_name,
+                ${INTAKE_PENDING} AS intake_pending
              FROM klient k
              LEFT JOIN leistungsvereinbarung lv ON lv.klient_id = k.klient_id
              LEFT JOIN dossier d ON d.klient_id = k.klient_id
@@ -28,7 +35,9 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN phase ph ON ph.phase_id = d.akt_phase_id
              LEFT JOIN standort st ON st.standort_id = d.standort_id
              WHERE k.aktiv = TRUE
-             ORDER BY k.nachname, k.vorname`
+               AND ($1 OR NOT ${INTAKE_PENDING})
+             ORDER BY k.nachname, k.vorname`,
+            [req.query.intake === 'inkl']
         );
         res.json(result.rows);
     } catch (err) {
@@ -75,6 +84,7 @@ router.get('/meine', auth, async (req, res) => {
 // GET /api/klienten/:id — Einzelner Klient
 router.get('/:id', auth, async (req, res) => {
     try {
+        const nkDa = await hatTabelle('klient_notfallkontakt');
         const result = await db.query(
             `SELECT
                 k.*,
@@ -82,8 +92,20 @@ router.get('/:id', auth, async (req, res) => {
                 lv.tage_mo, lv.tage_di, lv.tage_mi, lv.tage_do, lv.tage_fr,
                 lv.bemerkung AS lv_bemerkung,
                 lv.gueltig_ab, lv.gueltig_bis,
-                d.dossier_id
+                d.dossier_id,
+                ${nkDa ? "COALESCE(nk.kontakte, '[]'::json)" : "'[]'::json"} AS notfallkontakte
              FROM klient k
+             ${nkDa ? `LEFT JOIN LATERAL (
+                 SELECT JSON_AGG(JSON_BUILD_OBJECT(
+                            'kontakt_id', kontakt_id,
+                            'name',       name,
+                            'beziehung',  beziehung,
+                            'telefon',    telefon,
+                            'reihenfolge', reihenfolge
+                        ) ORDER BY reihenfolge, created_at) AS kontakte
+                 FROM klient_notfallkontakt
+                 WHERE klient_id = k.klient_id
+             ) nk ON TRUE` : ''}
              LEFT JOIN LATERAL (
                  SELECT * FROM leistungsvereinbarung
                  WHERE klient_id = k.klient_id
@@ -252,6 +274,92 @@ router.delete('/:id', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Deaktivieren' });
+    }
+});
+
+// ------------------------------------------------------------------
+// Notfallkontakte — mehrere je Klient
+// ------------------------------------------------------------------
+
+// GET /api/klienten/:id/notfallkontakte
+router.get('/:id/notfallkontakte', auth, async (req, res) => {
+    if (!await hatTabelle('klient_notfallkontakt')) {
+        return res.status(503).json({ error: 'Notfallkontakte sind noch nicht migriert (add-notfallkontakte.sql)' });
+    }
+    try {
+        const r = await db.query(
+            `SELECT kontakt_id, name, beziehung, telefon, reihenfolge
+             FROM klient_notfallkontakt WHERE klient_id = $1
+             ORDER BY reihenfolge, created_at`,
+            [req.params.id]
+        );
+        res.json(r.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Laden der Notfallkontakte' });
+    }
+});
+
+// POST /api/klienten/:id/notfallkontakte
+router.post('/:id/notfallkontakte', auth, async (req, res) => {
+    const { name, beziehung, telefon } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Name ist erforderlich' });
+    if (!await hatTabelle('klient_notfallkontakt')) {
+        return res.status(503).json({ error: 'Notfallkontakte sind noch nicht migriert (add-notfallkontakte.sql)' });
+    }
+    try {
+        const r = await db.query(
+            `INSERT INTO klient_notfallkontakt (klient_id, name, beziehung, telefon, reihenfolge)
+             VALUES ($1, $2, $3, $4,
+                     COALESCE((SELECT MAX(reihenfolge) + 1 FROM klient_notfallkontakt WHERE klient_id = $1), 0))
+             RETURNING kontakt_id, name, beziehung, telefon, reihenfolge`,
+            [req.params.id, name.trim(), beziehung || null, telefon || null]
+        );
+        res.status(201).json(r.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern des Notfallkontakts' });
+    }
+});
+
+// PUT /api/klienten/:id/notfallkontakte/:kontakt_id
+router.put('/:id/notfallkontakte/:kontakt_id', auth, async (req, res) => {
+    const { name, beziehung, telefon } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Name ist erforderlich' });
+    if (!await hatTabelle('klient_notfallkontakt')) {
+        return res.status(503).json({ error: 'Notfallkontakte sind noch nicht migriert (add-notfallkontakte.sql)' });
+    }
+    try {
+        const r = await db.query(
+            `UPDATE klient_notfallkontakt
+             SET name = $1, beziehung = $2, telefon = $3, updated_at = NOW()
+             WHERE kontakt_id = $4 AND klient_id = $5
+             RETURNING kontakt_id, name, beziehung, telefon, reihenfolge`,
+            [name.trim(), beziehung || null, telefon || null, req.params.kontakt_id, req.params.id]
+        );
+        if (!r.rows.length) return res.status(404).json({ error: 'Notfallkontakt nicht gefunden' });
+        res.json(r.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Speichern des Notfallkontakts' });
+    }
+});
+
+// DELETE /api/klienten/:id/notfallkontakte/:kontakt_id
+router.delete('/:id/notfallkontakte/:kontakt_id', auth, async (req, res) => {
+    if (!await hatTabelle('klient_notfallkontakt')) {
+        return res.status(503).json({ error: 'Notfallkontakte sind noch nicht migriert (add-notfallkontakte.sql)' });
+    }
+    try {
+        const r = await db.query(
+            `DELETE FROM klient_notfallkontakt WHERE kontakt_id = $1 AND klient_id = $2 RETURNING kontakt_id`,
+            [req.params.kontakt_id, req.params.id]
+        );
+        if (!r.rows.length) return res.status(404).json({ error: 'Notfallkontakt nicht gefunden' });
+        res.json({ ok: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Löschen des Notfallkontakts' });
     }
 });
 
