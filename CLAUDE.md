@@ -111,6 +111,13 @@ nicht pauschal einlesen.
   Stellen dupliziert und liegt jetzt zentral in
   `frontend/src/constants/rollen.js` – neue Fallrollen nur noch dort ergänzen.
 - Backlog: Etappe 3 (Serienbrief-Multi), Dark Mode
+- Geplante Etappe **Dateiupload**: Dokumente sollen grundsätzlich hochgeladen
+  werden können – nicht nur das SVA-Produkteblatt am Programm, sondern auch
+  Verfügungen und Zielvereinbarungen. Heute gibt es keine Dateiablage:
+  `programm_dokument` und `phase_dokument` speichern nur einen Dateinamen, der
+  „Hochladen"-Dialog legt nichts ab. Vor der Umsetzung Ablageort, Auslieferung
+  und Zugriffsschutz klären. Der Produkteblatt-Link am Programm ist bis dahin
+  ein Zwischenstand.
 - Entschieden: `{klientenfuehrung}` zieht ausschliesslich eine Zuweisung mit
   `rolle_im_fall = 'Klientenführung'`. Klientenführung ist eine eigenständige
   Rolle – „Fachperson" ist etwas anderes und darf nicht ersatzweise einspringen.

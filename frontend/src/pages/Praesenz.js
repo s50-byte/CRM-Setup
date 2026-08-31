@@ -143,7 +143,10 @@ export default function Praesenz() {
                 const ohneEintrag = data.filter(k => k.status === null);
                 if (ohneEintrag.length === 0) return;
                 return Promise.all(
-                    ohneEintrag.map(k => client.post('/praesenz', { klient_id: k.klient_id, datum, status: 'anwesend' }))
+                    // automatisch: true — die Seite legt diese Eintraege selbst an,
+                    // niemand hat etwas gemeldet. Das Backend loest dafuer keine
+                    // Meldung aus (Feedback 23.06.2026).
+                    ohneEintrag.map(k => client.post('/praesenz', { klient_id: k.klient_id, datum, status: 'anwesend', automatisch: true }))
                 ).then(() => laden());
             })
             .catch(console.error)
