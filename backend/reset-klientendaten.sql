@@ -11,6 +11,12 @@
 -- programm_verlauf (+vereinbarungsziel), verfuegung (+positionen),
 -- dossier_dokument, dossier_phase und externe_person_dossier.
 
+\set ON_ERROR_STOP on
+-- Nicht ewig auf eine Sperre warten: haengt eine andere offene Transaktion auf
+-- denselben Tabellen, bricht das Skript nach 15 Sekunden mit Fehler ab, statt
+-- stumm stehenzubleiben.
+SET lock_timeout = '15s';
+
 BEGIN;
 
 SELECT count(*) AS klienten_vorher FROM klient;
