@@ -70,9 +70,7 @@ Laufzeit (gecacht), ob eine Spalte oder Tabelle existiert, und baut das SQL
 entsprechend. Nach dem Einspielen einer Migration braucht es darum einen
 PM2-Restart, damit die neuen Felder genutzt werden.
 
-Aktuell noch nicht eingespielt: `add-notfallkontakte.sql`,
-`add-kriterium-verantwortlich.sql`, `add-programm-produkteblatt.sql`
-(alle in `backend/`, Ablauf siehe oben).
+Aktuell keine offene Migration.
 
 ## Arbeitsweise
 

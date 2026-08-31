@@ -2,7 +2,7 @@ require('dotenv').config();
 const db = require('./src/db');
 
 const GRUPPEN = [
-  ['Klient & Dossier', ['klient','dossier','klient_user','leistungsvereinbarung','vereinbarungsziel','dossier_phase','dossier_dokument']],
+  ['Klient & Dossier', ['klient','dossier','klient_user','klient_notfallkontakt','leistungsvereinbarung','vereinbarungsziel','dossier_phase','dossier_dokument']],
   ['Programme & Phasen', ['programm','phase','programm_verlauf','kriterium','kriterium_status','phase_task_vorlage','phase_rolle','programm_rolle','phase_vorlage','phase_dokument','programm_dokument']],
   ['Leistungen & Verfügungen', ['leistung','verfuegung','verfuegung_position']],
   ['Dokumente & Vorlagen', ['dokument','dokument_vorlage','vorlage_leistung']],

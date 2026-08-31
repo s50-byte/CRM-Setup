@@ -10,44 +10,8 @@ ist generiert; nach einer Migration so aktualisieren:
 (cd backend && node schema-doku.js) > /tmp/schema-body.md
 ```
 
-Danach den Inhalt von `/tmp/schema-body.md` ab der Zeile `## Klient & Dossier`
-in diese Datei übernehmen (Kopf bis hierhin bleibt von Hand gepflegt). Neue
-Tabellen ohne Zuordnung landen im Abschnitt "Nicht zugeordnet" und gehören in
-`GRUPPEN` in `backend/schema-doku.js` einsortiert.
-
-## Konventionen
-
-- Primärschlüssel sind durchgehend `uuid` mit `gen_random_uuid()`, benannt nach
-  dem Muster `<tabelle>_id` (`klient_id`, `dossier_id`, …). Ausnahme: `benutzer`
-  hat `user_id`.
-- Zeitstempel sind `timestamptz`, meist `created_at` / `updated_at` mit
-  `DEFAULT NOW()`. `updated_at` wird von der Anwendung gesetzt, nicht per Trigger.
-- Statusfelder sind überwiegend Postgres-Enums (Übersicht am Ende). Neue Werte
-  kommen per `ALTER TYPE … ADD VALUE` in einer Migration dazu; alte Werte werden
-  nicht entfernt, weshalb einzelne Enums historische Doppelspurigkeiten enthalten
-  (siehe `pipeline_status`, `externe_typ`).
-- Mit `ᵉ` markierte Typen sind Enums.
-- Zeilenzahlen sind eine Momentaufnahme des Pilotbestands und dienen nur der
-  Einordnung, welche Tabellen produktiv genutzt werden und welche (noch) leer sind.
-
-## Kern des Modells
-
-`klient` ist die Person, `dossier` der Fall dazu (1:1 in der Praxis). Das Dossier
-hält den aktuellen Zustand – `akt_programm_id`, `akt_phase_id`, `standort_id`,
-`zuweisende_person_id` – während `programm_verlauf` die Historie der Programm-
-und Phasendurchläufe führt (Status `Geplant` / `Laufend` / `Abgeschlossen` /
-`Abgebrochen`).
-
-Ein `programm` besteht aus `phase`-Einträgen, eine Phase aus `kriterium`-Einträgen;
-`kriterium_status` hält fest, welches Kriterium bei welchem Klienten erfüllt ist.
-
-Zuständigkeiten hängen an `klient_user` (`rolle_im_fall`, z. B. `Klientenführung`),
-nicht am Dossier. Externe Beteiligte hängen über `externe_person_dossier` am Fall.
-
-Abgerechnet wird über `leistung` (Katalog inkl. Tarife) → `verfuegung` →
-`verfuegung_position`. Dokumentvorlagen sind über `vorlage_leistung` n:m mit
-Leistungen verknüpft; erzeugte Dokumente landen in `dossier_dokument`.
-
+Danach den Inhalt von `/tmp/schema-body.md` ab der Zeile `✓ Datenbankverbindung erfolgreich
+✓ Datenbankverbindung erfolgreich
 ## Klient & Dossier
 
 ### `klient`  <sub>15 Zeilen</sub>
@@ -114,6 +78,19 @@ Leistungen verknüpft; erzeugte Dokumente landen in `dossier_dokument`.
 | `stellvertretung` | boolean | NOT NULL |  |
 | `zugewiesen_am` | date | NOT NULL |  |
 | `aktiv` | boolean | NOT NULL |  |
+
+### `klient_notfallkontakt`  <sub>1 Zeilen</sub>
+
+| Spalte | Typ | | Referenz |
+|---|---|---|---|
+| `kontakt_id` | uuid | PK |  |
+| `klient_id` | uuid | NOT NULL | → `klient` |
+| `name` | varchar | NOT NULL |  |
+| `beziehung` | varchar |  |  |
+| `telefon` | varchar |  |  |
+| `reihenfolge` | integer | NOT NULL |  |
+| `created_at` | timestamptz | NOT NULL |  |
+| `updated_at` | timestamptz | NOT NULL |  |
 
 ### `leistungsvereinbarung`  <sub>1 Zeilen</sub>
 
@@ -193,6 +170,7 @@ Leistungen verknüpft; erzeugte Dokumente landen in `dossier_dokument`.
 | `avg_dauer_monate` | integer |  |  |
 | `gruppe` | varchar |  |  |
 | `leistung_id` | uuid |  | → `leistung` |
+| `produkteblatt_url` | text |  |  |
 
 ### `phase`  <sub>36 Zeilen</sub>
 
@@ -236,6 +214,7 @@ Leistungen verknüpft; erzeugte Dokumente landen in `dossier_dokument`.
 | `pflicht` | boolean | NOT NULL |  |
 | `reihenfolge` | integer | NOT NULL |  |
 | `created_at` | timestamptz | NOT NULL |  |
+| `verantwortlich_user_id` | uuid |  | → `benutzer` |
 
 ### `kriterium_status`  <sub>0 Zeilen</sub>
 
@@ -455,7 +434,7 @@ Leistungen verknüpft; erzeugte Dokumente landen in `dossier_dokument`.
 | `termin_id` | uuid | PK | → `termin` |
 | `user_id` | uuid | PK | → `benutzer` |
 
-### `dashboard_meldung`  <sub>223 Zeilen</sub>
+### `dashboard_meldung`  <sub>230 Zeilen</sub>
 
 | Spalte | Typ | | Referenz |
 |---|---|---|---|
