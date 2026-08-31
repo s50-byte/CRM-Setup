@@ -238,13 +238,22 @@ router.post('/:id/phasen', auth, async (req, res) => {
     const { label, avg_dauer_tage } = req.body;
     if (!label?.trim()) return res.status(400).json({ error: 'Label erforderlich' });
     try {
+        // Das Phasenmodell haengt fachlich am Tarif (Etappe A1). Solange der
+        // Programm-Katalog noch existiert, werden beide Spalten gefuehrt – sonst
+        // haetten neue Phasen keinen Tarifbezug und fielen beim Aufloesen des
+        // Katalogs hinten runter.
+        const tarifDa = await hatSpalte('phase', 'leistung_id');
         const count = await db.query(
             `SELECT COUNT(*) FROM phase WHERE programm_id = $1`, [req.params.id]
         );
         const reihenfolge = parseInt(count.rows[0].count);
         const result = await db.query(
-            `INSERT INTO phase (programm_id, label, reihenfolge, avg_dauer_tage)
-             VALUES ($1, $2, $3, $4) RETURNING *`,
+            tarifDa
+                ? `INSERT INTO phase (programm_id, label, reihenfolge, avg_dauer_tage, leistung_id)
+                   VALUES ($1, $2, $3, $4, (SELECT leistung_id FROM programm WHERE programm_id = $1))
+                   RETURNING *`
+                : `INSERT INTO phase (programm_id, label, reihenfolge, avg_dauer_tage)
+                   VALUES ($1, $2, $3, $4) RETURNING *`,
             [req.params.id, label.trim(), reihenfolge, avg_dauer_tage || null]
         );
         res.status(201).json(result.rows[0]);
