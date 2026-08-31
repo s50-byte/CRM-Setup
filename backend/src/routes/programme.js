@@ -37,11 +37,11 @@ const GRUPPEN_META = {
 };
 
 async function ladePhasenUndRollen(progRows) {
-    const vwDa = await hatSpalte('kriterium', 'verantwortlich_user_id');
+    const vwDa = await hatSpalte('kriterium', 'verantwortlich_rolle');
     for (const prog of progRows) {
         const phasen = await db.query(
             `SELECT
-                ph.phase_id, ph.label, ph.reihenfolge, ph.avg_dauer_tage,
+                ph.phase_id, ph.label, ph.reihenfolge,
                 COALESCE(
                     JSON_AGG(
                         JSONB_BUILD_OBJECT(
@@ -49,8 +49,7 @@ async function ladePhasenUndRollen(progRows) {
                             'text', k.text,
                             'typ', k.typ,
                             'pflicht', k.pflicht
-                            ${vwDa ? `, 'verantwortlich_user_id', k.verantwortlich_user_id,
-                              'verantwortlich_name', kv.full_name` : ''}
+                            ${vwDa ? `, 'verantwortlich_rolle', k.verantwortlich_rolle` : ''}
                         ) ORDER BY k.reihenfolge
                     ) FILTER (WHERE k.kriterium_id IS NOT NULL),
                     '[]'
@@ -67,7 +66,6 @@ async function ladePhasenUndRollen(progRows) {
                 ) AS task_vorlagen
              FROM phase ph
              LEFT JOIN kriterium k ON k.phase_id = ph.phase_id
-             ${vwDa ? 'LEFT JOIN benutzer kv ON kv.user_id = k.verantwortlich_user_id' : ''}
              LEFT JOIN phase_task_vorlage ptv ON ptv.phase_id = ph.phase_id
              WHERE ph.programm_id = $1
              GROUP BY ph.phase_id
@@ -235,7 +233,7 @@ router.put('/:id/rollen', auth, async (req, res) => {
 
 // POST /api/programme/:id/phasen — Phase hinzufügen
 router.post('/:id/phasen', auth, async (req, res) => {
-    const { label, avg_dauer_tage } = req.body;
+    const { label } = req.body;
     if (!label?.trim()) return res.status(400).json({ error: 'Label erforderlich' });
     try {
         // Das Phasenmodell haengt fachlich am Tarif (Etappe A1). Solange der
@@ -253,12 +251,12 @@ router.post('/:id/phasen', auth, async (req, res) => {
         const reihenfolge = parseInt(naechste.rows[0].n, 10);
         const result = await db.query(
             tarifDa
-                ? `INSERT INTO phase (programm_id, label, reihenfolge, avg_dauer_tage, leistung_id)
-                   VALUES ($1, $2, $3, $4, (SELECT leistung_id FROM programm WHERE programm_id = $1))
+                ? `INSERT INTO phase (programm_id, label, reihenfolge, leistung_id)
+                   VALUES ($1, $2, $3, (SELECT leistung_id FROM programm WHERE programm_id = $1))
                    RETURNING *`
-                : `INSERT INTO phase (programm_id, label, reihenfolge, avg_dauer_tage)
-                   VALUES ($1, $2, $3, $4) RETURNING *`,
-            [req.params.id, label.trim(), reihenfolge, avg_dauer_tage || null]
+                : `INSERT INTO phase (programm_id, label, reihenfolge)
+                   VALUES ($1, $2, $3) RETURNING *`,
+            [req.params.id, label.trim(), reihenfolge]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -267,31 +265,21 @@ router.post('/:id/phasen', auth, async (req, res) => {
     }
 });
 
-// PUT /api/programme/:id/phasen/:phase_id — Phase aendern (Bezeichnung, Solldauer)
+// PUT /api/programme/:id/phasen/:phase_id — Phase umbenennen
+//
+// Eine Phase im Tarifkatalog hat bewusst KEINE Solldauer: die Aufteilung ergibt
+// sich erst am Fall aus der Programmdauer und wird dort von Hand verschoben.
 router.put('/:id/phasen/:phase_id', auth, async (req, res) => {
     if (!PROGRAMM_PFLEGE_ROLLEN.includes(req.user.system_rolle)) {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
-    const { label, avg_dauer_tage } = req.body;
-    if (label !== undefined && !label?.trim()) {
-        return res.status(400).json({ error: 'Bezeichnung darf nicht leer sein' });
-    }
-    // Die Solldauer ist die Grundlage fuer die Erstverteilung auf dem Zeitstrahl.
-    // 0 oder negativ ergibt keine Phase – eine Phase dauert mindestens einen Tag.
-    const dauer = avg_dauer_tage === undefined || avg_dauer_tage === null || avg_dauer_tage === ''
-        ? undefined
-        : parseInt(avg_dauer_tage, 10);
-    if (dauer !== undefined && (Number.isNaN(dauer) || dauer < 1)) {
-        return res.status(400).json({ error: 'Solldauer muss mindestens 1 Tag sein' });
-    }
+    const { label } = req.body;
+    if (!label?.trim()) return res.status(400).json({ error: 'Bezeichnung erforderlich' });
     try {
         const r = await db.query(
-            `UPDATE phase SET
-                label = COALESCE($1, label),
-                avg_dauer_tage = COALESCE($2, avg_dauer_tage)
-             WHERE phase_id = $3
-             RETURNING phase_id, label, reihenfolge, avg_dauer_tage`,
-            [label?.trim() ?? null, dauer ?? null, req.params.phase_id]
+            `UPDATE phase SET label = $1 WHERE phase_id = $2
+             RETURNING phase_id, label, reihenfolge`,
+            [label.trim(), req.params.phase_id]
         );
         if (!r.rows.length) return res.status(404).json({ error: 'Phase nicht gefunden' });
         res.json(r.rows[0]);
@@ -376,10 +364,10 @@ router.delete('/phasen/:phase_id', auth, async (req, res) => {
 
 // POST /api/programme/phasen/:phase_id/kriterien — Kriterium hinzufügen
 router.post('/phasen/:phase_id/kriterien', auth, async (req, res) => {
-    const { text, typ, pflicht, verantwortlich_user_id } = req.body;
+    const { text, typ, pflicht, verantwortlich_rolle } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'Text erforderlich' });
     try {
-        const vwDa = await hatSpalte('kriterium', 'verantwortlich_user_id');
+        const vwDa = await hatSpalte('kriterium', 'verantwortlich_rolle');
         const naechste = await db.query(
             `SELECT COALESCE(MAX(reihenfolge) + 1, 0) AS n FROM kriterium WHERE phase_id = $1`,
             [req.params.phase_id]
@@ -387,13 +375,13 @@ router.post('/phasen/:phase_id/kriterien', auth, async (req, res) => {
         const reihenfolge = parseInt(naechste.rows[0].n, 10);
         const result = await db.query(
             vwDa
-                ? `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge, verantwortlich_user_id)
+                ? `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge, verantwortlich_rolle)
                    VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`
                 : `INSERT INTO kriterium (phase_id, text, typ, pflicht, reihenfolge)
                    VALUES ($1, $2, $3, $4, $5) RETURNING *`,
             vwDa
                 ? [req.params.phase_id, text.trim(), typ || null, pflicht || false, reihenfolge,
-                   verantwortlich_user_id || null]
+                   verantwortlich_rolle || null]
                 : [req.params.phase_id, text.trim(), typ || null, pflicht || false, reihenfolge]
         );
         res.status(201).json(result.rows[0]);
@@ -405,22 +393,22 @@ router.post('/phasen/:phase_id/kriterien', auth, async (req, res) => {
 
 // PUT /api/programme/kriterien/:kriterium_id — Kriterium aendern (inkl. Verantwortliche)
 router.put('/kriterien/:kriterium_id', auth, async (req, res) => {
-    const { text, typ, pflicht, verantwortlich_user_id } = req.body;
+    const { text, typ, pflicht, verantwortlich_rolle } = req.body;
     try {
-        if (!await hatSpalte('kriterium', 'verantwortlich_user_id')) {
-            return res.status(503).json({ error: 'Verantwortliche je Kriterium sind noch nicht migriert (add-kriterium-verantwortlich.sql)' });
+        if (!await hatSpalte('kriterium', 'verantwortlich_rolle')) {
+            return res.status(503).json({ error: 'Verantwortliche Rolle je Kriterium ist noch nicht migriert (add-kriterium-rolle.sql)' });
         }
         const result = await db.query(
             `UPDATE kriterium SET
                 text = COALESCE($1, text),
                 typ = COALESCE($2, typ),
                 pflicht = COALESCE($3, pflicht),
-                verantwortlich_user_id = $4
+                verantwortlich_rolle = $4
              WHERE kriterium_id = $5
              RETURNING *`,
             [text?.trim() || null, typ || null,
              typeof pflicht === 'boolean' ? pflicht : null,
-             verantwortlich_user_id || null, req.params.kriterium_id]
+             verantwortlich_rolle || null, req.params.kriterium_id]
         );
         if (!result.rows.length) return res.status(404).json({ error: 'Kriterium nicht gefunden' });
         res.json(result.rows[0]);

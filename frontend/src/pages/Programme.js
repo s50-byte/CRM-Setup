@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
 import Modal from '../components/Modal';
-import { FALLROLLEN } from '../constants/rollen';
+import { FALLROLLEN, ROLLE_FARBE } from '../constants/rollen';
 
 const UEBERSICHT = '__uebersicht__';
 
@@ -124,13 +124,6 @@ export default function Programme() {
     const [dokForm, setDokForm] = useState({ dateiname: '', typ: 'Sonstiges' });
     const [fehler, setFehler] = useState('');
     const [busy, setBusy] = useState(false);
-    const [alleBenutzer, setAlleBenutzer] = useState([]);
-
-    useEffect(() => {
-        client.get('/benutzer')
-            .then(r => setAlleBenutzer(r.data || []))
-            .catch(() => setAlleBenutzer([]));
-    }, []);
 
     const allesProgramme = gruppen.flatMap(g => g.programme || []);
 
@@ -206,11 +199,8 @@ export default function Programme() {
         setBusy(true);
         setFehler('');
         try {
-            const r = await client.post(`/programme/${programm_id}/phasen`, {
-                label: text,
-                avg_dauer_tage: neuePhaseForm[programm_id]?.tage || null,
-            });
-            setNeuePhaseForm(prev => ({ ...prev, [programm_id]: { open: false, text: '', tage: '' } }));
+            const r = await client.post(`/programme/${programm_id}/phasen`, { label: text });
+            setNeuePhaseForm(prev => ({ ...prev, [programm_id]: { open: false, text: '' } }));
             await ladeProgramme();
             if (r.data?.phase_id) {
                 setActivePhase(prev => ({ ...prev, [programm_id]: r.data.phase_id }));
@@ -219,18 +209,6 @@ export default function Programme() {
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Hinzufügen der Phase');
         } finally { setBusy(false); }
-    }
-
-    async function phaseSolldauer(programm_id, phase_id, tage) {
-        const wert = String(tage).trim();
-        if (!wert) return;
-        setFehler('');
-        try {
-            await client.put(`/programme/${programm_id}/phasen/${phase_id}`, { avg_dauer_tage: wert });
-            await ladeProgramme();
-        } catch (err) {
-            setFehler(err.response?.data?.error || 'Solldauer konnte nicht gespeichert werden');
-        }
     }
 
     async function phaseVerschieben(programm_id, phasen, phase_id, richtung) {
@@ -272,7 +250,7 @@ export default function Programme() {
                 text,
                 typ: form.typ || null,
                 pflicht: form.pflicht || false,
-                verantwortlich_user_id: form.verantwortlich_user_id || null,
+                verantwortlich_rolle: form.verantwortlich_rolle || null,
             });
             setNeuerKForm(prev => ({ ...prev, [phase_id]: { text: '', pflicht: false } }));
             await ladeProgramme();
@@ -301,10 +279,10 @@ export default function Programme() {
         }
     }
 
-    async function kriteriumVerantwortlich(kriterium_id, user_id) {
+    async function kriteriumVerantwortlich(kriterium_id, rolle) {
         setBusy(true);
         try {
-            await client.put(`/programme/kriterien/${kriterium_id}`, { verantwortlich_user_id: user_id || null });
+            await client.put(`/programme/kriterien/${kriterium_id}`, { verantwortlich_rolle: rolle || null });
             await ladeProgramme();
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Zuweisen');
@@ -545,12 +523,6 @@ export default function Programme() {
                                                                                 } : undefined}
                                                                             >{ph.label}</span>
                                                                         )}
-                                                                        <span style={{
-                                                                            fontSize: 10.5, fontFamily: 'monospace', flexShrink: 0,
-                                                                            color: ph.avg_dauer_tage ? '#6B6860' : '#C9C6C0',
-                                                                        }} title="Solldauer">
-                                                                            {ph.avg_dauer_tage ? `${ph.avg_dauer_tage} T` : '— T'}
-                                                                        </span>
                                                                         {editierbar && (
                                                                             <span style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                                                                                 <button
@@ -585,14 +557,6 @@ export default function Programme() {
                                                                         }}
                                                                         placeholder="Phasenname…"
                                                                         style={{ ...INPUT_S, flex: 1, fontSize: 11.5 }}
-                                                                    />
-                                                                    <input
-                                                                        value={neuePhaseForm[p.programm_id]?.tage || ''}
-                                                                        onChange={e => setNeuePhaseForm(prev => ({ ...prev, [p.programm_id]: { ...prev[p.programm_id], tage: e.target.value.replace(/\D/g, '') } }))}
-                                                                        onKeyDown={e => { if (e.key === 'Enter') phaseHinzufuegen(p.programm_id); }}
-                                                                        placeholder="Tage"
-                                                                        title="Solldauer in Tagen"
-                                                                        style={{ ...INPUT_S, width: 48, fontSize: 11.5, textAlign: 'right' }}
                                                                     />
                                                                     <button onClick={() => phaseHinzufuegen(p.programm_id)} disabled={busy} style={{ ...BTN_ADD, padding: '3px 10px' }}>+</button>
                                                                 </div>
@@ -728,28 +692,6 @@ export default function Programme() {
                                                                 <>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                                                                         <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{activePhaseObj.label}</div>
-                                                                        {editierbar ? (
-                                                                            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#6B6860', flexShrink: 0 }}>
-                                                                                Solldauer
-                                                                                <input
-                                                                                    key={activePhaseObj.phase_id + ':' + (activePhaseObj.avg_dauer_tage ?? '')}
-                                                                                    defaultValue={activePhaseObj.avg_dauer_tage ?? ''}
-                                                                                    onBlur={e => {
-                                                                                        const wert = e.target.value.replace(/\D/g, '');
-                                                                                        if (wert && wert !== String(activePhaseObj.avg_dauer_tage ?? '')) {
-                                                                                            phaseSolldauer(p.programm_id, activePhaseObj.phase_id, wert);
-                                                                                        }
-                                                                                    }}
-                                                                                    onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                                                                                    style={{ ...INPUT_S, width: 52, fontSize: 11.5, textAlign: 'right' }}
-                                                                                />
-                                                                                Tage
-                                                                            </label>
-                                                                        ) : activePhaseObj.avg_dauer_tage ? (
-                                                                            <span style={{ fontSize: 11.5, color: '#6B6860', flexShrink: 0 }}>
-                                                                                Solldauer {activePhaseObj.avg_dauer_tage} Tage
-                                                                            </span>
-                                                                        ) : null}
                                                                         {editierbar && (
                                                                             <>
                                                                                 <button style={BTN_ADD} onClick={() => setRenamePhase({ phase_id: activePhaseObj.phase_id, label: activePhaseObj.label })}>
@@ -788,17 +730,21 @@ export default function Programme() {
                                                                                 }}>{k.pflicht ? 'Pflicht' : 'Optional'}</span>
                                                                                 {editierbar ? (
                                                                                     <select
-                                                                                        value={k.verantwortlich_user_id || ''}
+                                                                                        value={k.verantwortlich_rolle || ''}
                                                                                         onChange={e => kriteriumVerantwortlich(k.kriterium_id, e.target.value)}
                                                                                         style={{ ...INPUT_S, width: 150, flexShrink: 0 }}
                                                                                     >
-                                                                                        <option value="">— ohne Verantwortliche —</option>
-                                                                                        {alleBenutzer.map(b => (
-                                                                                            <option key={b.user_id} value={b.user_id}>{b.full_name}</option>
+                                                                                        <option value="">— ohne Rolle —</option>
+                                                                                        {FALLROLLEN.map(r => (
+                                                                                            <option key={r} value={r}>{r}</option>
                                                                                         ))}
                                                                                     </select>
-                                                                                ) : k.verantwortlich_name && (
-                                                                                    <span style={{ fontSize: 11, color: '#6B6860', flexShrink: 0 }}>👤 {k.verantwortlich_name}</span>
+                                                                                ) : k.verantwortlich_rolle && (
+                                                                                    <span style={{
+                                                                                        fontSize: 10.5, padding: '1px 7px', borderRadius: 8, flexShrink: 0,
+                                                                                        background: (ROLLE_FARBE[k.verantwortlich_rolle]?.bg) || '#F5F4F0',
+                                                                                        color: (ROLLE_FARBE[k.verantwortlich_rolle]?.color) || '#6B6860',
+                                                                                    }}>{k.verantwortlich_rolle}</span>
                                                                                 )}
                                                                                 {editierbar && (
                                                                                     <button style={BTN_DEL_SM} onClick={() => kriteriumLoeschen(k.kriterium_id)}>×</button>
@@ -833,13 +779,13 @@ export default function Programme() {
                                                                                     ))}
                                                                                 </select>
                                                                                 <select
-                                                                                    value={neuerKForm[activePhaseObj.phase_id]?.verantwortlich_user_id || ''}
-                                                                                    onChange={e => setNeuerKForm(prev => ({ ...prev, [activePhaseObj.phase_id]: { ...prev[activePhaseObj.phase_id], verantwortlich_user_id: e.target.value } }))}
+                                                                                    value={neuerKForm[activePhaseObj.phase_id]?.verantwortlich_rolle || ''}
+                                                                                    onChange={e => setNeuerKForm(prev => ({ ...prev, [activePhaseObj.phase_id]: { ...prev[activePhaseObj.phase_id], verantwortlich_rolle: e.target.value } }))}
                                                                                     style={{ ...INPUT_S, width: 150, flexShrink: 0 }}
                                                                                 >
-                                                                                    <option value="">— Verantwortliche —</option>
-                                                                                    {alleBenutzer.map(b => (
-                                                                                        <option key={b.user_id} value={b.user_id}>{b.full_name}</option>
+                                                                                    <option value="">— Rolle —</option>
+                                                                                    {FALLROLLEN.map(r => (
+                                                                                        <option key={r} value={r}>{r}</option>
                                                                                     ))}
                                                                                 </select>
                                                                                 <button
