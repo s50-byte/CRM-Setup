@@ -226,7 +226,13 @@ export default function Dossiers() {
 
     // Anfragen im Intake sind noch keine gefuehrten Faelle – eigene Gruppe,
     // wie die inaktiven Dossiers.
-    const imIntake = d => d.status !== 'inaktiv' && d.intake_abgeschlossen !== true;
+    //
+    // Massgebend ist das laufende Programm, nicht intake_abgeschlossen: das
+    // Kennzeichen wird erst beim Erfassen einer Verfuegung gesetzt, ein Dossier
+    // mit laufendem Programm ist aber laengst ein gefuehrter Fall.
+    const imIntake = d => d.status !== 'inaktiv'
+        && !d.programm_name
+        && d.intake_abgeschlossen !== true;
     const aktive = sortData(gefiltert.filter(d => d.status !== 'inaktiv' && !imIntake(d)), sortField, sortDir);
     const intake = sortData(gefiltert.filter(imIntake), sortFieldIntake, sortDirIntake);
     const inaktive = sortData(gefiltert.filter(d => d.status === 'inaktiv'), sortFieldInaktiv, sortDirInaktiv);

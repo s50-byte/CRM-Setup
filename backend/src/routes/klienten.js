@@ -9,7 +9,12 @@ const { hatTabelle } = require('../schema-flags');
 // Ein Dossier gilt als reine Intake-Anfrage, solange der Intake nicht
 // abgeschlossen ist. Solche Datensaetze sind noch keine gefuehrten Klienten und
 // werden in der Klientenliste nur auf Wunsch angezeigt (Feedback 06.07.2026).
-const INTAKE_PENDING = `(d.intake_abgeschlossen IS NOT TRUE AND d.dossier_id IS NOT NULL)`;
+// Massgebend ist das laufende Programm: intake_abgeschlossen wird erst beim
+// Erfassen einer Verfuegung gesetzt, ein Dossier mit laufendem Programm ist
+// aber laengst ein gefuehrter Fall.
+const INTAKE_PENDING = `(d.intake_abgeschlossen IS NOT TRUE
+                         AND d.dossier_id IS NOT NULL
+                         AND d.akt_programm_id IS NULL)`;
 
 // GET /api/klienten — Alle Klienten
 router.get('/', auth, async (req, res) => {
