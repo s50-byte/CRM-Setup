@@ -51,6 +51,7 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
     const [laden, setLaden] = useState(true);
     const [busy, setBusy] = useState(false);
     const [fehler, setFehler] = useState('');
+    const [zieht, setZieht] = useState(null);
 
     const laden_ = useCallback(async () => {
         try {
@@ -62,6 +63,38 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
     }, [dossierId]);
 
     useEffect(() => { laden_(); }, [laden_]);
+
+    // Ziehen endet, wo auch immer die Maus losgelassen wird.
+    useEffect(() => {
+        if (!zieht) return;
+        function los(e) {
+            const datum = datumAusX(zieht.container, e.clientX);
+            setZieht(null);
+            grenzeSetzen({ instanz_id: zieht.instanz_id }, datum);
+        }
+        window.addEventListener('mouseup', los);
+        return () => window.removeEventListener('mouseup', los);
+    });
+
+    // Die Grenze zwischen zwei Phasen ziehen: die linke endet am Vortag, die
+    // rechte beginnt am gezogenen Tag. Regeln prueft das Backend.
+    async function grenzeSetzen(rechtePhase, datum) {
+        setFehler('');
+        try {
+            await client.put(`/zeitstrahl/phase/${rechtePhase.instanz_id}`, { start_datum: datum });
+            await laden_();
+        } catch (err) {
+            setFehler(err.response?.data?.error || 'Verschieben nicht möglich');
+        }
+    }
+
+    // Pixelposition -> Datum auf der Achse.
+    function datumAusX(container, klientX) {
+        const r = container.getBoundingClientRect();
+        const anteilX = Math.min(1, Math.max(0, (klientX - r.left) / r.width));
+        const versatz = Math.round(anteilX * gesamt);
+        return new Date(achsenVon.getTime() + versatz * TAG).toISOString().slice(0, 10);
+    }
 
     async function erzeugen() {
         setBusy(true);
@@ -235,6 +268,25 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                                                     fontSize: 10, lineHeight: 1,
                                                 }}
                                             >📌</div>
+                                        ))}
+                                        {/* Griffe auf den Grenzen; die erste Phase
+                                            beginnt und die letzte endet mit dem Programm. */}
+                                        {bearbeitbar && s.phasen.slice(1).map(p => (
+                                            <div
+                                                key={'g' + p.instanz_id}
+                                                onMouseDown={e => {
+                                                    e.stopPropagation();
+                                                    setZieht({ instanz_id: p.instanz_id, container: e.currentTarget.parentElement });
+                                                }}
+                                                title="Grenze verschieben"
+                                                style={{
+                                                    position: 'absolute', top: 0, bottom: 0, zIndex: 4,
+                                                    left: `${anteil(p.start_datum, achsenVon, gesamt) * 100}%`,
+                                                    width: 9, marginLeft: -4.5, cursor: 'col-resize',
+                                                    background: zieht?.instanz_id === p.instanz_id ? 'rgba(37,99,235,.25)' : 'transparent',
+                                                    borderRadius: 3,
+                                                }}
+                                            />
                                         ))}
                                         {s.phasen.map(p => {
                                             const links = anteil(p.start_datum, achsenVon, gesamt);

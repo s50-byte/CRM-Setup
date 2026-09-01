@@ -639,49 +639,31 @@ router.get('/:id/phase/:phase_id/kriterien', auth, async (req, res) => {
 router.get('/:id/phase/:phase_id/zeitraum', auth, async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT start_datum, end_datum FROM dossier_phase WHERE dossier_id = $1 AND phase_id = $2`,
+            // Quelle ist programm_phase – dieselbe wie beim Zeitstrahl, damit
+            // beide Ansichten nicht auseinanderlaufen.
+            `SELECT pp.instanz_id, pp.start_datum, pp.end_datum
+             FROM programm_phase pp
+             JOIN programm_verlauf pv ON pv.verlauf_id = pp.verlauf_id
+             WHERE pv.dossier_id = $1 AND pp.phase_id = $2 AND pv.status = 'Laufend'
+             LIMIT 1`,
             [req.params.id, req.params.phase_id]
         );
-        res.json(result.rows[0] || { start_datum: null, end_datum: null });
+        res.json(result.rows[0] || { instanz_id: null, start_datum: null, end_datum: null });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden des Phasen-Zeitraums' });
     }
 });
 
-// PUT /api/dossiers/:id/phase/:phase_id/zeitraum — Start/Enddatum der Phase speichern
+// PUT /api/dossiers/:id/phase/:phase_id/zeitraum
+//
+// Leitet auf PUT /api/zeitstrahl/phase/:instanz_id weiter: der Zeitraum einer
+// Phase gehorcht denselben Regeln, egal ob er auf dem Zeitstrahl gezogen oder
+// in der Phasenmaske eingetippt wird.
 router.put('/:id/phase/:phase_id/zeitraum', auth, async (req, res) => {
-    const { start_datum, end_datum } = req.body;
-    try {
-        const dossier = await db.query(`SELECT klient_id FROM dossier WHERE dossier_id = $1`, [req.params.id]);
-        if (dossier.rows.length === 0) return res.status(404).json({ error: 'Dossier nicht gefunden' });
-
-        const phase = await db.query(`SELECT label FROM phase WHERE phase_id = $1`, [req.params.phase_id]);
-
-        const result = await db.query(
-            `INSERT INTO dossier_phase (dossier_id, phase_id, start_datum, end_datum)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (dossier_id, phase_id) DO UPDATE SET
-                start_datum = $3, end_datum = $4, updated_at = NOW()
-             RETURNING start_datum, end_datum`,
-            [req.params.id, req.params.phase_id, start_datum || null, end_datum || null]
-        );
-
-        const fmtD = d => d ? new Date(d).toLocaleDateString('de-CH') : '?';
-        await db.query(
-            `INSERT INTO zeitachse_eintrag (klient_id, user_id, typ, titel, auto_generated)
-             VALUES ($1, $2, 'System', $3, TRUE)`,
-            [
-                dossier.rows[0].klient_id, req.user.user_id,
-                `Phase ${phase.rows[0]?.label || ''}: Zeitraum ${fmtD(start_datum)} – ${fmtD(end_datum)} erfasst`,
-            ]
-        );
-
-        res.json(result.rows[0]);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Fehler beim Speichern des Phasen-Zeitraums' });
-    }
+    res.status(410).json({
+        error: 'Bitte den Zeitraum über den Zeitstrahl setzen (PUT /api/zeitstrahl/phase/:instanz_id).',
+    });
 });
 
 // PUT /api/dossiers/:id/phase/:phase_id/kriterien/:kriterium_id — abhaken toggle

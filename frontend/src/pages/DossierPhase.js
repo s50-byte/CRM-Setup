@@ -82,6 +82,8 @@ export default function DossierPhase() {
 
     // Phasen-Zeitraum
     const [zeitraum, setZeitraum] = useState({ von: '', bis: '' });
+    const [instanzId, setInstanzId] = useState(null);
+    const [zeitraumFehler, setZeitraumFehler] = useState('');
     const [zeitraumSpeichern, setZeitraumSpeichern] = useState(false);
     const [zeitraumGespeichert, setZeitraumGespeichert] = useState(false);
 
@@ -104,6 +106,7 @@ export default function DossierPhase() {
             setTasks(phaseTasks);
             setTermine(termRes.data || []);
             setDokumente(dokRes.data || []);
+            setInstanzId(zrRes.data?.instanz_id || null);
             setZeitraum({
                 von: zrRes.data?.start_datum ? zrRes.data.start_datum.slice(0, 10) : '',
                 bis: zrRes.data?.end_datum ? zrRes.data.end_datum.slice(0, 10) : '',
@@ -119,15 +122,18 @@ export default function DossierPhase() {
 
     async function speichernZeitraum() {
         setZeitraumSpeichern(true);
+        setZeitraumFehler('');
         try {
-            await client.put(`/dossiers/${id}/phase/${phase_id}/zeitraum`, {
+            // Derselbe Endpunkt wie beim Ziehen auf dem Zeitstrahl – gleiche Regeln.
+            await client.put(`/zeitstrahl/phase/${instanzId}`, {
                 start_datum: zeitraum.von || null,
                 end_datum: zeitraum.bis || null,
             });
             setZeitraumGespeichert(true);
             setTimeout(() => setZeitraumGespeichert(false), 2500);
         } catch (err) {
-            console.error(err);
+            // Die Regeln liefern sprechende Meldungen – die gehoeren dem Benutzer.
+            setZeitraumFehler(err.response?.data?.error || 'Zeitraum konnte nicht gespeichert werden');
         } finally {
             setZeitraumSpeichern(false);
         }
@@ -215,6 +221,11 @@ export default function DossierPhase() {
                         cursor: zeitraumSpeichern ? 'default' : 'pointer', border: 'none', borderRadius: 5,
                         background: zeitraumSpeichern ? '#93C5FD' : '#2563EB', color: '#fff', fontFamily: 'inherit'
                     }}>{zeitraumSpeichern ? 'Speichern…' : 'Speichern'}</button>
+                    {zeitraumFehler && (
+                        <div style={{ fontSize: 11.5, color: '#B91C1C', background: '#FEF2F2', border: '1px solid rgba(185,28,28,.15)', borderRadius: 5, padding: '5px 9px', marginTop: 6 }}>
+                            {zeitraumFehler}
+                        </div>
+                    )}
                     {zeitraumGespeichert && <span style={{ fontSize: 12.5, color: '#16A34A' }}>Gespeichert ✓</span>}
                 </div>
 
