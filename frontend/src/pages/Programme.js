@@ -81,6 +81,22 @@ function Section({ title, children, headerRight }) {
     );
 }
 
+// Das Produkteblatt haengt als einzelner Platz am Tarif, nicht in
+// programm_dokument. Fuer die Anzeige wird es der Liste vorangestellt, damit
+// alle Dokumente an einer Stelle stehen.
+const PRODUKTEBLATT_ID = '__produkteblatt__';
+
+function mitProdukteblatt(p, docs) {
+    if (!p.produkteblatt_datei_id) return docs;
+    const eintrag = {
+        pdok_id: PRODUKTEBLATT_ID,
+        dateiname: p.produkteblatt_titel || p.produkteblatt_dateiname || 'Produkteblatt',
+        typ: 'Produkteblatt',
+        datei_id: p.produkteblatt_datei_id,
+    };
+    return [eintrag, ...(docs || [])];
+}
+
 function DokListe({ docs, onDelete, onOeffnen }) {
     if (!docs) return <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic' }}>Laden…</div>;
     if (docs.length === 0) return <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic' }}>Keine Dokumente</div>;
@@ -646,40 +662,7 @@ export default function Programme() {
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                                                                     <div style={{ width: 12, height: 12, borderRadius: 4, background: p.farbe_hex, flexShrink: 0 }} />
                                                                     <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{p.name}</div>
-                                                                    {!editierbar && p.produkteblatt_datei_id && (
-                                                                        <button
-                                                                            onClick={() => dateiOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
-                                                                            style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, padding: 0 }}
-                                                                        >📄 {p.produkteblatt_titel || p.produkteblatt_dateiname || 'Produkteblatt SVA'}</button>
-                                                                    )}
                                                                 </div>
-
-                                                                {editierbar && (
-                                                                    <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
-                                                                        <span style={{ fontSize: 11.5, color: '#6B6860', flexShrink: 0 }}>Produkteblatt SVA</span>
-                                                                        {p.produkteblatt_datei_id ? (
-                                                                            <>
-                                                                                <button
-                                                                                    onClick={() => dateiOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
-                                                                                    style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
-                                                                                >📄 {p.produkteblatt_titel || p.produkteblatt_dateiname}</button>
-                                                                                <button
-                                                                                    onClick={() => produkteblattEntfernen(p)}
-                                                                                    disabled={busy}
-                                                                                    style={{ ...BTN_ADD, border: '1px solid rgba(220,38,38,.25)', background: '#FEF2F2', color: '#B91C1C' }}
-                                                                                >Entfernen</button>
-                                                                            </>
-                                                                        ) : (
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setDokForm({ dateiname: '', typ: 'Produkteblatt', datei: null });
-                                                                                    setDokModal({ produkteblatt: true, programm: p, programm_id: p.programm_id });
-                                                                                }}
-                                                                                style={BTN_ADD}
-                                                                            >Hochladen…</button>
-                                                                        )}
-                                                                    </div>
-                                                                )}
 
                                                                 {/* Leistungs-Infos */}
                                                                 {(p.tarifziffer || p.tarif || p.entschaedigungsart) && (
@@ -745,15 +728,27 @@ export default function Programme() {
                                                                 <Section
                                                                     title="Programm-Dokumente"
                                                                     headerRight={editierbar && (
-                                                                        <button style={BTN_ADD} onClick={() => {
-                                                                            setDokModal({ programm_id: p.programm_id, phase_id: null });
-                                                                            setDokForm({ dateiname: '', typ: 'Sonstiges', datei: null });
-                                                                        }}>+ Dokument</button>
+                                                                        <div style={{ display: 'flex', gap: 6 }}>
+                                                                            {!p.produkteblatt_datei_id && (
+                                                                                <button style={BTN_ADD} onClick={() => {
+                                                                                    setDokModal({ produkteblatt: true, programm: p, programm_id: p.programm_id });
+                                                                                    setDokForm({ dateiname: '', typ: 'Produkteblatt', datei: null });
+                                                                                }}>+ Produkteblatt</button>
+                                                                            )}
+                                                                            <button style={BTN_ADD} onClick={() => {
+                                                                                setDokModal({ programm_id: p.programm_id, phase_id: null });
+                                                                                setDokForm({ dateiname: '', typ: 'Sonstiges', datei: null });
+                                                                            }}>+ Dokument</button>
+                                                                        </div>
                                                                     )}
                                                                 >
                                                                     <DokListe onOeffnen={dateiOeffnen}
-                                                                        docs={progDoks[p.programm_id]}
-                                                                        onDelete={editierbar ? id => dokumentLoeschen(id, p.programm_id, null) : null}
+                                                                        docs={mitProdukteblatt(p, progDoks[p.programm_id])}
+                                                                        onDelete={editierbar
+                                                                            ? id => (id === PRODUKTEBLATT_ID
+                                                                                ? produkteblattEntfernen(p)
+                                                                                : dokumentLoeschen(id, p.programm_id, null))
+                                                                            : null}
                                                                     />
                                                                 </Section>
                                                             </>
