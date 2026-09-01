@@ -1,7 +1,8 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
-const { hatSpalte } = require('../schema-flags');
+const { hatSpalte, hatTabelle } = require('../schema-flags');
+const { straengeErzeugen } = require('../zeitstrahl');
 
 // GET /api/verfuegungen/:dossier_id
 router.get('/:dossier_id', auth, async (req, res) => {
@@ -178,6 +179,7 @@ router.post('/', auth, async (req, res) => {
             );
         }
 
+        await programmNachfuehren(pgClient, dossier_id || result.rows[0].dossier_id, result.rows[0].verfuegung_id);
         await pgClient.query('COMMIT');
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -247,6 +249,7 @@ router.put('/:id', auth, async (req, res) => {
             }
         }
 
+        await programmNachfuehren(pgClient, dossier_id || result.rows[0].dossier_id, result.rows[0].verfuegung_id);
         await pgClient.query('COMMIT');
         res.json(result.rows[0]);
     } catch (err) {
@@ -272,6 +275,61 @@ router.delete('/:id', auth, async (req, res) => {
         res.status(500).json({ error: 'Fehler beim Löschen der Verfügung' });
     }
 });
+
+
+// Die Dauer des Programms kommt aus der Verfuegung. Aendert sich deren
+// Zeitraum oder aendern sich die verfuegten Tarife, muss der Zeitstrahl
+// mitziehen - sonst stehen Balken auf einem Zeitraum, den es nicht mehr gibt,
+// und entfernte Tarife bleiben sichtbar.
+async function programmNachfuehren(pgClient, dossier_id, verfuegung_id) {
+    const v = await pgClient.query(
+        `SELECT gueltig_von, gueltig_bis FROM verfuegung
+         WHERE verfuegung_id = $1 AND status = 'aktiv'`,
+        [verfuegung_id]
+    );
+    if (!v.rows.length) return;
+    const { gueltig_von, gueltig_bis } = v.rows[0];
+    if (!gueltig_von || !gueltig_bis) return;
+
+    const pv = await pgClient.query(
+        `UPDATE programm_verlauf
+            SET start_datum = $1, geplantes_enddatum = $2, updated_at = NOW()
+          WHERE dossier_id = $3 AND status = 'Laufend'
+          RETURNING verlauf_id`,
+        [gueltig_von, gueltig_bis, dossier_id]
+    );
+    if (!pv.rows.length) return;
+
+    if (await hatTabelle('programm_phase')) {
+        await straengeErzeugen(pgClient, {
+            verlauf_id: pv.rows[0].verlauf_id,
+            verfuegung_id,
+            von: gueltig_von,
+            bis: gueltig_bis,
+        });
+    }
+}
+
+// Nach jeder Positionsaenderung die Straenge neu legen: ein hinzugefuegter
+// Tarif bekommt einen Strang, ein entfernter verschwindet.
+async function nachPositionsaenderung(verfuegung_id) {
+    const v = await db.query(
+        `SELECT dossier_id FROM verfuegung WHERE verfuegung_id = $1 AND status = 'aktiv'`,
+        [verfuegung_id]
+    );
+    if (!v.rows.length) return;
+    const pgClient = await db.connect();
+    try {
+        await pgClient.query('BEGIN');
+        await programmNachfuehren(pgClient, v.rows[0].dossier_id, verfuegung_id);
+        await pgClient.query('COMMIT');
+    } catch (err) {
+        await pgClient.query('ROLLBACK').catch(() => {});
+        console.error('[verfuegungen] Zeitstrahl nachfuehren:', err.message);
+    } finally {
+        pgClient.release();
+    }
+}
 
 // Programmvorschlag aus den Positionen.
 //
@@ -301,6 +359,7 @@ router.post('/:id/positionen', auth, async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
             [req.params.id, leistung_id, soll_stunden || 0, reihenfolge || 0, verrechnungsart || null, betrag || null]
         );
+        await nachPositionsaenderung(req.params.id);
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err);
@@ -320,6 +379,7 @@ router.put('/:id/positionen/:pos_id', auth, async (req, res) => {
             [leistung_id, soll_stunden || 0, reihenfolge || 0, verrechnungsart || null, betrag || null, req.params.pos_id, req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
+        await nachPositionsaenderung(req.params.id);
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
@@ -335,6 +395,7 @@ router.delete('/:id/positionen/:pos_id', auth, async (req, res) => {
             [req.params.pos_id, req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
+        await nachPositionsaenderung(req.params.id);
         res.json({ ok: true });
     } catch (err) {
         console.error(err);

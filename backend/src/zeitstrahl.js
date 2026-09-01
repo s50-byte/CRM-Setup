@@ -54,4 +54,41 @@ function strangBauen(von, bis, phasen) {
     });
 }
 
-module.exports = { strangBauen, tageVerteilen };
+// Legt die Straenge eines Programms neu an: je verfuegtem Tarif einer, ueber
+// den ganzen Zeitraum. Bestehende Instanzen werden ersetzt - so verschwinden
+// entfernte Tarife und ein geaenderter Zeitraum schlaegt durch.
+//
+// Erwartet einen Client innerhalb einer Transaktion.
+async function straengeErzeugen(pgClient, { verlauf_id, verfuegung_id, von, bis }) {
+    const tarife = await pgClient.query(
+        `SELECT DISTINCT leistung_id FROM verfuegung_position WHERE verfuegung_id = $1`,
+        [verfuegung_id]
+    );
+
+    await pgClient.query(`DELETE FROM programm_phase WHERE verlauf_id = $1`, [verlauf_id]);
+
+    let angelegt = 0;
+    const ohnePhasen = [];
+    for (const { leistung_id } of tarife.rows) {
+        const phasen = await pgClient.query(
+            `SELECT phase_id, label FROM phase WHERE leistung_id = $1 ORDER BY reihenfolge`,
+            [leistung_id]
+        );
+        if (!phasen.rows.length) {
+            const l = await pgClient.query('SELECT bezeichnung FROM leistung WHERE leistung_id = $1', [leistung_id]);
+            ohnePhasen.push(l.rows[0]?.bezeichnung || leistung_id);
+            continue;
+        }
+        for (const p of strangBauen(von, bis, phasen.rows)) {
+            await pgClient.query(
+                `INSERT INTO programm_phase (verlauf_id, leistung_id, phase_id, reihenfolge, start_datum, end_datum)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [verlauf_id, leistung_id, p.phase_id, p.reihenfolge, p.start_datum, p.end_datum]
+            );
+            angelegt++;
+        }
+    }
+    return { angelegt, straenge: tarife.rows.length - ohnePhasen.length, ohne_phasenmodell: ohnePhasen };
+}
+
+module.exports = { strangBauen, tageVerteilen, straengeErzeugen };

@@ -5,7 +5,7 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 const { hatTabelle } = require('../schema-flags');
-const { strangBauen } = require('../zeitstrahl');
+const { straengeErzeugen } = require('../zeitstrahl');
 
 async function tabelleDa(res) {
     if (await hatTabelle('programm_phase')) return true;
@@ -46,8 +46,10 @@ router.get('/:dossier_id', auth, async (req, res) => {
              JOIN phase ph ON ph.phase_id = pp.phase_id
              JOIN leistung l ON l.leistung_id = pp.leistung_id
              WHERE pp.verlauf_id = $1
+               AND EXISTS (SELECT 1 FROM verfuegung_position vp
+                           WHERE vp.verfuegung_id = $2 AND vp.leistung_id = pp.leistung_id)
              ORDER BY l.tarifnr, pp.reihenfolge`,
-            [prog.verlauf_id]
+            [prog.verlauf_id, prog.verfuegung_id]
         );
 
         // Nach Tarif gruppieren – je Tarif ein Strang.
@@ -100,32 +102,13 @@ router.post('/:dossier_id/erzeugen', auth, async (req, res) => {
         }
 
         await pgClient.query('BEGIN');
-        await pgClient.query(`DELETE FROM programm_phase WHERE verlauf_id = $1`, [prog.verlauf_id]);
-
-        let angelegt = 0;
-        const ohnePhasen = [];
-        for (const { leistung_id } of tarife.rows) {
-            const phasen = await pgClient.query(
-                `SELECT phase_id, label FROM phase WHERE leistung_id = $1 ORDER BY reihenfolge`,
-                [leistung_id]
-            );
-            if (!phasen.rows.length) {
-                const l = await pgClient.query('SELECT bezeichnung FROM leistung WHERE leistung_id = $1', [leistung_id]);
-                ohnePhasen.push(l.rows[0]?.bezeichnung || leistung_id);
-                continue;
-            }
-            const strang = strangBauen(von, bis, phasen.rows);
-            for (const p of strang) {
-                await pgClient.query(
-                    `INSERT INTO programm_phase (verlauf_id, leistung_id, phase_id, reihenfolge, start_datum, end_datum)
-                     VALUES ($1, $2, $3, $4, $5, $6)`,
-                    [prog.verlauf_id, leistung_id, p.phase_id, p.reihenfolge, p.start_datum, p.end_datum]
-                );
-                angelegt++;
-            }
-        }
+        const ergebnis = await straengeErzeugen(pgClient, {
+            verlauf_id: prog.verlauf_id,
+            verfuegung_id: prog.verfuegung_id,
+            von, bis,
+        });
         await pgClient.query('COMMIT');
-        res.json({ angelegt, straenge: tarife.rows.length - ohnePhasen.length, ohne_phasenmodell: ohnePhasen });
+        res.json(ergebnis);
     } catch (err) {
         await pgClient.query('ROLLBACK').catch(() => {});
         console.error('[zeitstrahl]', err.message);
