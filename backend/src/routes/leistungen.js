@@ -10,11 +10,15 @@ const FELDER = `leistung_id, tarifnr, bezeichnung, einheit, aktiv,
 // GET /api/leistungen — alle aktiven Leistungen (alle authentifizierten Benutzer)
 router.get('/', auth, async (req, res) => {
     try {
+        // Programmbezug mitliefern: die Verfuegung schlaegt daraus das Programm
+        // vor. programm.leistung_id ist eindeutig, darum genuegt ein LEFT JOIN.
         const result = await db.query(
-            `SELECT ${FELDER}
-             FROM leistung
-             WHERE aktiv = TRUE
-             ORDER BY produkt_nr, tarifnr`
+            `SELECT ${FELDER.split(',').map(f => 'l.' + f.trim()).join(', ')},
+                    p.programm_id, p.name AS programm_name
+             FROM leistung l
+             LEFT JOIN programm p ON p.leistung_id = l.leistung_id
+             WHERE l.aktiv = TRUE
+             ORDER BY l.produkt_nr, l.tarifnr`
         );
         res.json(result.rows);
     } catch (err) {

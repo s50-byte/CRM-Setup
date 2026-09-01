@@ -1,13 +1,17 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { hatSpalte } = require('../schema-flags');
 
 // GET /api/verfuegungen/:dossier_id
 router.get('/:dossier_id', auth, async (req, res) => {
     try {
+        const zeitraumDa = await hatSpalte('verfuegung', 'gueltig_von');
         const result = await db.query(
             `SELECT v.verfuegung_id, v.nummer, v.datum, v.bemerkung, v.status,
                     v.verrechnungsart, v.betrag,
+                    ${zeitraumDa ? 'v.gueltig_von, v.gueltig_bis, v.datei_id, dt.dateiname AS datei_name,'
+                                 : 'NULL::date AS gueltig_von, NULL::date AS gueltig_bis, NULL::uuid AS datei_id, NULL::varchar AS datei_name,'}
                     (SELECT GREATEST(1, COALESCE(
                         (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
                        + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int,
@@ -34,6 +38,7 @@ router.get('/:dossier_id', auth, async (req, res) => {
                         '[]'
                     ) AS positionen
              FROM verfuegung v
+             ${zeitraumDa ? 'LEFT JOIN datei dt ON dt.datei_id = v.datei_id' : ''}
              LEFT JOIN verfuegung_position vp ON vp.verfuegung_id = v.verfuegung_id
              LEFT JOIN leistung l ON l.leistung_id = vp.leistung_id
              WHERE v.dossier_id = $1
@@ -100,7 +105,8 @@ router.get('/:dossier_id', auth, async (req, res) => {
 
 // POST /api/verfuegungen
 router.post('/', auth, async (req, res) => {
-    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag, programm_id } = req.body;
+    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag, programm_id,
+            gueltig_von, gueltig_bis, datei_id } = req.body;
     if (!dossier_id || !nummer) {
         return res.status(400).json({ error: 'dossier_id und Nummer sind erforderlich' });
     }
@@ -115,12 +121,20 @@ router.post('/', auth, async (req, res) => {
                 [dossier_id]
             );
         }
+        const zeitraumDa = await hatSpalte('verfuegung', 'gueltig_von');
         const result = await pgClient.query(
-            `INSERT INTO verfuegung (dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             RETURNING *`,
-            [dossier_id, nummer.trim(), datum || null, bemerkung?.trim() || null, stat,
-             verrechnungsart || null, betrag || null]
+            zeitraumDa
+                ? `INSERT INTO verfuegung (dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag,
+                                           gueltig_von, gueltig_bis, datei_id)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`
+                : `INSERT INTO verfuegung (dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+            zeitraumDa
+                ? [dossier_id, nummer.trim(), datum || null, bemerkung?.trim() || null, stat,
+                   verrechnungsart || null, betrag || null,
+                   gueltig_von || null, gueltig_bis || null, datei_id || null]
+                : [dossier_id, nummer.trim(), datum || null, bemerkung?.trim() || null, stat,
+                   verrechnungsart || null, betrag || null]
         );
 
         // Intake automatisch abschliessen, wenn Verfügung im Bucket "Programmstart" eingetragen wird
@@ -129,16 +143,18 @@ router.post('/', auth, async (req, res) => {
             [dossier_id]
         );
 
-        // Erste Verfügung eines Dossiers startet das Programm (akt_programm_id + laufender programm_verlauf)
+        // Das Programm startet nur, wenn es ausdruecklich mitgegeben wird – der
+        // Vorschlag aus den Positionen wird in der Oberflaeche bestaetigt, nicht
+        // hier stillschweigend gesetzt.
         if (programm_id && !dosRes.rows[0]?.akt_programm_id) {
             await pgClient.query(
                 `UPDATE dossier SET akt_programm_id = $1, updated_at = NOW() WHERE dossier_id = $2`,
                 [programm_id, dossier_id]
             );
             await pgClient.query(
-                `INSERT INTO programm_verlauf (dossier_id, programm_id, status, start_datum)
-                 VALUES ($1, $2, 'Laufend', COALESCE($3, CURRENT_DATE))`,
-                [dossier_id, programm_id, datum || null]
+                `INSERT INTO programm_verlauf (dossier_id, programm_id, status, start_datum, geplantes_enddatum)
+                 VALUES ($1, $2, 'Laufend', COALESCE($3, $4, CURRENT_DATE), $5)`,
+                [dossier_id, programm_id, gueltig_von || null, datum || null, gueltig_bis || null]
             );
         }
 
@@ -168,7 +184,8 @@ router.post('/', auth, async (req, res) => {
 
 // PUT /api/verfuegungen/:id
 router.put('/:id', auth, async (req, res) => {
-    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag, programm_id } = req.body;
+    const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag, programm_id,
+            gueltig_von, gueltig_bis, datei_id } = req.body;
     if (!nummer) return res.status(400).json({ error: 'Nummer ist erforderlich' });
     const pgClient = await db.connect();
     try {
@@ -180,14 +197,25 @@ router.put('/:id', auth, async (req, res) => {
                 [dossier_id, req.params.id]
             );
         }
+        const zeitraumDa = await hatSpalte('verfuegung', 'gueltig_von');
         const result = await pgClient.query(
-            `UPDATE verfuegung
-             SET nummer = $1, datum = $2, bemerkung = $3, status = $4,
-                 verrechnungsart = $5, betrag = $6, updated_at = NOW()
-             WHERE verfuegung_id = $7
-             RETURNING *`,
-            [nummer.trim(), datum || null, bemerkung?.trim() || null, status || 'aktiv',
-             verrechnungsart || null, betrag || null, req.params.id]
+            zeitraumDa
+                ? `UPDATE verfuegung
+                   SET nummer = $1, datum = $2, bemerkung = $3, status = $4,
+                       verrechnungsart = $5, betrag = $6,
+                       gueltig_von = $8, gueltig_bis = $9, datei_id = $10,
+                       updated_at = NOW()
+                   WHERE verfuegung_id = $7 RETURNING *`
+                : `UPDATE verfuegung
+                   SET nummer = $1, datum = $2, bemerkung = $3, status = $4,
+                       verrechnungsart = $5, betrag = $6, updated_at = NOW()
+                   WHERE verfuegung_id = $7 RETURNING *`,
+            zeitraumDa
+                ? [nummer.trim(), datum || null, bemerkung?.trim() || null, status || 'aktiv',
+                   verrechnungsart || null, betrag || null, req.params.id,
+                   gueltig_von || null, gueltig_bis || null, datei_id || null]
+                : [nummer.trim(), datum || null, bemerkung?.trim() || null, status || 'aktiv',
+                   verrechnungsart || null, betrag || null, req.params.id]
         );
         if (result.rows.length === 0) {
             await pgClient.query('ROLLBACK');
@@ -239,38 +267,22 @@ router.delete('/:id', auth, async (req, res) => {
     }
 });
 
-// Startet das Programm eines Dossiers anhand der Leistung einer Verfuegungsposition.
+// Programmvorschlag aus den Positionen.
 //
-// POST /verfuegungen kennt zwar einen programm_id-Parameter, aber die Oberflaeche
-// schickt ihn nicht mit – das Programm wurde darum nie gestartet ("Verfuegungen
-// werden nicht mehr als Programme erkannt", Feedback 23.06.2026). Die Zuordnung
-// steckt ohnehin in den Positionen: programm.leistung_id verweist eindeutig auf
-// die Leistung, jede Leistung gehoert zu hoechstens einem Programm.
-//
-// Nur eine aktive Verfuegung startet ein Programm, und nur wenn noch keines laeuft.
-async function programmAusPositionStarten(verfuegung_id, leistung_id) {
+// Frueher startete eine Position das Programm automatisch. Das Zielmodell will
+// den Schritt bewusst von Hand: das System schlaegt vor, bestaetigt wird per
+// Klick, und aendern muss moeglich sein. Diese Funktion liefert nur noch den
+// Vorschlag - gesetzt wird er ueber PUT /dossiers/:id/programm.
+async function programmVorschlag(verfuegung_id) {
     const r = await db.query(
-        `SELECT v.dossier_id, v.datum, p.programm_id
-         FROM verfuegung v
-         JOIN dossier d ON d.dossier_id = v.dossier_id
-         JOIN programm p ON p.leistung_id = $2
-         WHERE v.verfuegung_id = $1
-           AND v.status = 'aktiv'
-           AND d.akt_programm_id IS NULL`,
-        [verfuegung_id, leistung_id]
+        `SELECT DISTINCT p.programm_id, p.name
+         FROM verfuegung_position vp
+         JOIN programm p ON p.leistung_id = vp.leistung_id
+         WHERE vp.verfuegung_id = $1::uuid
+         ORDER BY p.name`,
+        [verfuegung_id]
     );
-    if (!r.rows.length) return;
-    const { dossier_id, datum, programm_id } = r.rows[0];
-
-    await db.query(
-        `UPDATE dossier SET akt_programm_id = $1, updated_at = NOW() WHERE dossier_id = $2`,
-        [programm_id, dossier_id]
-    );
-    await db.query(
-        `INSERT INTO programm_verlauf (dossier_id, programm_id, status, start_datum)
-         VALUES ($1, $2, 'Laufend', COALESCE($3, CURRENT_DATE))`,
-        [dossier_id, programm_id, datum || null]
-    );
+    return r.rows;
 }
 
 // POST /api/verfuegungen/:id/positionen
@@ -283,7 +295,6 @@ router.post('/:id/positionen', auth, async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
             [req.params.id, leistung_id, soll_stunden || 0, reihenfolge || 0, verrechnungsart || null, betrag || null]
         );
-        await programmAusPositionStarten(req.params.id, leistung_id);
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err);
@@ -322,6 +333,16 @@ router.delete('/:id/positionen/:pos_id', auth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Löschen der Position' });
+    }
+});
+
+// GET /api/verfuegungen/:id/programmvorschlag — Programme aus den Positionen
+router.get('/:id/programmvorschlag', auth, async (req, res) => {
+    try {
+        res.json(await programmVorschlag(req.params.id));
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Ermitteln des Programmvorschlags' });
     }
 });
 

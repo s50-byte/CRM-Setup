@@ -39,8 +39,13 @@ function positionSoll(p, leistungen, dauerMonate) {
 }
 
 export default function VerfuegungModal({ open, onClose, dossierId, dossier, verfuegung, onSaved }) {
-    const [aktTab, setAktTab] = useState('verfuegung');
-    const [bezeichnung, setBezeichnung] = useState('');
+    const [nummer, setNummer] = useState('');
+    const [gueltigVon, setGueltigVon] = useState('');
+    const [gueltigBis, setGueltigBis] = useState('');
+    const [datei, setDatei] = useState(null);          // neu gewaehlt, noch nicht hochgeladen
+    const [dateiId, setDateiId] = useState(null);      // bereits hinterlegt
+    const [dateiName, setDateiName] = useState('');
+    const [programmId, setProgrammId] = useState('');  // bestaetigter Vorschlag
     const [datum, setDatum] = useState('');
     const [status, setStatus] = useState('aktiv');
     const [bemerkung, setBemerkung] = useState('');
@@ -60,12 +65,17 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
     useEffect(() => {
         if (!open) return;
         client.get('/leistungen').then(r => setLeistungen(r.data)).catch(console.error);
-        setBezeichnung(verfuegung?.nummer || '');
+        setNummer(verfuegung?.nummer || '');
         setDatum(verfuegung?.datum ? verfuegung.datum.slice(0, 10) : '');
+        setGueltigVon(verfuegung?.gueltig_von ? verfuegung.gueltig_von.slice(0, 10) : '');
+        setGueltigBis(verfuegung?.gueltig_bis ? verfuegung.gueltig_bis.slice(0, 10) : '');
+        setDatei(null);
+        setDateiId(verfuegung?.datei_id || null);
+        setDateiName(verfuegung?.datei_name || '');
+        setProgrammId('');
         setStatus(verfuegung?.status || 'aktiv');
         setBemerkung(verfuegung?.bemerkung || '');
         setFehler('');
-        setAktTab('verfuegung');
         setPositionen(
             (verfuegung?.positionen || []).map((p, i) => ({
                 _key: i,
@@ -106,21 +116,45 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
         }));
     }
 
+    // Vorschlag aus den Positionen: jede Leistung gehoert zu hoechstens einem
+    // Programm. Bestaetigt wird er unten per Klick, aendern bleibt moeglich.
+    const vorschlaege = [...new Map(
+        positionen
+            .map(pos => leistungen.find(l => l.leistung_id === pos.leistung_id))
+            .filter(l => l && l.programm_id)
+            .map(l => [l.programm_id, { programm_id: l.programm_id, name: l.programm_name || l.bezeichnung }])
+    ).values()];
+
+    const hatProgramm = !!dossier?.akt_programm_id;
+
     async function handleSubmit() {
-        if (!bezeichnung.trim()) {
+        if (!nummer.trim()) {
             setFehler('Bezeichnung ist erforderlich.');
-            setAktTab('verfuegung');
             return;
         }
         setLaden(true);
         setFehler('');
         try {
+            // Erst die Datei in die Ablage, dann die Verfuegung mit dem Verweis.
+            let datei_id = dateiId;
+            if (datei) {
+                const fd = new FormData();
+                fd.append('datei', datei);
+                const r = await client.post('/dateien', fd);
+                datei_id = r.data.datei_id;
+            }
+
             const payload = {
                 dossier_id: dossierId,
-                nummer: bezeichnung.trim(),
+                nummer: nummer.trim(),
                 datum: datum || null,
+                gueltig_von: gueltigVon || null,
+                gueltig_bis: gueltigBis || null,
+                datei_id: datei_id || null,
                 bemerkung: bemerkung.trim() || null,
                 status,
+                // Nur was ausdruecklich bestaetigt wurde – nie automatisch.
+                programm_id: programmId || null,
             };
             let verfuegungId;
             if (verfuegung) {
@@ -173,33 +207,48 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
 
     return (
         <Modal open={open} onClose={onClose} title={verfuegung ? 'Verfügung bearbeiten' : 'Neue Verfügung'} width={560}>
-            {/* Tabs */}
-            <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,.09)', marginBottom: 16, marginTop: -4 }}>
-                {[
-                    { key: 'verfuegung', label: 'Verfügung' },
-                    { key: 'positionen', label: `Tarife${positionen.length > 0 ? ` (${positionen.length})` : ''}` },
-                ].map(tab => (
-                    <button key={tab.key} onClick={() => setAktTab(tab.key)} style={{
-                        padding: '8px 16px', fontSize: 12.5, fontWeight: aktTab === tab.key ? 600 : 400,
-                        cursor: 'pointer', border: 'none', background: 'transparent',
-                        color: aktTab === tab.key ? '#2563EB' : '#6B6860',
-                        borderBottom: aktTab === tab.key ? '2px solid #2563EB' : '2px solid transparent',
-                        fontFamily: 'inherit', textTransform: 'uppercase', letterSpacing: '.04em',
-                    }}>
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Tab: Verfügung */}
-            {aktTab === 'verfuegung' && (
+            {(
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
-                        <FieldLabel required>Bezeichnung</FieldLabel>
+                        <FieldLabel required>Verfügungsnummer</FieldLabel>
                         <input
-                            type="text" value={bezeichnung} onChange={e => setBezeichnung(e.target.value)}
-                            placeholder="z.B. IV-Massnahme Detailhandel 2026" style={inputStyle}
+                            type="text" value={nummer} onChange={e => setNummer(e.target.value)}
+                            placeholder="z.B. 756.1234.5678.90 / 2026-04" style={inputStyle}
                         />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div>
+                            <FieldLabel>Gültig von</FieldLabel>
+                            <input type="date" value={gueltigVon} onChange={e => setGueltigVon(e.target.value)} style={inputStyle} />
+                        </div>
+                        <div>
+                            <FieldLabel>Gültig bis</FieldLabel>
+                            <input type="date" value={gueltigBis} onChange={e => setGueltigBis(e.target.value)} style={inputStyle} />
+                        </div>
+                    </div>
+                    <div>
+                        <FieldLabel>Verfügungsdokument</FieldLabel>
+                        {dateiId && !datei ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ flex: 1, fontSize: 12.5 }}>📄 {dateiName || 'hinterlegt'}</span>
+                                <button
+                                    onClick={() => { setDateiId(null); setDateiName(''); }}
+                                    style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(220,38,38,.25)', borderRadius: 5, background: '#FEF2F2', color: '#B91C1C', fontFamily: 'inherit' }}
+                                >Entfernen</button>
+                            </div>
+                        ) : (
+                            <>
+                                <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
+                                    onChange={e => setDatei(e.target.files?.[0] || null)}
+                                    style={{ ...inputStyle, padding: '6px 8px' }}
+                                />
+                                <div style={{ fontSize: 10.5, color: '#A09D97', marginTop: 4 }}>
+                                    PDF, JPG, PNG, DOCX, XLSX · max. 20 MB
+                                </div>
+                            </>
+                        )}
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                         <div>
@@ -225,8 +274,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                 </div>
             )}
 
-            {/* Tab: Positionen */}
-            {aktTab === 'positionen' && (
+            {(
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {positionen.length === 0 && (
                         <div style={{ fontSize: 12.5, color: '#9CA3AF', textAlign: 'center', padding: '1rem 0' }}>
@@ -251,7 +299,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                                             <option value="">— Leistung wählen —</option>
                                             {leistungen.map(l => (
                                                 <option key={l.leistung_id} value={l.leistung_id}>
-                                                    {l.tarifnr} · {l.bezeichnung}
+                                                    {l.tarifnr} · {l.nummer}
                                                 </option>
                                             ))}
                                         </select>
@@ -322,6 +370,28 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                             {gesamtSoll.chf > 0 && <span>CHF {gesamtSoll.chf.toFixed(2)}</span>}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Programmvorschlag aus den Positionen — bestaetigen oder aendern */}
+            {!hatProgramm && vorschlaege.length > 0 && (
+                <div style={{ marginTop: 14, padding: '10px 12px', background: '#F8FAFF', border: '1px solid rgba(37,99,235,.18)', borderRadius: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>
+                        Programm starten
+                    </div>
+                    <div style={{ fontSize: 12, color: '#374151', marginBottom: 8 }}>
+                        Aus den Tarifen vorgeschlagen. Ohne Auswahl wird kein Programm gestartet.
+                    </div>
+                    <select
+                        value={programmId}
+                        onChange={e => setProgrammId(e.target.value)}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                    >
+                        <option value="">— kein Programm starten —</option>
+                        {vorschlaege.map(v => (
+                            <option key={v.programm_id} value={v.programm_id}>{v.name}</option>
+                        ))}
+                    </select>
                 </div>
             )}
 
