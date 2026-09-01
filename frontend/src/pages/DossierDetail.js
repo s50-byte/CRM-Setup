@@ -151,6 +151,7 @@ export default function DossierDetail() {
     const [ferienModal, setFerienModal] = useState(false);
     const [terminModal, setTerminModal] = useState(false);
     const [detailTermin, setDetailTermin] = useState(null);
+    const [terminBearbeiten, setTerminBearbeiten] = useState(null);
 
     // Programmhistorie
     const [verlaufOffen, setVerlaufOffen] = useState(false);
@@ -1153,11 +1154,12 @@ export default function DossierDetail() {
                 }}
             />
             <NeuerTerminModal
-                open={terminModal}
-                onClose={() => setTerminModal(false)}
+                open={terminModal || !!terminBearbeiten}
+                termin={terminBearbeiten}
+                onClose={() => { setTerminModal(false); setTerminBearbeiten(null); }}
                 klientId={dossier?.klient_id}
                 dossierZuweisungen={zugewiesen}
-                onSaved={() => { setTerminModal(false); loadTermine(); }}
+                onSaved={() => { setTerminModal(false); setTerminBearbeiten(null); loadTermine(); }}
             />
 
             <DokumentErstellenModal
@@ -1250,6 +1252,11 @@ export default function DossierDetail() {
                                     marginRight: 'auto'
                                 }}>Absagen</button>
                             )}
+                            <button onClick={() => { setTerminBearbeiten(detailTermin); setDetailTermin(null); }} style={{
+                                padding: '7px 18px', fontSize: 13, cursor: 'pointer',
+                                border: 'none', borderRadius: 6,
+                                background: '#2563EB', fontFamily: 'inherit', color: '#fff', fontWeight: 500
+                            }}>Bearbeiten</button>
                             <button onClick={() => setDetailTermin(null)} style={{
                                 padding: '7px 18px', fontSize: 13, cursor: 'pointer',
                                 border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,

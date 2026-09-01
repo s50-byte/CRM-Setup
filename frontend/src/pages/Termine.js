@@ -35,6 +35,7 @@ export default function Termine() {
     const [laden, setLaden] = useState(true);
     const [terminModal, setTerminModal] = useState(false);
     const [detailTermin, setDetailTermin] = useState(null);
+    const [bearbeiten, setBearbeiten] = useState(null);
     const [sortField, setSortField] = useState('datum');
     const [sortDir, setSortDir] = useState('asc');
 
@@ -351,6 +352,11 @@ export default function Termine() {
                                     marginRight: 'auto'
                                 }}>Absagen</button>
                             )}
+                            <button onClick={() => { setBearbeiten(detailTermin); setDetailTermin(null); }} style={{
+                                padding: '7px 18px', fontSize: 13, cursor: 'pointer',
+                                border: 'none', borderRadius: 6,
+                                background: '#2563EB', fontFamily: 'inherit', color: '#fff', fontWeight: 500
+                            }}>Bearbeiten</button>
                             <button onClick={() => setDetailTermin(null)} style={{
                                 padding: '7px 18px', fontSize: 13, cursor: 'pointer',
                                 border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
@@ -362,10 +368,13 @@ export default function Termine() {
             )}
 
             <NeuerTerminModal
-                open={terminModal}
-                onClose={() => setTerminModal(false)}
+                open={terminModal || !!bearbeiten}
+                termin={bearbeiten}
+                klientId={bearbeiten?.klient_id}
+                onClose={() => { setTerminModal(false); setBearbeiten(null); }}
                 onSaved={() => {
                     setTerminModal(false);
+                    setBearbeiten(null);
                     client.get('/termine').then(r => setTermine(r.data));
                 }}
             />

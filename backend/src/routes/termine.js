@@ -169,6 +169,53 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // PUT /api/termine/:id/absagen — Termin absagen + Dashboard-Meldungen
+// PUT /api/termine/:id — Termin aendern
+//
+// Bisher liessen sich Termine nur absagen. Ein verschobener Termin musste
+// abgesagt und neu erfasst werden, womit Teilnehmende und Notiz verloren
+// gingen.
+router.put('/:id', auth, async (req, res) => {
+    const { typ, datum, zeit, notiz, status, teilnehmende } = req.body;
+    if (!typ || !datum) return res.status(400).json({ error: 'Typ und Datum erforderlich' });
+
+    const dbClient = await db.connect();
+    try {
+        await dbClient.query('BEGIN');
+        const r = await dbClient.query(
+            `UPDATE termin
+                SET typ = $1, datum = $2, zeit = $3, notiz = $4,
+                    status = COALESCE($5, status), updated_at = NOW()
+              WHERE termin_id = $6
+              RETURNING *`,
+            [typ, datum, zeit || null, notiz || null, status || null, req.params.id]
+        );
+        if (!r.rows.length) {
+            await dbClient.query('ROLLBACK');
+            return res.status(404).json({ error: 'Termin nicht gefunden' });
+        }
+
+        // Teilnehmende nur anfassen, wenn sie mitgeschickt wurden – sonst
+        // wuerde ein Aufruf ohne das Feld alle Zuweisungen loeschen.
+        if (Array.isArray(teilnehmende)) {
+            await dbClient.query('DELETE FROM termin_user WHERE termin_id = $1', [req.params.id]);
+            for (const user_id of teilnehmende) {
+                await dbClient.query(
+                    'INSERT INTO termin_user (termin_id, user_id) VALUES ($1, $2)',
+                    [req.params.id, user_id]
+                );
+            }
+        }
+        await dbClient.query('COMMIT');
+        res.json(r.rows[0]);
+    } catch (err) {
+        await dbClient.query('ROLLBACK').catch(() => {});
+        console.error(err);
+        res.status(500).json({ error: 'Fehler beim Ändern des Termins' });
+    } finally {
+        dbClient.release();
+    }
+});
+
 router.put('/:id/absagen', auth, async (req, res) => {
     const dbClient = await db.connect();
     try {

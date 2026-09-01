@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 
 const TYPEN = ['Erstgespräch', 'Schnuppereinsatz', 'Standortgespräch', 'Programmstart', 'Abschlussgespräch'];
 
-export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dossierZuweisungen }) {
+export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dossierZuweisungen, termin }) {
     const { benutzer: currentUser } = useAuth();
     const [form, setForm] = useState({
         klient_id: klientId || '', typ: 'Erstgespräch', datum: '', zeit: '', notiz: ''
@@ -38,7 +38,25 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
             client.get('/benutzer').then(r => setBenutzer(r.data)).catch(console.error);
         }
         if (klientId) setForm(prev => ({ ...prev, klient_id: klientId }));
-    }, [open, klientId, nurZugewiesene]);
+
+        // Bestehenden Termin uebernehmen, sonst leeres Formular.
+        if (termin) {
+            setForm({
+                klient_id: termin.klient_id || klientId || '',
+                typ: termin.typ || 'Erstgespräch',
+                datum: termin.datum ? termin.datum.slice(0, 10) : '',
+                zeit: termin.zeit ? termin.zeit.slice(0, 5) : '',
+                notiz: termin.notiz || '',
+            });
+            const ids = (termin.personen || []).map(p => p.user_id).filter(Boolean);
+            setIchNehmeTeile(ids.includes(currentUser?.user_id));
+            setTeilnehmende(ids.filter(u => u !== currentUser?.user_id));
+        } else {
+            setForm({ klient_id: klientId || '', typ: 'Erstgespräch', datum: '', zeit: '', notiz: '' });
+            setTeilnehmende([]);
+            setIchNehmeTeile(true);
+        }
+    }, [open, klientId, nurZugewiesene, termin, currentUser?.user_id]);
 
     const personenListe = nurZugewiesene
         ? zugewieseneOhneMich
@@ -66,7 +84,10 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
             const teilnehmendeFinal = ichNehmeTeile && currentUser?.user_id
                 ? [...teilnehmende, currentUser.user_id]
                 : teilnehmende;
-            await client.post('/termine', {
+            const senden = termin
+                ? (d) => client.put(`/termine/${termin.termin_id}`, d)
+                : (d) => client.post('/termine', d);
+            await senden({
                 klient_id: effectiveKlientId,
                 typ: form.typ,
                 datum: form.datum,
@@ -93,7 +114,7 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
             : `${teilnehmende.length} Personen ausgewählt`;
 
     return (
-        <Modal open={open} onClose={onClose} title="Neuer Termin">
+        <Modal open={open} onClose={onClose} title={termin ? 'Termin bearbeiten' : 'Neuer Termin'}>
             {fehler && (
                 <div style={{
                     background: '#FEF2F2', border: '1px solid rgba(220,38,38,.2)',
@@ -223,7 +244,7 @@ export default function NeuerTerminModal({ open, onClose, onSaved, klientId, dos
             <div style={btnRow}>
                 <button style={btnSecondary} onClick={onClose}>Abbrechen</button>
                 <button style={{ ...btnPrimary, opacity: laden ? .7 : 1 }} onClick={speichern} disabled={laden}>
-                    {laden ? 'Speichern…' : 'Termin erfassen'}
+                    {laden ? 'Speichern…' : termin ? 'Änderungen speichern' : 'Termin erfassen'}
                 </button>
             </div>
         </Modal>
