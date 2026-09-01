@@ -81,7 +81,7 @@ function Section({ title, children, headerRight }) {
     );
 }
 
-function DokListe({ docs, onDelete }) {
+function DokListe({ docs, onDelete, onOeffnen }) {
     if (!docs) return <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic' }}>Laden…</div>;
     if (docs.length === 0) return <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic' }}>Keine Dokumente</div>;
     return (
@@ -89,7 +89,16 @@ function DokListe({ docs, onDelete }) {
             {docs.map(d => (
                 <div key={d.pdok_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
                     <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 5, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.08)', fontFamily: 'monospace', flexShrink: 0 }}>{d.typ || '—'}</span>
-                    <span style={{ flex: 1, fontSize: 12.5 }}>{d.dateiname}</span>
+                    {d.datei_id ? (
+                        <button
+                            onClick={() => onOeffnen(d.datei_id, d.dateiname)}
+                            style={{ flex: 1, fontSize: 12.5, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#2563EB', fontFamily: 'inherit' }}
+                        >{d.dateiname}</button>
+                    ) : (
+                        <span style={{ flex: 1, fontSize: 12.5 }} title="Ohne Datei – vor der Dateiablage erfasst">
+                            {d.dateiname}
+                        </span>
+                    )}
                     {onDelete && (
                         <button style={BTN_DEL_SM} onClick={() => onDelete(d.pdok_id)}>×</button>
                     )}
@@ -121,7 +130,7 @@ export default function Programme() {
     const [neuerKForm, setNeuerKForm] = useState({});
     const [neuePhaseForm, setNeuePhaseForm] = useState({});
     const [dokModal, setDokModal] = useState(null);
-    const [dokForm, setDokForm] = useState({ dateiname: '', typ: 'Sonstiges' });
+    const [dokForm, setDokForm] = useState({ dateiname: '', typ: 'Sonstiges', datei: null });
     const [fehler, setFehler] = useState('');
     const [busy, setBusy] = useState(false);
 
@@ -261,20 +270,6 @@ export default function Programme() {
 
     // Datei hochladen und am Programm verknuepfen. Der Download laeuft ueber das
     // Backend, damit die Datei nicht ohne Anmeldung erreichbar ist.
-    async function produkteblattHochladen(programm, datei) {
-        if (!datei) return;
-        setBusy(true);
-        setFehler('');
-        try {
-            const daten = new FormData();
-            daten.append('datei', datei);
-            const r = await client.post('/dateien', daten);
-            await produkteblattSpeichern(programm, { produkteblatt_datei_id: r.data.datei_id });
-        } catch (err) {
-            setFehler(err.response?.data?.error || 'Produkteblatt konnte nicht hochgeladen werden');
-        } finally { setBusy(false); }
-    }
-
     async function produkteblattEntfernen(programm) {
         setBusy(true);
         setFehler('');
@@ -288,7 +283,7 @@ export default function Programme() {
         } finally { setBusy(false); }
     }
 
-    async function produkteblattOeffnen(datei_id, dateiname) {
+    async function dateiOeffnen(datei_id, dateiname) {
         try {
             const r = await client.get(`/dateien/${datei_id}`, { responseType: 'blob' });
             const url = window.URL.createObjectURL(r.data);
@@ -346,21 +341,41 @@ export default function Programme() {
         }
     }
 
+    // Zuerst die Datei in die Ablage, dann die Zeile mit dem Verweis. Umgekehrt
+    // gaebe es bei einem Fehler einen Eintrag ohne Datei.
+    async function dateiHochladen(datei) {
+        const daten = new FormData();
+        daten.append('datei', datei);
+        const r = await client.post('/dateien', daten);
+        return r.data.datei_id;
+    }
+
     async function dokumentHochladen() {
-        if (!dokForm.dateiname.trim() || !dokModal) return;
+        if (!dokForm.dateiname.trim() || !dokModal || !dokForm.datei) return;
         setBusy(true);
         setFehler('');
         try {
+            const datei_id = await dateiHochladen(dokForm.datei);
+
+            // Das Produkteblatt haengt am Tarif, nicht an der Dokumentliste.
+            if (dokModal.produkteblatt) {
+                await produkteblattSpeichern(dokModal.programm, { produkteblatt_datei_id: datei_id });
+                setDokModal(null);
+                setDokForm({ dateiname: '', typ: 'Sonstiges', datei: null });
+                return;
+            }
+
             await client.post('/dokumente/programm', {
                 programm_id: dokModal.programm_id,
                 phase_id: dokModal.phase_id || null,
                 dateiname: dokForm.dateiname.trim(),
                 typ: dokForm.typ,
+                datei_id,
             });
             if (dokModal.phase_id) await loadPhaseDoks(dokModal.phase_id);
             else await loadProgDoks(dokModal.programm_id);
             setDokModal(null);
-            setDokForm({ dateiname: '', typ: 'Sonstiges' });
+            setDokForm({ dateiname: '', typ: 'Sonstiges', datei: null });
         } catch (err) {
             setFehler(err.response?.data?.error || 'Fehler beim Hochladen');
         } finally { setBusy(false); }
@@ -630,7 +645,7 @@ export default function Programme() {
                                                                     <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{p.name}</div>
                                                                     {!editierbar && p.produkteblatt_datei_id && (
                                                                         <button
-                                                                            onClick={() => produkteblattOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
+                                                                            onClick={() => dateiOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
                                                                             style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, padding: 0 }}
                                                                         >📄 {p.produkteblatt_dateiname || 'Produkteblatt SVA'}</button>
                                                                     )}
@@ -642,7 +657,7 @@ export default function Programme() {
                                                                         {p.produkteblatt_datei_id ? (
                                                                             <>
                                                                                 <button
-                                                                                    onClick={() => produkteblattOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
+                                                                                    onClick={() => dateiOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
                                                                                     style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
                                                                                 >📄 {p.produkteblatt_dateiname}</button>
                                                                                 <button
@@ -652,20 +667,14 @@ export default function Programme() {
                                                                                 >Entfernen</button>
                                                                             </>
                                                                         ) : (
-                                                                            <label style={{ ...BTN_ADD, cursor: 'pointer' }}>
-                                                                                Datei wählen…
-                                                                                <input
-                                                                                    type="file"
-                                                                                    accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
-                                                                                    onChange={e => {
-                                                                                        produkteblattHochladen(p, e.target.files?.[0]);
-                                                                                        e.target.value = '';
-                                                                                    }}
-                                                                                    style={{ display: 'none' }}
-                                                                                />
-                                                                            </label>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setDokForm({ dateiname: '', typ: 'Produkteblatt', datei: null });
+                                                                                    setDokModal({ produkteblatt: true, programm: p, programm_id: p.programm_id });
+                                                                                }}
+                                                                                style={BTN_ADD}
+                                                                            >Hochladen…</button>
                                                                         )}
-                                                                        <span style={{ fontSize: 10.5, color: '#A09D97' }}>PDF, JPG, PNG, DOCX, XLSX · max. 20 MB</span>
                                                                     </div>
                                                                 )}
 
@@ -735,11 +744,11 @@ export default function Programme() {
                                                                     headerRight={editierbar && (
                                                                         <button style={BTN_ADD} onClick={() => {
                                                                             setDokModal({ programm_id: p.programm_id, phase_id: null });
-                                                                            setDokForm({ dateiname: '', typ: 'Sonstiges' });
+                                                                            setDokForm({ dateiname: '', typ: 'Sonstiges', datei: null });
                                                                         }}>+ Dokument</button>
                                                                     )}
                                                                 >
-                                                                    <DokListe
+                                                                    <DokListe onOeffnen={dateiOeffnen}
                                                                         docs={progDoks[p.programm_id]}
                                                                         onDelete={editierbar ? id => dokumentLoeschen(id, p.programm_id, null) : null}
                                                                     />
@@ -889,11 +898,11 @@ export default function Programme() {
                                                                         headerRight={editierbar && (
                                                                             <button style={BTN_ADD} onClick={() => {
                                                                                 setDokModal({ programm_id: p.programm_id, phase_id: activePhaseObj.phase_id });
-                                                                                setDokForm({ dateiname: '', typ: 'Sonstiges' });
+                                                                                setDokForm({ dateiname: '', typ: 'Sonstiges', datei: null });
                                                                             }}>+ Dokument</button>
                                                                         )}
                                                                     >
-                                                                        <DokListe
+                                                                        <DokListe onOeffnen={dateiOeffnen}
                                                                             docs={phaseDoks[activePhaseObj.phase_id]}
                                                                             onDelete={editierbar ? id => dokumentLoeschen(id, p.programm_id, activePhaseObj.phase_id) : null}
                                                                         />
@@ -919,19 +928,30 @@ export default function Programme() {
             <Modal
                 open={!!dokModal}
                 onClose={() => setDokModal(null)}
-                title={dokModal?.phase_id ? 'Phasen-Dokument hochladen' : 'Programm-Dokument hochladen'}
+                title={dokModal?.produkteblatt ? 'Produkteblatt hochladen'
+                     : dokModal?.phase_id ? 'Phasen-Dokument hochladen'
+                     : 'Programm-Dokument hochladen'}
                 width={400}
             >
                 <div style={{ marginBottom: 14 }}>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>Datei wählen</label>
                     <input
                         type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
                         style={{ ...INPUT_S, width: '100%', boxSizing: 'border-box', padding: '6px 8px' }}
                         onChange={e => {
-                            const f = e.target.files?.[0];
-                            if (f && !dokForm.dateiname) setDokForm(prev => ({ ...prev, dateiname: f.name }));
+                            const f = e.target.files?.[0] || null;
+                            setDokForm(prev => ({
+                                ...prev,
+                                datei: f,
+                                // Anzeigename nur vorbelegen, nicht ueberschreiben.
+                                dateiname: prev.dateiname || (f ? f.name : ''),
+                            }));
                         }}
                     />
+                    <div style={{ fontSize: 10.5, color: '#A09D97', marginTop: 4 }}>
+                        PDF, JPG, PNG, DOCX, XLSX · max. 20 MB
+                    </div>
                 </div>
                 <div style={{ marginBottom: 14 }}>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>Dateiname *</label>
@@ -944,20 +964,29 @@ export default function Programme() {
                 </div>
                 <div style={{ marginBottom: 20 }}>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>Typ</label>
-                    <select
-                        style={{ ...INPUT_S, width: '100%', boxSizing: 'border-box' }}
-                        value={dokForm.typ}
-                        onChange={e => setDokForm(prev => ({ ...prev, typ: e.target.value }))}
-                    >
-                        {DOK_TYPEN.map(t => <option key={t}>{t}</option>)}
-                    </select>
+                    {dokModal?.produkteblatt ? (
+                        <input
+                            value="Produkteblatt"
+                            readOnly
+                            title="Beim Produkteblatt ist der Typ vorgegeben"
+                            style={{ ...INPUT_S, width: '100%', boxSizing: 'border-box', background: '#F5F4F0', color: '#6B6860' }}
+                        />
+                    ) : (
+                        <select
+                            style={{ ...INPUT_S, width: '100%', boxSizing: 'border-box' }}
+                            value={dokForm.typ}
+                            onChange={e => setDokForm(prev => ({ ...prev, typ: e.target.value }))}
+                        >
+                            {DOK_TYPEN.map(t => <option key={t}>{t}</option>)}
+                        </select>
+                    )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                     <button onClick={() => setDokModal(null)} style={{ padding: '7px 14px', fontSize: 13, cursor: 'pointer', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, background: '#fff', fontFamily: 'inherit', color: '#6B6860' }}>Abbrechen</button>
                     <button
                         onClick={dokumentHochladen}
-                        disabled={busy || !dokForm.dateiname.trim()}
-                        style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', opacity: busy || !dokForm.dateiname.trim() ? .5 : 1 }}
+                        disabled={busy || !dokForm.dateiname.trim() || !dokForm.datei}
+                        style={{ padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', opacity: busy || !dokForm.dateiname.trim() || !dokForm.datei ? .5 : 1 }}
                     >{busy ? 'Hochladen…' : 'Hochladen'}</button>
                 </div>
             </Modal>

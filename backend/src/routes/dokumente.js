@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { hatSpalte } = require('../schema-flags');
 
 // Separate Tabelle (nicht die schema.sql-Tabelle 'dokument', die dateipfad NOT NULL hat)
 db.query(`
@@ -128,8 +129,10 @@ db.query(`
 // GET /api/dokumente/programm/:programm_id — Programm-Dokumente (phase_id IS NULL)
 router.get('/programm/:programm_id', auth, async (req, res) => {
     try {
+        const dateiDa = await hatSpalte('programm_dokument', 'datei_id');
         const result = await db.query(
             `SELECT d.pdok_id, d.dateiname, d.typ, d.erstellt_am,
+                    ${dateiDa ? 'd.datei_id,' : 'NULL::uuid AS datei_id,'}
                     u.full_name AS erstellt_von_name
              FROM programm_dokument d
              LEFT JOIN benutzer u ON u.user_id = d.erstellt_von
@@ -147,8 +150,10 @@ router.get('/programm/:programm_id', auth, async (req, res) => {
 // GET /api/dokumente/phase/:phase_id — Phasen-Dokumente
 router.get('/phase/:phase_id', auth, async (req, res) => {
     try {
+        const dateiDa = await hatSpalte('programm_dokument', 'datei_id');
         const result = await db.query(
             `SELECT d.pdok_id, d.dateiname, d.typ, d.erstellt_am,
+                    ${dateiDa ? 'd.datei_id,' : 'NULL::uuid AS datei_id,'}
                     u.full_name AS erstellt_von_name
              FROM programm_dokument d
              LEFT JOIN benutzer u ON u.user_id = d.erstellt_von
@@ -165,15 +170,21 @@ router.get('/phase/:phase_id', auth, async (req, res) => {
 
 // POST /api/dokumente/programm — Programm-/Phasen-Dokument erstellen
 router.post('/programm', auth, async (req, res) => {
-    const { programm_id, phase_id, dateiname, typ } = req.body;
+    const { programm_id, phase_id, dateiname, typ, datei_id } = req.body;
     if (!programm_id || !dateiname?.trim()) {
         return res.status(400).json({ error: 'programm_id und dateiname erforderlich' });
     }
     try {
+        const dateiDa = await hatSpalte('programm_dokument', 'datei_id');
         const result = await db.query(
-            `INSERT INTO programm_dokument (programm_id, phase_id, dateiname, typ, erstellt_von)
-             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-            [programm_id, phase_id || null, dateiname.trim(), typ || null, req.user.user_id]
+            dateiDa
+                ? `INSERT INTO programm_dokument (programm_id, phase_id, dateiname, typ, erstellt_von, datei_id)
+                   VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`
+                : `INSERT INTO programm_dokument (programm_id, phase_id, dateiname, typ, erstellt_von)
+                   VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            dateiDa
+                ? [programm_id, phase_id || null, dateiname.trim(), typ || null, req.user.user_id, datei_id || null]
+                : [programm_id, phase_id || null, dateiname.trim(), typ || null, req.user.user_id]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -185,7 +196,23 @@ router.post('/programm', auth, async (req, res) => {
 // DELETE /api/dokumente/programm/:id — Programm-Dokument löschen
 router.delete('/programm/:id', auth, async (req, res) => {
     try {
-        await db.query(`DELETE FROM programm_dokument WHERE pdok_id = $1`, [req.params.id]);
+        // Die Datei geht mit – sonst bleibt sie als Waise auf der Ablage liegen.
+        const dateiDa = await hatSpalte('programm_dokument', 'datei_id');
+        const weg = await db.query(
+            dateiDa
+                ? `DELETE FROM programm_dokument WHERE pdok_id = $1 RETURNING datei_id`
+                : `DELETE FROM programm_dokument WHERE pdok_id = $1 RETURNING NULL::uuid AS datei_id`,
+            [req.params.id]
+        );
+        const datei_id = weg.rows[0]?.datei_id;
+        if (datei_id) {
+            const d = await db.query(
+                `DELETE FROM datei WHERE datei_id = $1 RETURNING ablage, schluessel`, [datei_id]
+            );
+            if (d.rows.length) {
+                await require('../dateiablage').loeschen(d.rows[0].ablage, d.rows[0].schluessel);
+            }
+        }
         res.json({ message: 'Dokument gelöscht' });
     } catch (err) {
         console.error(err);
