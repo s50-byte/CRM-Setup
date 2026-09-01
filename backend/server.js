@@ -31,6 +31,7 @@ app.use('/api/feedback',     require('./src/routes/feedback'));
 app.use('/api/klientenbesprechung', require('./src/routes/klientenbesprechung'));
 app.use('/api/vorlagen',     require('./src/routes/vorlagen'));
 app.use('/api/dateien',      require('./src/routes/dateien'));
+app.use('/api/zeitstrahl',   require('./src/routes/zeitstrahl'));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
