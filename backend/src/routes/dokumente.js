@@ -104,7 +104,14 @@ router.put('/:dok_id', auth, async (req, res) => {
 // DELETE /api/dokumente/:id
 router.delete('/:id', auth, async (req, res) => {
     try {
-        await db.query(`DELETE FROM phase_dokument WHERE dokument_id = $1`, [req.params.id]);
+        // Ohne Treffer ein 404: vorher meldete die Route auch dann Erfolg, wenn
+        // gar nichts geloescht wurde – die Oberflaeche entfernte den Eintrag
+        // lokal, und beim naechsten Laden war er wieder da.
+        const r = await db.query(
+            `DELETE FROM phase_dokument WHERE dokument_id = $1 RETURNING dokument_id`,
+            [req.params.id]
+        );
+        if (!r.rows.length) return res.status(404).json({ error: 'Dokument nicht gefunden' });
         res.json({ message: 'Dokument gelöscht' });
     } catch (err) {
         console.error(err);
