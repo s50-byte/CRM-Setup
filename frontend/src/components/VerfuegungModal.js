@@ -45,6 +45,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
     const [datei, setDatei] = useState(null);          // neu gewaehlt, noch nicht hochgeladen
     const [dateiId, setDateiId] = useState(null);      // bereits hinterlegt
     const [dateiName, setDateiName] = useState('');
+    const [dateiTitel, setDateiTitel] = useState('');
     const [programmId, setProgrammId] = useState('');  // bestaetigter Vorschlag
     const [datum, setDatum] = useState('');
     const [status, setStatus] = useState('aktiv');
@@ -72,6 +73,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
         setDatei(null);
         setDateiId(verfuegung?.datei_id || null);
         setDateiName(verfuegung?.datei_name || '');
+        setDateiTitel(verfuegung?.datei_titel || '');
         setProgrammId('');
         setStatus(verfuegung?.status || 'aktiv');
         setBemerkung(verfuegung?.bemerkung || '');
@@ -151,6 +153,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                 gueltig_von: gueltigVon || null,
                 gueltig_bis: gueltigBis || null,
                 datei_id: datei_id || null,
+                datei_titel: dateiTitel.trim() || null,
                 bemerkung: bemerkung.trim() || null,
                 status,
                 // Nur was ausdruecklich bestaetigt wurde – nie automatisch.
@@ -230,9 +233,9 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                         <FieldLabel>Verfügungsdokument</FieldLabel>
                         {dateiId && !datei ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ flex: 1, fontSize: 12.5 }}>📄 {dateiName || 'hinterlegt'}</span>
+                                <span style={{ flex: 1, fontSize: 12.5 }}>📄 {dateiTitel || dateiName || 'hinterlegt'}</span>
                                 <button
-                                    onClick={() => { setDateiId(null); setDateiName(''); }}
+                                    onClick={() => { setDateiId(null); setDateiName(''); setDateiTitel(''); }}
                                     style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(220,38,38,.25)', borderRadius: 5, background: '#FEF2F2', color: '#B91C1C', fontFamily: 'inherit' }}
                                 >Entfernen</button>
                             </div>
@@ -241,20 +244,30 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                                 <input
                                     type="file"
                                     accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
-                                    onChange={e => setDatei(e.target.files?.[0] || null)}
+                                    onChange={e => {
+                                        const f = e.target.files?.[0] || null;
+                                        setDatei(f);
+                                        // Anzeigename vorbelegen, nicht ueberschreiben.
+                                        setDateiTitel(prev => prev || (f ? f.name : ''));
+                                    }}
                                     style={{ ...inputStyle, padding: '6px 8px' }}
                                 />
                                 <div style={{ fontSize: 10.5, color: '#A09D97', marginTop: 4 }}>
                                     PDF, JPG, PNG, DOCX, XLSX · max. 20 MB
                                 </div>
+                                {datei && (
+                                    <input
+                                        type="text"
+                                        value={dateiTitel}
+                                        onChange={e => setDateiTitel(e.target.value)}
+                                        placeholder="Anzeigename"
+                                        style={{ ...inputStyle, marginTop: 6 }}
+                                    />
+                                )}
                             </>
                         )}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        <div>
-                            <FieldLabel>Datum</FieldLabel>
-                            <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={inputStyle} />
-                        </div>
+                    <div>
                         <div>
                             <FieldLabel>Status</FieldLabel>
                             <select value={status} onChange={e => setStatus(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
@@ -299,7 +312,7 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                                             <option value="">— Leistung wählen —</option>
                                             {leistungen.map(l => (
                                                 <option key={l.leistung_id} value={l.leistung_id}>
-                                                    {l.tarifnr} · {l.nummer}
+                                                    {l.tarifnr} · {l.bezeichnung}
                                                 </option>
                                             ))}
                                         </select>

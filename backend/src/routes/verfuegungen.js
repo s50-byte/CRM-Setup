@@ -7,11 +7,13 @@ const { hatSpalte } = require('../schema-flags');
 router.get('/:dossier_id', auth, async (req, res) => {
     try {
         const zeitraumDa = await hatSpalte('verfuegung', 'gueltig_von');
+        const titelDa = await hatSpalte('verfuegung', 'datei_titel');
         const result = await db.query(
             `SELECT v.verfuegung_id, v.nummer, v.datum, v.bemerkung, v.status,
                     v.verrechnungsart, v.betrag,
                     ${zeitraumDa ? 'v.gueltig_von, v.gueltig_bis, v.datei_id, dt.dateiname AS datei_name,'
-                                 : 'NULL::date AS gueltig_von, NULL::date AS gueltig_bis, NULL::uuid AS datei_id, NULL::varchar AS datei_name,'}
+                                 + (titelDa ? ' v.datei_titel,' : ' NULL::varchar AS datei_titel,')
+                                 : 'NULL::date AS gueltig_von, NULL::date AS gueltig_bis, NULL::uuid AS datei_id, NULL::varchar AS datei_name, NULL::varchar AS datei_titel,'}
                     (SELECT GREATEST(1, COALESCE(
                         (EXTRACT(YEAR FROM age(pv.geplantes_enddatum, pv.start_datum)) * 12
                        + EXTRACT(MONTH FROM age(pv.geplantes_enddatum, pv.start_datum)))::int,
@@ -42,7 +44,7 @@ router.get('/:dossier_id', auth, async (req, res) => {
              LEFT JOIN verfuegung_position vp ON vp.verfuegung_id = v.verfuegung_id
              LEFT JOIN leistung l ON l.leistung_id = vp.leistung_id
              WHERE v.dossier_id = $1
-             GROUP BY v.verfuegung_id
+             GROUP BY v.verfuegung_id${zeitraumDa ? ', dt.dateiname' : ''}
              ORDER BY (v.status = 'aktiv') DESC, v.datum DESC NULLS LAST`,
             [req.params.dossier_id]
         );
@@ -106,7 +108,7 @@ router.get('/:dossier_id', auth, async (req, res) => {
 // POST /api/verfuegungen
 router.post('/', auth, async (req, res) => {
     const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag, programm_id,
-            gueltig_von, gueltig_bis, datei_id } = req.body;
+            gueltig_von, gueltig_bis, datei_id, datei_titel } = req.body;
     if (!dossier_id || !nummer) {
         return res.status(400).json({ error: 'dossier_id und Nummer sind erforderlich' });
     }
@@ -121,20 +123,25 @@ router.post('/', auth, async (req, res) => {
                 [dossier_id]
             );
         }
+        // Zwei getrennte Migrationen, darum zwei getrennte Schalter.
         const zeitraumDa = await hatSpalte('verfuegung', 'gueltig_von');
+        const titelDa = await hatSpalte('verfuegung', 'datei_titel');
+        const spalten = ['dossier_id', 'nummer', 'datum', 'bemerkung', 'status', 'verrechnungsart', 'betrag'];
+        const werte = [dossier_id, nummer.trim(), datum || null, bemerkung?.trim() || null, stat,
+                       verrechnungsart || null, betrag || null];
+        if (zeitraumDa) {
+            spalten.push('gueltig_von', 'gueltig_bis', 'datei_id');
+            werte.push(gueltig_von || null, gueltig_bis || null, datei_id || null);
+        }
+        if (titelDa) {
+            spalten.push('datei_titel');
+            werte.push(datei_titel?.trim() || null);
+        }
         const result = await pgClient.query(
-            zeitraumDa
-                ? `INSERT INTO verfuegung (dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag,
-                                           gueltig_von, gueltig_bis, datei_id)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`
-                : `INSERT INTO verfuegung (dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-            zeitraumDa
-                ? [dossier_id, nummer.trim(), datum || null, bemerkung?.trim() || null, stat,
-                   verrechnungsart || null, betrag || null,
-                   gueltig_von || null, gueltig_bis || null, datei_id || null]
-                : [dossier_id, nummer.trim(), datum || null, bemerkung?.trim() || null, stat,
-                   verrechnungsart || null, betrag || null]
+            `INSERT INTO verfuegung (${spalten.join(', ')})
+             VALUES (${spalten.map((_, i) => '$' + (i + 1)).join(', ')})
+             RETURNING *`,
+            werte
         );
 
         // Intake automatisch abschliessen, wenn Verfügung im Bucket "Programmstart" eingetragen wird
@@ -185,7 +192,7 @@ router.post('/', auth, async (req, res) => {
 // PUT /api/verfuegungen/:id
 router.put('/:id', auth, async (req, res) => {
     const { dossier_id, nummer, datum, bemerkung, status, verrechnungsart, betrag, programm_id,
-            gueltig_von, gueltig_bis, datei_id } = req.body;
+            gueltig_von, gueltig_bis, datei_id, datei_titel } = req.body;
     if (!nummer) return res.status(400).json({ error: 'Nummer ist erforderlich' });
     const pgClient = await db.connect();
     try {
@@ -198,24 +205,23 @@ router.put('/:id', auth, async (req, res) => {
             );
         }
         const zeitraumDa = await hatSpalte('verfuegung', 'gueltig_von');
+        const titelDa = await hatSpalte('verfuegung', 'datei_titel');
+        const setzt = ['nummer = $1', 'datum = $2', 'bemerkung = $3', 'status = $4',
+                       'verrechnungsart = $5', 'betrag = $6', 'updated_at = NOW()'];
+        const werte = [nummer.trim(), datum || null, bemerkung?.trim() || null, status || 'aktiv',
+                       verrechnungsart || null, betrag || null, req.params.id];
+        let n = 8;
+        if (zeitraumDa) {
+            setzt.push(`gueltig_von = $${n++}`, `gueltig_bis = $${n++}`, `datei_id = $${n++}`);
+            werte.push(gueltig_von || null, gueltig_bis || null, datei_id || null);
+        }
+        if (titelDa) {
+            setzt.push(`datei_titel = $${n++}`);
+            werte.push(datei_titel?.trim() || null);
+        }
         const result = await pgClient.query(
-            zeitraumDa
-                ? `UPDATE verfuegung
-                   SET nummer = $1, datum = $2, bemerkung = $3, status = $4,
-                       verrechnungsart = $5, betrag = $6,
-                       gueltig_von = $8, gueltig_bis = $9, datei_id = $10,
-                       updated_at = NOW()
-                   WHERE verfuegung_id = $7 RETURNING *`
-                : `UPDATE verfuegung
-                   SET nummer = $1, datum = $2, bemerkung = $3, status = $4,
-                       verrechnungsart = $5, betrag = $6, updated_at = NOW()
-                   WHERE verfuegung_id = $7 RETURNING *`,
-            zeitraumDa
-                ? [nummer.trim(), datum || null, bemerkung?.trim() || null, status || 'aktiv',
-                   verrechnungsart || null, betrag || null, req.params.id,
-                   gueltig_von || null, gueltig_bis || null, datei_id || null]
-                : [nummer.trim(), datum || null, bemerkung?.trim() || null, status || 'aktiv',
-                   verrechnungsart || null, betrag || null, req.params.id]
+            `UPDATE verfuegung SET ${setzt.join(', ')} WHERE verfuegung_id = $7 RETURNING *`,
+            werte
         );
         if (result.rows.length === 0) {
             await pgClient.query('ROLLBACK');
