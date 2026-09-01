@@ -24,6 +24,17 @@ const LABEL_FARBEN = {
 // Der Intake laeuft in drei Stufen. Die mittlere ist eine Verzweigung: ein
 // Dossier geht durch GENAU EINEN der drei Bereiche, nicht durch alle
 // nacheinander (Feedback 01.09.2026).
+// Lesbare Bezeichnungen fuer die rohen Enum-Werte.
+const INTAKE_LABEL = {
+    vorabklaerung: 'Vorabklärung',
+    berufsmassnahmen: 'Berufsmassnahmen',
+    integrationsmassnahmen: 'Integrationsmassnahmen',
+    beratung_coaching: 'Beratung & Coaching',
+    programmstart: 'Programmstart',
+    Erstkontakt: 'Erstkontakt',
+    'In Abklärung': 'In Abklärung',
+};
+
 const INTAKE_STUFEN = [
     { keys: ['vorabklaerung'], label: 'Vorabklärung' },
     {
@@ -421,6 +432,12 @@ export default function DossierDetail() {
                             {dossier.vorname} {dossier.nachname}
                         </div>
                         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
+                            {/* Programm und Phase – der Zustand, in dem der Fall steckt. */}
+                            {dossier.programm_name && (
+                                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(37,99,235,.15)', fontWeight: 500 }}>
+                                    {dossier.programm_name}
+                                </span>
+                            )}
                             {dossier.phase_label && (
                                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#F5F3FF', color: '#5B21B6', border: '1px solid rgba(124,58,237,.15)', fontFamily: 'monospace' }}>
                                     {dossier.phase_label}
@@ -434,9 +451,11 @@ export default function DossierDetail() {
                                     border: `1px solid ${LABEL_FARBEN[dossier.klient_label].color}33`,
                                 }}>{dossier.klient_label}</span>
                             )}
-                            {dossier.pipeline_status && (
-                                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.09)', fontFamily: 'monospace' }}>
-                                    {dossier.pipeline_status}
+                            {/* Der Intake-Status nur, solange kein Programm laeuft – danach
+                                sagen Programm und Phase mehr aus. Und lesbar statt roh. */}
+                            {!dossier.programm_name && dossier.pipeline_status && (
+                                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.09)' }}>
+                                    {INTAKE_LABEL[dossier.pipeline_status] || dossier.pipeline_status}
                                 </span>
                             )}
                         </div>
