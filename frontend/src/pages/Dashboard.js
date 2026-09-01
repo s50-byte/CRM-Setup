@@ -122,15 +122,17 @@ function MeldungKarte({ m, onAcknowledge, onTerminClick, abgesagteTerminIds, onD
                     if (a.typ === 'klientenfuehrung_offen') {
                         return (
                             <div key={i} style={{ marginTop: 3 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: '#9A3412' }}>
-                                    Klientenführung zuweisen
+                                <div style={{ fontSize: 12, fontWeight: 600, color: a.klientenfuehrung ? '#1A1917' : '#9A3412' }}>
+                                    {a.klientenfuehrung ? 'Programmstart — Klientenführung prüfen' : 'Klientenführung zuweisen'}
                                 </div>
                                 <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>
                                     <button
                                         onClick={() => onDossierClick?.(a.dossier_id)}
                                         style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#2563EB', fontFamily: 'inherit', fontSize: 12, textDecoration: 'underline', textDecorationColor: 'rgba(37,99,235,.3)' }}
                                     >{a.klient_name}</button>
-                                    <span> ist im Programmstart und hat noch keine Klientenführung.</span>
+                                    {a.klientenfuehrung
+                                        ? <span> ist im Programmstart. Klientenführung: <strong>{a.klientenfuehrung}</strong>.</span>
+                                        : <span> ist im Programmstart und hat noch <strong>keine Klientenführung</strong>.</span>}
                                 </div>
                             </div>
                         );

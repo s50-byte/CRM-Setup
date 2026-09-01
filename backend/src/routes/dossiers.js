@@ -361,18 +361,21 @@ router.put('/:id/intake', auth, async (req, res) => {
             }
         }
 
-        // Rutscht ein Dossier in "Programmstart", muss zwingend eine
-        // Klientenfuehrung zugewiesen werden - das macht die Abteilungsleitung.
-        // Steht schon eine fest, gibt es nichts zu tun und keine Meldung.
+        // Rutscht ein Dossier in "Programmstart", muss die Klientenfuehrung
+        // stehen - dafuer sorgt die Abteilungsleitung. Gemeldet wird jeder
+        // Eintritt, auch wenn schon jemand zugewiesen ist: die Abteilungsleitung
+        // will das gegenpruefen, nicht nur Luecken nachtragen.
         if (pipeline_status === 'programmstart' && alterPipelineStatus !== 'programmstart') {
             const fuehrung = await db.query(
-                `SELECT 1 FROM klient_user ku
-                  JOIN dossier d ON d.klient_id = ku.klient_id
+                `SELECT b.full_name
+                   FROM klient_user ku
+                   JOIN dossier d ON d.klient_id = ku.klient_id
+                   JOIN benutzer b ON b.user_id = ku.user_id
                   WHERE d.dossier_id = $1 AND ku.rolle_im_fall = 'Klientenführung' AND ku.aktiv
                   LIMIT 1`,
                 [req.params.id]
             );
-            if (!fuehrung.rows.length) {
+            {
                 const leitung = await db.query(
                     `SELECT DISTINCT ba.user_id
                      FROM benutzer_aufgabe ba
@@ -390,6 +393,7 @@ router.put('/:id/intake', auth, async (req, res) => {
                     dossier_id: req.params.id,
                     klient_name: `${vorher.rows[0].vorname} ${vorher.rows[0].nachname}`,
                     neuer_status: INTAKE_BUCKET_LABEL.programmstart,
+                    klientenfuehrung: fuehrung.rows[0]?.full_name || null,
                 }]);
                 for (const row of empfaenger) {
                     await db.query(
