@@ -64,16 +64,25 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
 
     useEffect(() => { laden_(); }, [laden_]);
 
-    // Ziehen endet, wo auch immer die Maus losgelassen wird.
+    // Waehrend des Ziehens das Datum unter dem Zeiger mitfuehren und beim
+    // Loslassen setzen.
     useEffect(() => {
         if (!zieht) return;
+        function bewegt(e) {
+            const datum = datumAusX(zieht.container, e.clientX);
+            setZieht(z => (z && z.datum !== datum ? { ...z, datum, x: e.clientX } : z));
+        }
         function los(e) {
             const datum = datumAusX(zieht.container, e.clientX);
             setZieht(null);
             grenzeSetzen({ instanz_id: zieht.instanz_id }, datum);
         }
+        window.addEventListener('mousemove', bewegt);
         window.addEventListener('mouseup', los);
-        return () => window.removeEventListener('mouseup', los);
+        return () => {
+            window.removeEventListener('mousemove', bewegt);
+            window.removeEventListener('mouseup', los);
+        };
     });
 
     // Die Grenze zwischen zwei Phasen ziehen: die linke endet am Vortag, die
@@ -256,11 +265,18 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                             const farbe = STRANG_FARBEN[si % STRANG_FARBEN.length];
                             return (
                                 <div key={s.leistung_id}>
-                                    <div style={{ fontSize: 11, color: '#6B6860', marginBottom: 4 }}>
-                                        <span style={{ fontFamily: 'monospace', color: farbe, fontWeight: 600 }}>{s.tarifnr}</span>
-                                        {' · '}{s.bezeichnung}
+                                    {/* Beginnt dort, wo die erste Phase anfaengt – sonst
+                                        steht er am linken Rand, wenn die Achse weiter reicht. */}
+                                    <div style={{ position: 'relative', height: 15, marginBottom: 3 }}>
+                                        <div style={{
+                                            position: 'absolute', left: `${anteil(s.phasen[0].start_datum, achsenVon, gesamt) * 100}%`,
+                                            fontSize: 11, color: '#6B6860', whiteSpace: 'nowrap',
+                                        }}>
+                                            <span style={{ fontFamily: 'monospace', color: farbe, fontWeight: 600 }}>{s.tarifnr}</span>
+                                            {' · '}{s.bezeichnung}
+                                        </div>
                                     </div>
-                                    <div style={{ position: 'relative', height: 46 }}>
+                                    <div style={{ position: 'relative', height: 30 }}>
                                         {/* Phasengebundene Termine liegen in ihrer Phase */}
                                         {(phasenTermine[s.leistung_id] || []).map(t => (
                                             <div
@@ -289,12 +305,28 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                                                 title="Grenze verschieben"
                                                 style={{
                                                     position: 'absolute', top: 0, bottom: 0, zIndex: 4,
-                                                    left: `${anteil(p.start_datum, achsenVon, gesamt) * 100}%`,
+                                                    left: `${anteil(
+                                                        zieht?.instanz_id === p.instanz_id && zieht.datum
+                                                            ? zieht.datum : p.start_datum,
+                                                        achsenVon, gesamt) * 100}%`,
                                                     width: 9, marginLeft: -4.5, cursor: 'col-resize',
                                                     background: zieht?.instanz_id === p.instanz_id ? 'rgba(37,99,235,.25)' : 'transparent',
                                                     borderRadius: 3,
                                                 }}
-                                            />
+                                            >
+                                                {zieht?.instanz_id === p.instanz_id && zieht.datum && (
+                                                    <div style={{
+                                                        position: 'absolute', bottom: '100%', left: '50%',
+                                                        transform: 'translateX(-50%)', marginBottom: 3,
+                                                        background: '#1A1917', color: '#fff',
+                                                        fontSize: 10.5, fontFamily: 'monospace',
+                                                        padding: '2px 6px', borderRadius: 4,
+                                                        whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 6,
+                                                    }}>
+                                                        {new Date(zieht.datum).toLocaleDateString('de-CH', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                                                    </div>
+                                                )}
+                                            </div>
                                         ))}
                                         {s.phasen.map(p => {
                                             const links = anteil(p.start_datum, achsenVon, gesamt);
@@ -313,24 +345,22 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                                                         borderLeft: `3px solid ${farbe}`,
                                                         outline: jetzt ? `1px solid ${farbe}` : 'none',
                                                         borderRadius: 4,
-                                                        padding: '5px 8px',
+                                                        padding: '3px 7px',
                                                         overflow: 'hidden',
                                                         cursor: onPhaseKlick ? 'pointer' : 'default',
                                                         boxSizing: 'border-box',
                                                         userSelect: 'none',
                                                     }}
                                                 >
-                                                    <div style={{ fontSize: 11.5, fontWeight: jetzt ? 600 : 500, color: '#1A1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    <div style={{ fontSize: 11, fontWeight: jetzt ? 600 : 500, color: '#1A1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.25 }}>
                                                         {p.phase_label}
+                                                        {Number(p.kriterien_pflicht) > 0 && (
+                                                            <span style={{ color: farbe, fontWeight: 600 }}> ·{p.kriterien_pflicht}</span>
+                                                        )}
                                                     </div>
-                                                    <div style={{ fontSize: 10, color: '#6B6860', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                                                    <div style={{ fontSize: 9.5, color: '#6B6860', fontFamily: 'monospace', whiteSpace: 'nowrap', lineHeight: 1.25 }}>
                                                         {kurz(p.start_datum)}–{kurz(p.end_datum)}
                                                     </div>
-                                                    {Number(p.kriterien_pflicht) > 0 && (
-                                                        <div style={{ fontSize: 9.5, color: farbe, whiteSpace: 'nowrap' }}>
-                                                            {p.kriterien_pflicht} Pflicht
-                                                        </div>
-                                                    )}
                                                 </div>
                                             );
                                         })}
