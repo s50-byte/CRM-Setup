@@ -24,7 +24,7 @@ const STATUS_LABELS = {
     'feiertag': 'Feiertag', 'unfall': 'Unfall',
 };
 
-function MeldungKarte({ m, onAcknowledge, onTerminClick, abgesagteTerminIds }) {
+function MeldungKarte({ m, onAcknowledge, onTerminClick, abgesagteTerminIds, onDossierClick }) {
     const sl = s => STATUS_LABELS[s] || s || '—';
     return (
         <div style={{
@@ -114,6 +114,24 @@ function MeldungKarte({ m, onAcknowledge, onTerminClick, abgesagteTerminIds }) {
                                         {a.notiz.length > 100 ? a.notiz.slice(0, 100) + '…' : a.notiz}
                                     </div>
                                 )}
+                            </div>
+                        );
+                    }
+                    // Klientenfuehrung fehlt, obwohl das Programm startet – die
+                    // Meldung fuehrt direkt ins Dossier, wo zugewiesen wird.
+                    if (a.typ === 'klientenfuehrung_offen') {
+                        return (
+                            <div key={i} style={{ marginTop: 3 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#9A3412' }}>
+                                    Klientenführung zuweisen
+                                </div>
+                                <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>
+                                    <button
+                                        onClick={() => onDossierClick?.(a.dossier_id)}
+                                        style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#2563EB', fontFamily: 'inherit', fontSize: 12, textDecoration: 'underline', textDecorationColor: 'rgba(37,99,235,.3)' }}
+                                    >{a.klient_name}</button>
+                                    <span> ist im Programmstart und hat noch keine Klientenführung.</span>
+                                </div>
                             </div>
                         );
                     }
@@ -289,7 +307,7 @@ export default function Dashboard() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {meldungenAnzeige.map(m => (
-                                <MeldungKarte key={m.meldung_id} m={m} onAcknowledge={acknowledge} onTerminClick={ladeTerminDetail} abgesagteTerminIds={abgesagteTerminIds} />
+                                <MeldungKarte key={m.meldung_id} m={m} onAcknowledge={acknowledge} onTerminClick={ladeTerminDetail} abgesagteTerminIds={abgesagteTerminIds} onDossierClick={d => navigate(`/dossiers/${d}`)} />
                             ))}
                         </div>
                     )}
@@ -321,7 +339,7 @@ export default function Dashboard() {
                         {frueherOffen && (
                             <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '520px', overflowY: 'auto' }}>
                                 {fruehereMeldungenAnzeige.map(m => (
-                                    <MeldungKarte key={m.meldung_id} m={m} onTerminClick={ladeTerminDetail} abgesagteTerminIds={abgesagteTerminIds} />
+                                    <MeldungKarte key={m.meldung_id} m={m} onTerminClick={ladeTerminDetail} abgesagteTerminIds={abgesagteTerminIds} onDossierClick={d => navigate(`/dossiers/${d}`)} />
                                 ))}
                             </div>
                         )}

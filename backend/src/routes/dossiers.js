@@ -347,6 +347,46 @@ router.put('/:id/intake', auth, async (req, res) => {
             }
         }
 
+        // Rutscht ein Dossier in "Programmstart", muss zwingend eine
+        // Klientenfuehrung zugewiesen werden - das macht die Abteilungsleitung.
+        // Steht schon eine fest, gibt es nichts zu tun und keine Meldung.
+        if (pipeline_status === 'programmstart' && alterPipelineStatus !== 'programmstart') {
+            const fuehrung = await db.query(
+                `SELECT 1 FROM klient_user ku
+                  JOIN dossier d ON d.klient_id = ku.klient_id
+                  WHERE d.dossier_id = $1 AND ku.rolle_im_fall = 'Klientenführung' AND ku.aktiv
+                  LIMIT 1`,
+                [req.params.id]
+            );
+            if (!fuehrung.rows.length) {
+                const leitung = await db.query(
+                    `SELECT DISTINCT ba.user_id
+                     FROM benutzer_aufgabe ba
+                     JOIN benutzer b ON b.user_id = ba.user_id AND b.aktiv
+                     WHERE ba.rolle_name = 'Abteilungsleitung'`
+                );
+                // Ist keine Abteilungsleitung erfasst, geht die Meldung ans
+                // Leitungsteam - sonst bliebe sie ungesehen liegen.
+                const empfaenger = leitung.rows.length ? leitung.rows : (await db.query(
+                    `SELECT user_id FROM benutzer WHERE aktiv AND system_rolle IN ('leitungsteam','admin')`
+                )).rows;
+
+                const aenderung = JSON.stringify([{
+                    typ: 'klientenfuehrung_offen',
+                    dossier_id: req.params.id,
+                    klient_name: `${vorher.rows[0].vorname} ${vorher.rows[0].nachname}`,
+                    neuer_status: INTAKE_BUCKET_LABEL.programmstart,
+                }]);
+                for (const row of empfaenger) {
+                    await db.query(
+                        `INSERT INTO dashboard_meldung (empfaenger_id, datum, aenderungen, erstellt_von)
+                         VALUES ($1, CURRENT_DATE, $2::jsonb, $3)`,
+                        [row.user_id, aenderung, req.user.user_id]
+                    );
+                }
+            }
+        }
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
