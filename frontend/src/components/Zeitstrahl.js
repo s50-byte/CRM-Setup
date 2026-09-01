@@ -19,6 +19,33 @@ function kurz(d) {
 
 const STRANG_FARBEN = ['#2563EB', '#15803D', '#B45309', '#7C3AED', '#BE123C'];
 
+// Anteil eines Datums an der Gesamtdauer, 0..1
+function anteil(datum, von, gesamt) {
+    return Math.round((new Date(datum) - new Date(von)) / TAG) / gesamt;
+}
+
+// Beschriftung der Achse: Monatsanfaenge im Zeitraum. Bei kurzen Zeitraeumen
+// zusaetzlich der Beginn, damit die Achse nicht leer bleibt.
+function achsenMarken(von, bis) {
+    const marken = [];
+    const start = new Date(von), ende = new Date(bis);
+    const z = new Date(start.getFullYear(), start.getMonth(), 1);
+    if (z < start) z.setMonth(z.getMonth() + 1);
+    while (z <= ende) {
+        marken.push({ datum: new Date(z), label: z.toLocaleDateString('de-CH', { month: 'short' }) });
+        z.setMonth(z.getMonth() + 1);
+    }
+    if (!marken.length || anteil(marken[0].datum, von, tage(von, bis)) > 0.15) {
+        marken.unshift({ datum: start, label: kurz(start) });
+    }
+    return marken;
+}
+
+function istHeute(p) {
+    const h = new Date(); h.setHours(0, 0, 0, 0);
+    return new Date(p.start_datum) <= h && h <= new Date(p.end_datum);
+}
+
 export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
     const [daten, setDaten] = useState(null);
     const [laden, setLaden] = useState(true);
@@ -58,6 +85,14 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
     const straenge = daten?.straenge || [];
     const gesamt = von && bis ? tage(von, bis) : 0;
 
+    // Heute nur einzeichnen, wenn es in den Zeitraum faellt.
+    const heuteAnteil = (() => {
+        if (!von || !bis || !gesamt) return null;
+        const h = new Date(); h.setHours(0, 0, 0, 0);
+        const a = anteil(h, von, gesamt);
+        return a >= 0 && a <= 1 ? a : null;
+    })();
+
     if (!prog) return null;
 
     return (
@@ -91,52 +126,92 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                     Noch keine Phasen verteilt.{bearbeitbar ? ' Über „Erzeugen" aus der Verfügung anlegen.' : ''}
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {straenge.map((s, si) => {
-                        const farbe = STRANG_FARBEN[si % STRANG_FARBEN.length];
-                        return (
-                            <div key={s.leistung_id}>
-                                <div style={{ fontSize: 11, color: '#6B6860', marginBottom: 4 }}>
-                                    <span style={{ fontFamily: 'monospace', color: farbe, fontWeight: 600 }}>{s.tarifnr}</span>
-                                    {' · '}{s.bezeichnung}
-                                </div>
-                                <div style={{ display: 'flex', gap: 2, height: 42 }}>
-                                    {s.phasen.map(p => {
-                                        const anteil = gesamt > 0 ? tage(p.start_datum, p.end_datum) / gesamt : 0;
-                                        return (
-                                            <div
-                                                key={p.instanz_id}
-                                                onClick={onPhaseKlick ? () => onPhaseKlick(p.phase_id) : undefined}
-                                                title={`${p.phase_label}: ${kurz(p.start_datum)} – ${kurz(p.end_datum)} (${tage(p.start_datum, p.end_datum)} Tage)`}
-                                                style={{
-                                                    flex: `${Math.max(anteil, 0.04)} 0 0`,
-                                                    background: farbe + '18',
-                                                    borderLeft: `3px solid ${farbe}`,
-                                                    borderRadius: 4,
-                                                    padding: '5px 8px',
-                                                    overflow: 'hidden',
-                                                    cursor: onPhaseKlick ? 'pointer' : 'default',
-                                                    minWidth: 0,
-                                                }}
-                                            >
-                                                <div style={{ fontSize: 11.5, fontWeight: 500, color: '#1A1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {p.phase_label}
-                                                </div>
-                                                <div style={{ fontSize: 10, color: '#6B6860', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                                                    {kurz(p.start_datum)}–{kurz(p.end_datum)}
-                                                </div>
-                                                {Number(p.kriterien_pflicht) > 0 && (
-                                                    <div style={{ fontSize: 9.5, color: farbe }}>
-                                                        {p.kriterien_pflicht} Pflicht
+                <div style={{ position: 'relative' }}>
+                    {/* Heute-Linie über alle Stränge – daran ist ablesbar, welcher
+                        Tarif gerade in welcher Phase steht. */}
+                    {heuteAnteil !== null && (
+                        <div style={{
+                            position: 'absolute', top: 0, bottom: 18,
+                            left: `${heuteAnteil * 100}%`,
+                            width: 2, marginLeft: -1, background: '#DC2626', zIndex: 3,
+                            pointerEvents: 'none',
+                        }}>
+                            <div style={{
+                                position: 'absolute', top: -6, left: -18, width: 38,
+                                fontSize: 9, fontWeight: 700, color: '#DC2626',
+                                textAlign: 'center', letterSpacing: '.04em',
+                            }}>HEUTE</div>
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
+                        {straenge.map((s, si) => {
+                            const farbe = STRANG_FARBEN[si % STRANG_FARBEN.length];
+                            return (
+                                <div key={s.leistung_id}>
+                                    <div style={{ fontSize: 11, color: '#6B6860', marginBottom: 4 }}>
+                                        <span style={{ fontFamily: 'monospace', color: farbe, fontWeight: 600 }}>{s.tarifnr}</span>
+                                        {' · '}{s.bezeichnung}
+                                    </div>
+                                    <div style={{ position: 'relative', height: 46 }}>
+                                        {s.phasen.map(p => {
+                                            const links = anteil(p.start_datum, von, gesamt);
+                                            const breite = tage(p.start_datum, p.end_datum) / gesamt;
+                                            const jetzt = istHeute(p);
+                                            return (
+                                                <div
+                                                    key={p.instanz_id}
+                                                    onClick={onPhaseKlick ? () => onPhaseKlick(p.phase_id) : undefined}
+                                                    title={`${p.phase_label}: ${kurz(p.start_datum)} – ${kurz(p.end_datum)} (${tage(p.start_datum, p.end_datum)} Tage)`}
+                                                    style={{
+                                                        position: 'absolute', top: 0, bottom: 0,
+                                                        left: `${links * 100}%`,
+                                                        width: `calc(${breite * 100}% - 2px)`,
+                                                        background: jetzt ? farbe + '2E' : farbe + '14',
+                                                        borderLeft: `3px solid ${farbe}`,
+                                                        outline: jetzt ? `1px solid ${farbe}` : 'none',
+                                                        borderRadius: 4,
+                                                        padding: '5px 8px',
+                                                        overflow: 'hidden',
+                                                        cursor: onPhaseKlick ? 'pointer' : 'default',
+                                                        boxSizing: 'border-box',
+                                                    }}
+                                                >
+                                                    <div style={{ fontSize: 11.5, fontWeight: jetzt ? 600 : 500, color: '#1A1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {p.phase_label}
                                                     </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                                    <div style={{ fontSize: 10, color: '#6B6860', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                                                        {kurz(p.start_datum)}–{kurz(p.end_datum)}
+                                                    </div>
+                                                    {Number(p.kriterien_pflicht) > 0 && (
+                                                        <div style={{ fontSize: 9.5, color: farbe, whiteSpace: 'nowrap' }}>
+                                                            {p.kriterien_pflicht} Pflicht
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
+
+                    {/* Datumsachse */}
+                    <div style={{ position: 'relative', height: 18, marginTop: 6, borderTop: '1px solid rgba(0,0,0,.09)' }}>
+                        {achsenMarken(von, bis).map((m, i) => (
+                            <div key={i} style={{
+                                position: 'absolute', top: 0,
+                                left: `${anteil(m.datum, von, gesamt) * 100}%`,
+                                fontSize: 9.5, color: '#A09D97', fontFamily: 'monospace',
+                                paddingLeft: 3, borderLeft: '1px solid rgba(0,0,0,.12)', height: 12,
+                                whiteSpace: 'nowrap',
+                            }}>{m.label}</div>
+                        ))}
+                        <div style={{ position: 'absolute', top: 0, right: 0, fontSize: 9.5, color: '#A09D97', fontFamily: 'monospace' }}>
+                            {kurz(bis)}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

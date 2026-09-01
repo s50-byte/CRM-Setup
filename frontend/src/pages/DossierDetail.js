@@ -360,7 +360,6 @@ export default function DossierDetail() {
 
     const verlauf = dossier.programm_verlauf || [];
     const zugewiesen = dossier.zugewiesen || [];
-    const phasen = dossier.phasen || [];
     const hatAktiveVerfuegung = verfuegungen.some(v => v.status === 'aktiv');
     const zeigeIntakeStepper = !dossier.intake_abgeschlossen && !hatAktiveVerfuegung;
 
@@ -631,47 +630,6 @@ export default function DossierDetail() {
                 onPhaseKlick={phase_id => navigate(`/dossiers/${id}/phase/${phase_id}`)}
             />
 
-            {/* ── PHASEN-STEPPER ──────────────────────────── */}
-            {phasen.length > 0 && hatAktiveVerfuegung && (
-                <div style={{ ...CARD, padding: '.875rem 1.25rem', marginBottom: '.875rem' }}>
-                    <div style={{ ...SECTION_HDR, marginBottom: '.625rem' }}>Aktuelle Phase</div>
-                    <div style={{ display: 'flex', overflowX: 'auto', paddingBottom: 4 }}>
-                        {phasen.map((ph, i, arr) => {
-                            const currentIdx = arr.findIndex(p => p.phase_id === dossier.akt_phase_id);
-                            const done = i < currentIdx;
-                            const active = i === currentIdx;
-                            return (
-                                <div
-                                    key={ph.phase_id}
-                                    onClick={() => navigate(`/dossiers/${id}/phase/${ph.phase_id}`)}
-                                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 68, position: 'relative', cursor: 'pointer' }}
-                                >
-                                    {i < arr.length - 1 && (
-                                        <div style={{ position: 'absolute', top: 12, left: '50%', width: '100%', height: 2, background: done ? '#16A34A' : '#E3E1DA', zIndex: 0 }} />
-                                    )}
-                                    <div style={{
-                                        width: 24, height: 24, borderRadius: '50%', zIndex: 1,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: 10, fontWeight: 600, fontFamily: 'monospace',
-                                        background: done ? '#16A34A' : active ? '#2563EB' : '#fff',
-                                        border: `2px solid ${done ? '#16A34A' : active ? '#2563EB' : '#E3E1DA'}`,
-                                        color: done || active ? '#fff' : '#A09D97',
-                                        boxShadow: active ? '0 0 0 4px rgba(37,99,235,.15)' : 'none',
-                                        transition: 'all .15s',
-                                    }}>
-                                        {done ? '✓' : i + 1}
-                                    </div>
-                                    <div style={{
-                                        fontSize: 9, fontWeight: active ? 600 : 500, marginTop: 5,
-                                        textAlign: 'center', lineHeight: 1.3, maxWidth: 64,
-                                        color: done ? '#15803D' : active ? '#2563EB' : '#A09D97',
-                                    }}>{ph.label}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
 
             {/* ── ZWEISPALTEN-LAYOUT ──────────────────────── */}
             <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '1rem', marginBottom: '.875rem' }}>
