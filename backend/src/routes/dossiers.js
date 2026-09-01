@@ -282,6 +282,10 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
+// Die drei Massnahmenrichtungen. Aus der Vorabklaerung fuehrt der Weg
+// zwingend ueber eine davon - nie direkt in den Programmstart.
+const RICHTUNGEN = ['berufsmassnahmen', 'integrationsmassnahmen', 'beratung_coaching'];
+
 const INTAKE_BEREICH_MAP = {
     berufsmassnahmen: 'BM',
     integrationsmassnahmen: 'IM',
@@ -310,6 +314,18 @@ router.put('/:id/intake', auth, async (req, res) => {
         if (vorher.rows.length === 0) return res.status(404).json({ error: 'Dossier nicht gefunden' });
         const alterPipelineStatus = vorher.rows[0].pipeline_status;
 
+        // Aus der Vorabklaerung nicht direkt in den Programmstart: der Fall
+        // muss eine Massnahmenrichtung durchlaufen haben, sonst waere spaeter
+        // nicht mehr erkennbar, worum es geht.
+        if (alterPipelineStatus === 'vorabklaerung' && pipeline_status === 'programmstart') {
+            return res.status(400).json({
+                error: 'Aus der Vorabklärung muss zuerst eine Massnahme gewählt werden — '
+                     + 'Berufsmassnahmen, Integrationsmassnahmen oder Beratung & Coaching.',
+            });
+        }
+
+        const massnahmeDa = await hatSpalte('dossier', 'massnahme');
+
         // Absage macht das Dossier inaktiv. Start erfolgt (Verfügung eingetragen) bleibt aktiv.
         const neuerStatus = (intake_abgeschlossen && absage_grund) ? 'inaktiv' : 'aktiv';
 
@@ -318,10 +334,16 @@ router.put('/:id/intake', auth, async (req, res) => {
                 pipeline_status = $1, intake_abgeschlossen = $2,
                 absage_grund = $3, absage_notiz = $4,
                 status = $5,
+                ${massnahmeDa ? `massnahme = CASE
+                    WHEN $1 = 'vorabklaerung' THEN NULL
+                    WHEN $1::text = ANY($7::text[]) THEN $1
+                    ELSE massnahme END,` : ''}
                 updated_at = NOW()
              WHERE dossier_id = $6
              RETURNING *`,
-            [pipeline_status, intake_abgeschlossen || false, absage_grund || null, absage_notiz || null, neuerStatus, req.params.id]
+            massnahmeDa
+                ? [pipeline_status, intake_abgeschlossen || false, absage_grund || null, absage_notiz || null, neuerStatus, req.params.id, RICHTUNGEN]
+                : [pipeline_status, intake_abgeschlossen || false, absage_grund || null, absage_notiz || null, neuerStatus, req.params.id]
         );
 
         // Bereichs-Zuständige benachrichtigen, wenn aus Vorabklärung in einen Bereich verschoben wird

@@ -24,6 +24,15 @@ const LABEL_FARBEN = {
 // Der Intake laeuft in drei Stufen. Die mittlere ist eine Verzweigung: ein
 // Dossier geht durch GENAU EINEN der drei Bereiche, nicht durch alle
 // nacheinander (Feedback 01.09.2026).
+// Die drei Massnahmenrichtungen, je mit eigener Farbe. Steht ein Dossier im
+// Programmstart, sagt pipeline_status nichts mehr darueber aus, welchen Weg es
+// genommen hat - dafuer wird die Richtung am Dossier festgehalten.
+const MASSNAHME_STIL = {
+    berufsmassnahmen:       { label: 'Berufsmassnahmen',        bg: '#ECFDF5', color: '#15803D', rand: 'rgba(22,163,74,.2)' },
+    integrationsmassnahmen: { label: 'Integrationsmassnahmen',  bg: '#FFF7ED', color: '#C2410C', rand: 'rgba(194,65,12,.2)' },
+    beratung_coaching:      { label: 'Beratung & Coaching',     bg: '#FDF4FF', color: '#7E22CE', rand: 'rgba(126,34,206,.2)' },
+};
+
 // Lesbare Bezeichnungen fuer die rohen Enum-Werte.
 const INTAKE_LABEL = {
     vorabklaerung: 'Vorabklärung',
@@ -444,6 +453,17 @@ export default function DossierDetail() {
                                         ? dossier.phase_label
                                         : (INTAKE_LABEL[dossier.pipeline_status] || dossier.pipeline_status)}
                                 </span>
+                            )}
+                            {/* Die gewaehlte Massnahme, sobald sie nicht mehr aus dem
+                                Abschnitt hervorgeht - also ab dem Programmstart. */}
+                            {dossier.massnahme && MASSNAHME_STIL[dossier.massnahme]
+                                && dossier.pipeline_status !== dossier.massnahme && (
+                                <span style={{
+                                    fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 500,
+                                    background: MASSNAHME_STIL[dossier.massnahme].bg,
+                                    color: MASSNAHME_STIL[dossier.massnahme].color,
+                                    border: `1px solid ${MASSNAHME_STIL[dossier.massnahme].rand}`,
+                                }}>{MASSNAHME_STIL[dossier.massnahme].label}</span>
                             )}
                             {dossier.klient_label && LABEL_FARBEN[dossier.klient_label] && (
                                 <span style={{

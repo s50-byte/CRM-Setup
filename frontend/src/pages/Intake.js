@@ -24,6 +24,15 @@ const RICHTUNGEN = ['berufsmassnahmen', 'integrationsmassnahmen', 'beratung_coac
 // versehentlich gewollt.
 function rueckfrage(von, nach) {
     if (von === nach) return null;
+    // Aus der Vorabklaerung fuehrt kein direkter Weg in den Programmstart.
+    if (von === 'vorabklaerung' && nach === 'programmstart') {
+        return {
+            gesperrt: true,
+            titel: 'Zuerst eine Massnahme wählen',
+            text: 'Aus der Vorabklärung geht es über Berufsmassnahmen, '
+                + 'Integrationsmassnahmen oder Beratung & Coaching — nicht direkt in den Programmstart.',
+        };
+    }
     if (von === 'vorabklaerung' && RICHTUNGEN.includes(nach)) return null;
     if (RICHTUNGEN.includes(von) && nach === 'programmstart') return null;
     if (nach === 'vorabklaerung') {
@@ -279,8 +288,8 @@ export default function Intake() {
                                 padding: '7px 20px', fontSize: 13, cursor: 'pointer',
                                 border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
                                 background: '#fff', fontFamily: 'inherit', color: '#6B6860',
-                            }}>Nein</button>
-                            <button onClick={() => {
+                            }}>{bestaetigung.gesperrt ? 'Verstanden' : 'Nein'}</button>
+                            {!bestaetigung.gesperrt && <button onClick={() => {
                                 const { dossier, neuerBucket } = bestaetigung;
                                 setBestaetigung(null);
                                 verschiebenAusfuehren(dossier, neuerBucket);
@@ -288,7 +297,7 @@ export default function Intake() {
                                 padding: '7px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
                                 border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff',
                                 fontFamily: 'inherit',
-                            }}>Ja</button>
+                            }}>Ja</button>}
                         </div>
                     </div>
                 </div>
