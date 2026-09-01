@@ -93,10 +93,22 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
     // klemmen: nur so ist der Abstand zwischen heute und Programmstart im
     // selben Massstab ablesbar wie die Phasen untereinander.
     const heuteDatum = (() => { const h = new Date(); h.setHours(0, 0, 0, 0); return h; })();
+    const termine = daten?.termine || [];
+
+    // Ein Termin nach dem Programmende zieht die Achse mit: letzter Termin plus
+    // sieben Tage ist dann der rechte Abschluss, damit er nicht am Rand klebt.
+    const letzterTermin = termine.reduce((max, t) => {
+        const d = new Date(t.datum);
+        return !max || d > max ? d : max;
+    }, null);
+
     const achsenVon = zeitraumGueltig
-        ? (heuteDatum < new Date(von) ? heuteDatum : new Date(von)) : null;
+        ? new Date(Math.min(heuteDatum, new Date(von),
+            ...termine.map(t => new Date(t.datum)))) : null;
     const achsenBis = zeitraumGueltig
-        ? (heuteDatum > new Date(bis) ? heuteDatum : new Date(bis)) : null;
+        ? new Date(Math.max(heuteDatum, new Date(bis),
+            ...(letzterTermin && letzterTermin > new Date(bis)
+                ? [new Date(letzterTermin.getTime() + 7 * TAG)] : []))) : null;
     const gesamt = zeitraumGueltig ? tage(achsenVon, achsenBis) : 0;
 
     // Heute liegt durch die mitwachsende Achse immer im Bild – am echten Ort.
@@ -105,6 +117,18 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
         davor: heuteDatum < new Date(von),
         danach: heuteDatum > new Date(bis),
     } : null;
+
+    // Frei erfasste gegen phasengebundene trennen; letztere dem Strang ihrer
+    // Phase zuordnen, damit sie im richtigen Balken erscheinen.
+    const phaseZuStrang = {};
+    straenge.forEach(s => s.phasen.forEach(p => { phaseZuStrang[p.instanz_id] = s.leistung_id; }));
+    const freieTermine = termine.filter(t => !t.programm_phase_id);
+    const phasenTermine = {};
+    termine.filter(t => t.programm_phase_id).forEach(t => {
+        const strang = phaseZuStrang[t.programm_phase_id];
+        if (!strang) return;
+        (phasenTermine[strang] = phasenTermine[strang] || []).push(t);
+    });
 
     if (!prog) return null;
 
@@ -150,20 +174,42 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                         Tarif gerade in welcher Phase steht. */}
                     {heute && (
                         <div style={{
-                            position: 'absolute', top: 0, bottom: 18,
+                            position: 'absolute', top: 0, bottom: 4,
                             left: `${heute.anteil * 100}%`,
                             width: 2, marginLeft: -1, zIndex: 3, pointerEvents: 'none',
                             background: heute.davor || heute.danach ? '#DC262655' : '#DC2626',
                         }}>
+                            {/* Beschriftung unterhalb der Achse */}
                             <div style={{
-                                position: 'absolute', top: -6,
-                                left: heute.anteil > .5 ? 'auto' : -14,
-                                right: heute.anteil > .5 ? -14 : 'auto',
+                                position: 'absolute', bottom: -13,
+                                left: heute.anteil > .5 ? 'auto' : -3,
+                                right: heute.anteil > .5 ? -3 : 'auto',
                                 fontSize: 9, fontWeight: 700, color: '#DC2626',
                                 letterSpacing: '.04em', whiteSpace: 'nowrap',
-                            }}>
-                                {heute.davor ? 'HEUTE ◂' : heute.danach ? '▸ HEUTE' : 'HEUTE'}
-                            </div>
+                            }}>HEUTE</div>
+                        </div>
+                    )}
+
+                    {/* Frei erfasste Termine ueber den Straengen – sie gehoeren zu
+                        keiner Phase und schraenken die Planung nicht ein. */}
+                    {freieTermine.length > 0 && (
+                        <div style={{ position: 'relative', height: 20, marginBottom: 2 }}>
+                            {freieTermine.map(t => (
+                                <div
+                                    key={t.termin_id}
+                                    title={`${t.typ} · ${kurz(t.datum)}${t.zeit ? ' ' + t.zeit.slice(0, 5) : ''}`}
+                                    style={{
+                                        position: 'absolute', bottom: 0,
+                                        left: `${anteil(t.datum, achsenVon, gesamt) * 100}%`,
+                                        transform: 'translateX(-50%)',
+                                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                        zIndex: 2,
+                                    }}
+                                >
+                                    <span style={{ fontSize: 11, lineHeight: 1 }}>📅</span>
+                                    <span style={{ width: 1, height: 6, background: '#A09D97' }} />
+                                </div>
+                            ))}
                         </div>
                     )}
 
@@ -177,6 +223,19 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                                         {' · '}{s.bezeichnung}
                                     </div>
                                     <div style={{ position: 'relative', height: 46 }}>
+                                        {/* Phasengebundene Termine liegen in ihrer Phase */}
+                                        {(phasenTermine[s.leistung_id] || []).map(t => (
+                                            <div
+                                                key={t.termin_id}
+                                                title={`${t.typ} · ${kurz(t.datum)}${t.zeit ? ' ' + t.zeit.slice(0, 5) : ''}`}
+                                                style={{
+                                                    position: 'absolute', top: 2, zIndex: 2,
+                                                    left: `${anteil(t.datum, achsenVon, gesamt) * 100}%`,
+                                                    transform: 'translateX(-50%)',
+                                                    fontSize: 10, lineHeight: 1,
+                                                }}
+                                            >📌</div>
+                                        ))}
                                         {s.phasen.map(p => {
                                             const links = anteil(p.start_datum, achsenVon, gesamt);
                                             const breite = tage(p.start_datum, p.end_datum) / gesamt;
@@ -223,7 +282,7 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                     {/* Grenzen des Programms, wenn die Achse weiter reicht */}
                     {(heute?.davor || heute?.danach) && (
                         <div style={{
-                            position: 'absolute', top: 0, bottom: 18,
+                            position: 'absolute', top: 0, bottom: 30,
                             left: `${anteil(von, achsenVon, gesamt) * 100}%`,
                             width: `${(programmTage / gesamt) * 100}%`,
                             border: '1px dashed rgba(0,0,0,.16)', borderRadius: 4,
@@ -232,7 +291,7 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                     )}
 
                     {/* Datumsachse */}
-                    <div style={{ position: 'relative', height: 18, marginTop: 6, borderTop: '1px solid rgba(0,0,0,.09)' }}>
+                    <div style={{ position: 'relative', height: 30, marginTop: 6, borderTop: '1px solid rgba(0,0,0,.09)' }}>
                         {achsenMarken(achsenVon, achsenBis).map((m, i) => (
                             <div key={i} style={{
                                 position: 'absolute', top: 0,

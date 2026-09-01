@@ -4,7 +4,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
-const { hatTabelle } = require('../schema-flags');
+const { hatTabelle, hatSpalte } = require('../schema-flags');
 const { straengeErzeugen } = require('../zeitstrahl');
 
 async function tabelleDa(res) {
@@ -33,7 +33,7 @@ router.get('/:dossier_id', auth, async (req, res) => {
     if (!await tabelleDa(res)) return;
     try {
         const prog = await programmLaden(req.params.dossier_id);
-        if (!prog) return res.json({ programm: null, straenge: [] });
+        if (!prog) return res.json({ programm: null, straenge: [], termine: [] });
 
         const r = await db.query(
             `SELECT pp.instanz_id, pp.leistung_id, pp.phase_id, pp.reihenfolge,
@@ -67,7 +67,21 @@ router.get('/:dossier_id', auth, async (req, res) => {
             }
             strang.phasen.push(zeile);
         }
-        res.json({ programm: prog, straenge });
+        // Termine des Klienten: phasengebundene liegen in ihrer Phase, frei
+        // erfasste ausserhalb. Beide erscheinen auf dem Zeitstrahl.
+        const gebundenDa = await hatSpalte('termin', 'programm_phase_id');
+        const termine = await db.query(
+            `SELECT t.termin_id, t.typ, t.datum, t.zeit, t.status,
+                    ${gebundenDa ? 't.programm_phase_id' : 'NULL::uuid AS programm_phase_id'}
+             FROM termin t
+             JOIN dossier d ON d.klient_id = t.klient_id
+             WHERE d.dossier_id = $1::uuid
+               AND t.status <> 'Abgesagt'
+             ORDER BY t.datum, t.zeit`,
+            [req.params.dossier_id]
+        );
+
+        res.json({ programm: prog, straenge, termine: termine.rows });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden des Zeitstrahls' });
