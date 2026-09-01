@@ -20,12 +20,21 @@ const LABEL_FARBEN = {
     'MA': { bg: '#F5F3FF', color: '#5B21B6' },
 };
 
-const INTAKE_BUCKETS = [
-    { key: 'vorabklaerung',          label: 'Vorabklärung' },
-    { key: 'berufsmassnahmen',       label: 'Berufsmassnahmen' },
-    { key: 'integrationsmassnahmen', label: 'Integrationsmassnahmen' },
-    { key: 'beratung_coaching',      label: 'Beratung & Coaching' },
-    { key: 'programmstart',          label: 'Programmstart' },
+// Der Intake laeuft in drei Stufen. Die mittlere ist eine Verzweigung: ein
+// Dossier geht durch GENAU EINEN der drei Bereiche, nicht durch alle
+// nacheinander (Feedback 01.09.2026).
+const INTAKE_STUFEN = [
+    { keys: ['vorabklaerung'], label: 'Vorabklärung' },
+    {
+        keys: ['berufsmassnahmen', 'integrationsmassnahmen', 'beratung_coaching'],
+        label: 'Bereich',
+        varianten: [
+            { key: 'berufsmassnahmen',       label: 'Berufsmassnahmen' },
+            { key: 'integrationsmassnahmen', label: 'Integrationsmassnahmen' },
+            { key: 'beratung_coaching',      label: 'Beratung & Coaching' },
+        ],
+    },
+    { keys: ['programmstart'], label: 'Programmstart' },
 ];
 
 const JKAT = {
@@ -140,6 +149,7 @@ export default function DossierDetail() {
     // Ziele
     const [ziele, setZiele] = useState([]);
     const [zielInput, setZielInput] = useState('');
+    const [zielDatumInput, setZielDatumInput] = useState('');
     const [zielFehler, setZielFehler] = useState('');
 
     const [termine, setTermine] = useState([]);
@@ -217,6 +227,21 @@ export default function DossierDetail() {
         client.get(`/dossiers/${id}/dokumente`).then(r => setDokumente(r.data)).catch(console.error);
     }, [id]);
 
+    // Hochgeladene Dokumente (z.B. Verfuegungen) werden heruntergeladen statt
+    // im Texteditor geoeffnet.
+    async function dateiHerunterladen(datei_id, name) {
+        try {
+            const r = await client.get(`/dateien/${datei_id}`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(r.data);
+            const a = document.createElement('a');
+            a.href = url; a.download = name || 'dokument';
+            document.body.appendChild(a); a.click(); a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
     function loadDokumente() {
         client.get(`/dossiers/${id}/dokumente`).then(r => setDokumente(r.data)).catch(console.error);
     }
@@ -237,15 +262,28 @@ export default function DossierDetail() {
         if (!zielInput.trim()) return;
         setZielFehler('');
         try {
-            const r = await client.post(`/dossiers/${id}/ziele`, { text: zielInput.trim() });
+            const r = await client.post(`/dossiers/${id}/ziele`, {
+                text: zielInput.trim(),
+                ziel_datum: zielDatumInput || null,
+            });
             setZiele(prev => [...prev, r.data]);
             setZielInput('');
+            setZielDatumInput('');
         } catch (err) {
             console.error(err);
             setZielFehler(err.response?.data?.error || 'Fehler beim Erstellen des Ziels.');
         }
     }
 
+
+    async function zielDatum(ziel_id, datum) {
+        setZiele(zs => zs.map(z => z.ziel_id === ziel_id ? { ...z, ziel_datum: datum } : z));
+        try {
+            await client.put(`/dossiers/${id}/ziele/${ziel_id}`, { ziel_datum: datum || null });
+        } catch (err) {
+            console.error(err);
+        }
+    }
     async function toggleZiel(ziel_id) {
         setZielFehler('');
         try {
@@ -589,35 +627,46 @@ export default function DossierDetail() {
             {zeigeIntakeStepper && (
                 <div style={{ ...CARD, padding: '.875rem 1.25rem', marginBottom: '.875rem' }}>
                     <div style={{ ...SECTION_HDR, marginBottom: '.625rem' }}>Intake-Status</div>
-                    <div style={{ display: 'flex', overflowX: 'auto', paddingBottom: 4 }}>
-                        {INTAKE_BUCKETS.map((b, i, arr) => {
-                            const currentIdx = arr.findIndex(x => x.key === dossier.pipeline_status);
-                            const done = i < currentIdx;
-                            const active = i === currentIdx;
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                        {INTAKE_STUFEN.map((stufe, i, arr) => {
+                            const aktIdx = arr.findIndex(x => x.keys.includes(dossier.pipeline_status));
+                            const done = aktIdx >= 0 && i < aktIdx;
+                            const active = i === aktIdx;
+                            const farbe = done ? '#16A34A' : active ? '#2563EB' : '#E3E1DA';
                             return (
-                                <div
-                                    key={b.key}
-                                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 68, position: 'relative' }}
-                                >
-                                    {i < arr.length - 1 && (
-                                        <div style={{ position: 'absolute', top: 12, left: '50%', width: '100%', height: 2, background: done ? '#16A34A' : '#E3E1DA', zIndex: 0 }} />
-                                    )}
-                                    <div style={{
-                                        width: 24, height: 24, borderRadius: '50%', zIndex: 1,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: 10, fontWeight: 600, fontFamily: 'monospace',
-                                        background: done ? '#16A34A' : active ? '#2563EB' : '#fff',
-                                        border: `2px solid ${done ? '#16A34A' : active ? '#2563EB' : '#E3E1DA'}`,
-                                        color: done || active ? '#fff' : '#A09D97',
-                                        boxShadow: active ? '0 0 0 4px rgba(37,99,235,.15)' : 'none',
-                                    }}>
-                                        {done ? '✓' : i + 1}
+                                <div key={i} style={{ flex: stufe.varianten ? 2.4 : 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                                        <div style={{
+                                            width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: 10, fontWeight: 600, fontFamily: 'monospace',
+                                            background: done ? '#16A34A' : active ? '#2563EB' : '#fff',
+                                            border: `2px solid ${farbe}`,
+                                            color: done || active ? '#fff' : '#A09D97',
+                                        }}>{done ? '✓' : i + 1}</div>
+                                        <span style={{ fontSize: 11, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap', color: done ? '#15803D' : active ? '#2563EB' : '#A09D97' }}>
+                                            {stufe.label}
+                                        </span>
+                                        {i < arr.length - 1 && (
+                                            <div style={{ flex: 1, height: 2, background: done ? '#16A34A' : '#E3E1DA', minWidth: 8 }} />
+                                        )}
                                     </div>
-                                    <div style={{
-                                        fontSize: 9, fontWeight: active ? 600 : 500, marginTop: 5,
-                                        textAlign: 'center', lineHeight: 1.3, maxWidth: 64,
-                                        color: done ? '#15803D' : active ? '#2563EB' : '#A09D97',
-                                    }}>{b.label}</div>
+                                    {stufe.varianten && (
+                                        <div style={{ display: 'flex', gap: 4, paddingLeft: 28, flexWrap: 'wrap' }}>
+                                            {stufe.varianten.map(v => {
+                                                const gewaehlt = dossier.pipeline_status === v.key;
+                                                return (
+                                                    <span key={v.key} style={{
+                                                        fontSize: 9.5, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap',
+                                                        background: gewaehlt ? '#EEF3FE' : 'transparent',
+                                                        border: `1px solid ${gewaehlt ? 'rgba(37,99,235,.3)' : 'rgba(0,0,0,.08)'}`,
+                                                        color: gewaehlt ? '#1D4ED8' : '#C9C6C0',
+                                                        fontWeight: gewaehlt ? 600 : 400,
+                                                    }}>{v.label}</span>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
@@ -662,9 +711,22 @@ export default function DossierDetail() {
                                         textDecoration: z.erreicht ? 'line-through' : 'none',
                                         color: z.erreicht ? '#A09D97' : '#1A1917',
                                     }}>{z.text}</span>
+                                    {/* Angestrebtes Datum – nicht zu verwechseln mit
+                                        erreicht_am, das den Zeitpunkt des Abhakens haelt. */}
+                                    <input
+                                        type="date"
+                                        value={z.ziel_datum ? z.ziel_datum.slice(0, 10) : ''}
+                                        onChange={e => zielDatum(z.ziel_id, e.target.value)}
+                                        title="Bis wann soll das Ziel erreicht sein?"
+                                        style={{
+                                            fontSize: 10.5, fontFamily: 'monospace', flexShrink: 0,
+                                            border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
+                                            padding: '2px 5px', background: '#fff', color: '#6B6860',
+                                        }}
+                                    />
                                     {z.erreicht_am && (
-                                        <span style={{ fontSize: 10.5, color: '#A09D97', fontFamily: 'monospace', flexShrink: 0 }}>
-                                            {fmt(z.erreicht_am)}
+                                        <span title="erreicht am" style={{ fontSize: 10.5, color: '#15803D', fontFamily: 'monospace', flexShrink: 0 }}>
+                                            ✓ {fmt(z.erreicht_am)}
                                         </span>
                                     )}
                                     <button onClick={() => deleteZiel(z.ziel_id)} style={{
@@ -686,6 +748,13 @@ export default function DossierDetail() {
                                         onKeyDown={e => e.key === 'Enter' && addZiel()}
                                         placeholder="Neues Ziel eingeben…"
                                         style={{ flex: 1, fontSize: 12.5, padding: '6px 10px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, fontFamily: 'inherit', outline: 'none' }}
+                                    />
+                                    <input
+                                        type="date"
+                                        value={zielDatumInput}
+                                        onChange={e => setZielDatumInput(e.target.value)}
+                                        title="Bis wann soll das Ziel erreicht sein?"
+                                        style={{ fontSize: 12, padding: '6px 8px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, fontFamily: 'inherit', outline: 'none', color: '#6B6860' }}
                                     />
                                     <button onClick={addZiel} style={{ padding: '6px 14px', fontSize: 12.5, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', fontWeight: 500 }}>+</button>
                                 </div>
@@ -1013,7 +1082,9 @@ export default function DossierDetail() {
                         ) : dokumente.map(dok => (
                             <div
                                 key={dok.dok_id}
-                                onClick={() => { setGewaehltesDokument(dok); setDokumentEditorModal(true); }}
+                                onClick={() => dok.datei_id
+                                    ? dateiHerunterladen(dok.datei_id, dok.titel)
+                                    : (setGewaehltesDokument(dok), setDokumentEditorModal(true))}
                                 style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 8px', background: '#F5F4F0', borderRadius: 6, marginBottom: 5, cursor: 'pointer' }}
                                 onMouseEnter={e => e.currentTarget.style.background = '#EEF3FE'}
                                 onMouseLeave={e => e.currentTarget.style.background = '#F5F4F0'}
@@ -1021,12 +1092,15 @@ export default function DossierDetail() {
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dok.titel}</div>
                                     <div style={{ fontSize: 10.5, color: '#A09D97', marginTop: 1 }}>
+                                        {dok.herkunft && dok.datei_id && <span>{dok.herkunft} · </span>}
                                         {dok.vorlage_name && <span>{dok.vorlage_name} · </span>}
                                         {new Date(dok.created_at).toLocaleDateString('de-CH')}
                                         {dok.erstellt_von_name && <span> · {dok.erstellt_von_name}</span>}
                                     </div>
                                 </div>
-                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0, marginTop: 2 }}>✎</span>
+                                <span style={{ fontSize: 11, color: '#A09D97', flexShrink: 0, marginTop: 2 }}>
+                                    {dok.datei_id ? '⤓' : '✎'}
+                                </span>
                             </div>
                         ))}
                     </div>

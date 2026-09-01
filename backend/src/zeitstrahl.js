@@ -88,6 +88,27 @@ async function straengeErzeugen(pgClient, { verlauf_id, verfuegung_id, von, bis 
             angelegt++;
         }
     }
+    // Die aktuelle Phase des Dossiers ergibt sich aus dem Zeitstrahl: die Phase,
+    // in der heute liegt, sonst die erste. Dossiers, die aus dem Intake mit
+    // "Programmstart" kommen, stehen sonst weiter auf der Intake-Phase
+    // (Feedback 01.09.2026).
+    await pgClient.query(
+        `UPDATE dossier d
+            SET akt_phase_id = COALESCE(
+                    (SELECT pp.phase_id FROM programm_phase pp
+                      WHERE pp.verlauf_id = $1
+                        AND CURRENT_DATE BETWEEN pp.start_datum AND pp.end_datum
+                      ORDER BY pp.reihenfolge LIMIT 1),
+                    (SELECT pp.phase_id FROM programm_phase pp
+                      WHERE pp.verlauf_id = $1
+                      ORDER BY pp.start_datum, pp.reihenfolge LIMIT 1)
+                ),
+                updated_at = NOW()
+          FROM programm_verlauf pv
+         WHERE pv.verlauf_id = $1 AND d.dossier_id = pv.dossier_id`,
+        [verlauf_id]
+    );
+
     return { angelegt, straenge: tarife.rows.length - ohnePhasen.length, ohne_phasenmodell: ohnePhasen };
 }
 

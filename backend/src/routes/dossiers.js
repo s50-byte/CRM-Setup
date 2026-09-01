@@ -4,6 +4,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { hatSpalte } = require('../schema-flags');
 
 // GET /api/dossiers — Alle Dossiers
 router.get('/', auth, async (req, res) => {
@@ -444,7 +445,7 @@ router.post('/:id/zuweisung', auth, async (req, res) => {
 
 // POST /api/dossiers/:id/ziele — Neues Ziel erstellen
 router.post('/:id/ziele', auth, async (req, res) => {
-    const { text } = req.body;
+    const { text, ziel_datum } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'Text erforderlich' });
     try {
         const verlauf = await db.query(
@@ -455,9 +456,16 @@ router.post('/:id/ziele', auth, async (req, res) => {
         const verlauf_id = verlauf.rows[0].verlauf_id;
         const count = await db.query(`SELECT COUNT(*) FROM vereinbarungsziel WHERE verlauf_id = $1`, [verlauf_id]);
         const reihenfolge = parseInt(count.rows[0].count);
+        const datumDa = await hatSpalte('vereinbarungsziel', 'ziel_datum');
         const result = await db.query(
-            `INSERT INTO vereinbarungsziel (verlauf_id, text, reihenfolge) VALUES ($1,$2,$3) RETURNING *`,
-            [verlauf_id, text.trim(), reihenfolge]
+            datumDa
+                ? `INSERT INTO vereinbarungsziel (verlauf_id, text, reihenfolge, ziel_datum)
+                   VALUES ($1,$2,$3,$4) RETURNING *`
+                : `INSERT INTO vereinbarungsziel (verlauf_id, text, reihenfolge)
+                   VALUES ($1,$2,$3) RETURNING *`,
+            datumDa
+                ? [verlauf_id, text.trim(), reihenfolge, ziel_datum || null]
+                : [verlauf_id, text.trim(), reihenfolge]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -468,14 +476,30 @@ router.post('/:id/ziele', auth, async (req, res) => {
 
 // PUT /api/dossiers/:id/ziele/:ziel_id — Ziel abhaken
 router.put('/:id/ziele/:ziel_id', auth, async (req, res) => {
+    const { text, ziel_datum } = req.body || {};
     try {
-        const result = await db.query(
-            `UPDATE vereinbarungsziel
-             SET erreicht = NOT erreicht,
-                 erreicht_am = CASE WHEN erreicht = FALSE THEN CURRENT_DATE ELSE NULL END
-             WHERE ziel_id = $1 RETURNING *`,
-            [req.params.ziel_id]
-        );
+        // Ohne Feldangaben wird abgehakt, sonst geaendert – so bleibt der
+        // bisherige Klick auf das Haekchen unveraendert.
+        const aendern = text !== undefined || ziel_datum !== undefined;
+        const datumDa = await hatSpalte('vereinbarungsziel', 'ziel_datum');
+        const result = aendern
+            ? await db.query(
+                datumDa
+                    ? `UPDATE vereinbarungsziel SET text = COALESCE($1, text), ziel_datum = $2
+                       WHERE ziel_id = $3 RETURNING *`
+                    : `UPDATE vereinbarungsziel SET text = COALESCE($1, text)
+                       WHERE ziel_id = $3 RETURNING *`,
+                datumDa
+                    ? [text?.trim() || null, ziel_datum || null, req.params.ziel_id]
+                    : [text?.trim() || null, null, req.params.ziel_id]
+            )
+            : await db.query(
+                `UPDATE vereinbarungsziel
+                 SET erreicht = NOT erreicht,
+                     erreicht_am = CASE WHEN erreicht = FALSE THEN CURRENT_DATE ELSE NULL END
+                 WHERE ziel_id = $1 RETURNING *`,
+                [req.params.ziel_id]
+            );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Ziel nicht gefunden' });
         res.json(result.rows[0]);
     } catch (err) {
@@ -699,7 +723,8 @@ router.get('/:id/dokumente', auth, async (req, res) => {
         const result = await db.query(
             `SELECT d.dok_id, d.titel, d.inhalt, d.created_at, d.updated_at,
                     v.name AS vorlage_name,
-                    u.full_name AS erstellt_von_name
+                    u.full_name AS erstellt_von_name,
+                    NULL::uuid AS datei_id, 'Dokument' AS herkunft
              FROM dossier_dokument d
              LEFT JOIN dokument_vorlage v ON v.vorlage_id = d.vorlage_id
              LEFT JOIN benutzer u ON u.user_id = d.erstellt_von
@@ -707,7 +732,26 @@ router.get('/:id/dokumente', auth, async (req, res) => {
              ORDER BY d.created_at DESC`,
             [req.params.id]
         );
-        res.json(result.rows);
+
+        // Hochgeladene Verfuegungen gehoeren hier ebenso hin – sie sind
+        // Dokumente des Dossiers, nur an anderer Stelle erfasst
+        // (Feedback 01.09.2026).
+        let verfuegungen = { rows: [] };
+        if (await hatSpalte('verfuegung', 'datei_id')) {
+            verfuegungen = await db.query(
+                `SELECT v.verfuegung_id AS dok_id,
+                        COALESCE(${await hatSpalte('verfuegung', 'datei_titel') ? 'v.datei_titel,' : ''} dt.dateiname) AS titel,
+                        NULL::text AS inhalt, v.created_at, v.updated_at,
+                        NULL::varchar AS vorlage_name, NULL::varchar AS erstellt_von_name,
+                        v.datei_id, 'Verfügung ' || v.nummer AS herkunft
+                 FROM verfuegung v
+                 JOIN datei dt ON dt.datei_id = v.datei_id
+                 WHERE v.dossier_id = $1::uuid
+                 ORDER BY v.created_at DESC`,
+                [req.params.id]
+            );
+        }
+        res.json([...verfuegungen.rows, ...result.rows]);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Fehler beim Laden der Dokumente' });
