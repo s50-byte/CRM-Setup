@@ -3,6 +3,7 @@ const db = require('../db');
 const auth = require('../middleware/auth');
 const { hatSpalte, hatTabelle } = require('../schema-flags');
 const { straengeErzeugen } = require('../zeitstrahl');
+const { intakeAbschliessenWennMoeglich } = require('../intake');
 
 // GET /api/verfuegungen/:dossier_id
 router.get('/:dossier_id', auth, async (req, res) => {
@@ -166,16 +167,12 @@ router.post('/', auth, async (req, res) => {
             );
         }
 
-        if (dosRes.rows[0]?.pipeline_status === 'programmstart') {
-            await pgClient.query(
-                `UPDATE dossier SET intake_abgeschlossen = TRUE, absage_grund = 'Verfügung eingetragen', status = 'aktiv', updated_at = NOW()
-                 WHERE dossier_id = $1`,
-                [dossier_id]
-            );
+        const abgeschlossen = await intakeAbschliessenWennMoeglich(pgClient, dossier_id);
+        if (abgeschlossen) {
             await pgClient.query(
                 `INSERT INTO journal_eintrag (klient_id, user_id, kategorie, datum, text)
                  VALUES ($1, $2, 'Sonstiges', CURRENT_DATE, 'Intake abgeschlossen — Verfügung eingetragen, Start erfolgt')`,
-                [dosRes.rows[0].klient_id, req.user.user_id]
+                [abgeschlossen.klient_id, req.user.user_id]
             );
         }
 
@@ -249,6 +246,7 @@ router.put('/:id', auth, async (req, res) => {
             }
         }
 
+        await intakeAbschliessenWennMoeglich(pgClient, result.rows[0].dossier_id);
         await programmNachfuehren(pgClient, dossier_id || result.rows[0].dossier_id, result.rows[0].verfuegung_id);
         await pgClient.query('COMMIT');
         res.json(result.rows[0]);

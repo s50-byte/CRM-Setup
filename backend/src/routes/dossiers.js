@@ -5,6 +5,7 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 const { hatSpalte } = require('../schema-flags');
+const { intakeAbschliessenWennMoeglich } = require('../intake');
 
 // GET /api/dossiers — Alle Dossiers
 router.get('/', auth, async (req, res) => {
@@ -344,6 +345,19 @@ router.put('/:id/intake', auth, async (req, res) => {
                         [row.user_id, aenderung, req.user.user_id]
                     );
                 }
+            }
+        }
+
+        // Verschiebt jemand ein Dossier nach "Programmstart" und es liegt bereits
+        // eine aktive Verfuegung vor, ist der Intake damit abgeschlossen.
+        if (pipeline_status === 'programmstart') {
+            const fertig = await intakeAbschliessenWennMoeglich(db, req.params.id);
+            if (fertig) {
+                await db.query(
+                    `INSERT INTO journal_eintrag (klient_id, user_id, kategorie, datum, text)
+                     VALUES ($1, $2, 'Sonstiges', CURRENT_DATE, 'Intake abgeschlossen — Verfügung eingetragen, Start erfolgt')`,
+                    [fertig.klient_id, req.user.user_id]
+                );
             }
         }
 
