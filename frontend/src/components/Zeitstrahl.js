@@ -85,22 +85,26 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
     const straenge = daten?.straenge || [];
     // Ohne vollstaendigen Zeitraum laesst sich nichts massstabsgetreu zeichnen –
     // ein fehlendes Enddatum ergaebe NaN und damit ein zerrissenes Layout.
-    const gesamt = von && bis ? tage(von, bis) : 0;
-    const zeitraumGueltig = Number.isFinite(gesamt) && gesamt >= 1;
+    const programmTage = von && bis ? tage(von, bis) : 0;
+    const zeitraumGueltig = Number.isFinite(programmTage) && programmTage >= 1;
 
-    // Liegt heute ausserhalb des Zeitraums, wird die Linie an den Rand geklemmt
-    // statt weggelassen: bei einem Programm, das erst beginnt, steht sie links,
-    // bei einem abgelaufenen rechts. So bleibt ablesbar, wo man steht.
-    const heute = (() => {
-        if (!zeitraumGueltig) return null;
-        const h = new Date(); h.setHours(0, 0, 0, 0);
-        const a = anteil(h, von, gesamt);
-        return {
-            anteil: Math.min(1, Math.max(0, a)),
-            davor: a < 0,
-            danach: a > 1,
-        };
-    })();
+    // Die Achse spannt ueber das Programm UND den heutigen Tag. Liegt heute
+    // ausserhalb, waechst die Achse dorthin, statt die Linie an den Rand zu
+    // klemmen: nur so ist der Abstand zwischen heute und Programmstart im
+    // selben Massstab ablesbar wie die Phasen untereinander.
+    const heuteDatum = (() => { const h = new Date(); h.setHours(0, 0, 0, 0); return h; })();
+    const achsenVon = zeitraumGueltig
+        ? (heuteDatum < new Date(von) ? heuteDatum : new Date(von)) : null;
+    const achsenBis = zeitraumGueltig
+        ? (heuteDatum > new Date(bis) ? heuteDatum : new Date(bis)) : null;
+    const gesamt = zeitraumGueltig ? tage(achsenVon, achsenBis) : 0;
+
+    // Heute liegt durch die mitwachsende Achse immer im Bild – am echten Ort.
+    const heute = zeitraumGueltig ? {
+        anteil: anteil(heuteDatum, achsenVon, gesamt),
+        davor: heuteDatum < new Date(von),
+        danach: heuteDatum > new Date(bis),
+    } : null;
 
     if (!prog) return null;
 
@@ -112,7 +116,7 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                 </div>
                 {von && bis && (
                     <span style={{ fontSize: 11, color: '#A09D97', fontFamily: 'monospace' }}>
-                        {kurz(von)} – {kurz(bis)} · {gesamt} Tage
+                        {kurz(von)} – {kurz(achsenBis)} · {gesamt} Tage
                     </span>
                 )}
                 {bearbeitbar && (
@@ -174,7 +178,7 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                                     </div>
                                     <div style={{ position: 'relative', height: 46 }}>
                                         {s.phasen.map(p => {
-                                            const links = anteil(p.start_datum, von, gesamt);
+                                            const links = anteil(p.start_datum, achsenVon, gesamt);
                                             const breite = tage(p.start_datum, p.end_datum) / gesamt;
                                             const jetzt = istHeute(p);
                                             return (
@@ -216,12 +220,23 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                         })}
                     </div>
 
+                    {/* Grenzen des Programms, wenn die Achse weiter reicht */}
+                    {(heute?.davor || heute?.danach) && (
+                        <div style={{
+                            position: 'absolute', top: 0, bottom: 18,
+                            left: `${anteil(von, achsenVon, gesamt) * 100}%`,
+                            width: `${(programmTage / gesamt) * 100}%`,
+                            border: '1px dashed rgba(0,0,0,.16)', borderRadius: 4,
+                            pointerEvents: 'none', zIndex: 0,
+                        }} />
+                    )}
+
                     {/* Datumsachse */}
                     <div style={{ position: 'relative', height: 18, marginTop: 6, borderTop: '1px solid rgba(0,0,0,.09)' }}>
-                        {achsenMarken(von, bis).map((m, i) => (
+                        {achsenMarken(achsenVon, achsenBis).map((m, i) => (
                             <div key={i} style={{
                                 position: 'absolute', top: 0,
-                                left: `${anteil(m.datum, von, gesamt) * 100}%`,
+                                left: `${anteil(m.datum, achsenVon, gesamt) * 100}%`,
                                 fontSize: 9.5, color: '#A09D97', fontFamily: 'monospace',
                                 paddingLeft: 3, borderLeft: '1px solid rgba(0,0,0,.12)', height: 12,
                                 whiteSpace: 'nowrap',
