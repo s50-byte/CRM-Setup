@@ -134,17 +134,23 @@ db.query(`
 `).catch(err => console.error('programm_dokument table init:', err));
 
 // GET /api/dokumente/programm/:programm_id — Programm-Dokumente (phase_id IS NULL)
+// ?mit_phasen=1 liefert zusaetzlich die Dokumente aller Phasen des Programms.
+// Die Uebersicht ist eine Zusammenfassung des Ganzen und soll alles zeigen.
 router.get('/programm/:programm_id', auth, async (req, res) => {
     try {
         const dateiDa = await hatSpalte('programm_dokument', 'datei_id');
+        const mitPhasen = req.query.mit_phasen === '1';
         const result = await db.query(
             `SELECT d.pdok_id, d.dateiname, d.typ, d.erstellt_am,
                     ${dateiDa ? 'd.datei_id,' : 'NULL::uuid AS datei_id,'}
+                    d.phase_id, ph.label AS phase_label,
                     u.full_name AS erstellt_von_name
              FROM programm_dokument d
              LEFT JOIN benutzer u ON u.user_id = d.erstellt_von
-             WHERE d.programm_id = $1 AND d.phase_id IS NULL
-             ORDER BY d.erstellt_am DESC`,
+             LEFT JOIN phase ph ON ph.phase_id = d.phase_id
+             WHERE d.programm_id = $1
+               ${mitPhasen ? '' : 'AND d.phase_id IS NULL'}
+             ORDER BY ph.reihenfolge NULLS FIRST, d.erstellt_am DESC`,
             [req.params.programm_id]
         );
         res.json(result.rows);

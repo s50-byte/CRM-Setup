@@ -105,6 +105,10 @@ function DokListe({ docs, onDelete, onOeffnen }) {
             {docs.map(d => (
                 <div key={d.pdok_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
                     <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 5, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.08)', fontFamily: 'monospace', flexShrink: 0 }}>{d.typ || '—'}</span>
+                    {d.phase_label && (
+                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: '#EEF3FE', color: '#1D4ED8', flexShrink: 0 }}
+                              title="Dokument dieser Phase">{d.phase_label}</span>
+                    )}
                     {d.datei_id ? (
                         <button
                             onClick={() => onOeffnen(d.datei_id, d.dateiname)}
@@ -115,7 +119,7 @@ function DokListe({ docs, onDelete, onOeffnen }) {
                             {d.dateiname}
                         </span>
                     )}
-                    {onDelete && (
+                    {onDelete && !d.phase_label && (
                         <button style={BTN_DEL_SM} onClick={() => onDelete(d.pdok_id)}>×</button>
                     )}
                 </div>
@@ -169,7 +173,7 @@ export default function Programme() {
 
     async function loadProgDoks(programm_id) {
         try {
-            const r = await client.get(`/dokumente/programm/${programm_id}`);
+            const r = await client.get(`/dokumente/programm/${programm_id}?mit_phasen=1`);
             setProgDoks(prev => ({ ...prev, [programm_id]: r.data }));
         } catch (err) { console.error(err); }
     }
@@ -712,7 +716,12 @@ export default function Programme() {
                                                                             ))}
                                                                         </div>
                                                                     ) : (() => {
-                                                                        const alleRollen = [...new Set((p.phasen || []).flatMap(ph => ph.rollen || []))];
+                                                                        // Die Uebersicht fasst zusammen: die am Programm gesetzten
+                                                                        // Rollen und alle, die in einzelnen Phasen vorkommen.
+                                                                        const alleRollen = [...new Set([
+                                                                            ...(p.rollen || []),
+                                                                            ...(p.phasen || []).flatMap(ph => ph.rollen || []),
+                                                                        ])];
                                                                         return alleRollen.length === 0 ? (
                                                                             <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic' }}>Keine Rollen definiert</div>
                                                                         ) : (
