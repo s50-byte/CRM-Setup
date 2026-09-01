@@ -166,7 +166,12 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
     if (!prog) return null;
 
     return (
-        <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.07)', borderRadius: 10, padding: '.875rem 1.25rem', marginBottom: '.875rem' }}>
+        <div style={{
+            background: '#fff', border: '1px solid rgba(0,0,0,.07)', borderRadius: 10,
+            padding: '.875rem 1.25rem', marginBottom: '.875rem',
+            userSelect: zieht ? 'none' : undefined,
+            cursor: zieht ? 'col-resize' : undefined,
+        }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '.7rem' }}>
                 <div style={{ flex: 1, fontSize: 10.5, fontWeight: 700, color: '#6B6860', textTransform: 'uppercase', letterSpacing: '.06em' }}>
                     Zeitstrahl
@@ -275,6 +280,9 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                                             <div
                                                 key={'g' + p.instanz_id}
                                                 onMouseDown={e => {
+                                                    // Ohne preventDefault startet der Browser eine
+                                                    // Textmarkierung, sobald man zieht.
+                                                    e.preventDefault();
                                                     e.stopPropagation();
                                                     setZieht({ instanz_id: p.instanz_id, container: e.currentTarget.parentElement });
                                                 }}
@@ -309,6 +317,7 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                                                         overflow: 'hidden',
                                                         cursor: onPhaseKlick ? 'pointer' : 'default',
                                                         boxSizing: 'border-box',
+                                                        userSelect: 'none',
                                                     }}
                                                 >
                                                     <div style={{ fontSize: 11.5, fontWeight: jetzt ? 600 : 500, color: '#1A1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
