@@ -14,9 +14,25 @@ export const FALLROLLEN = [
     'Bereichsleitung',
 ];
 
+// Rollen, die an einem konkreten Fall vergeben werden. Abteilungs- und
+// Bereichsleitung gehoeren nicht dazu: das sind Funktionen einer Person, keine
+// Zustaendigkeit in einem einzelnen Dossier.
+export const ROLLEN_ZUWEISUNG = [
+    'Klientenführung', 'Job Coach', 'Fachperson', 'Stellvertretung',
+];
+
+// Kuerzel fuer knappe Darstellungen, etwa in der Dossierliste.
+export const ROLLEN_KUERZEL = {
+    'Klientenführung':   'KF',
+    'Fachperson':        'FP',
+    'Job Coach':         'JC',
+    'Abteilungsleitung': 'AL',
+    'Bereichsleitung':   'BL',
+    'Stellvertretung':   'SV',
+};
+
 // Kontextspezifische Varianten
 export const ROLLEN_EIGENES_PROFIL = [...FALLROLLEN, 'Intake'];
-export const ROLLEN_ZUWEISUNG     = [...FALLROLLEN, 'Stellvertretung'];
 export const ROLLEN_FILTER        = ['Alle', ...FALLROLLEN];
 
 export const ROLLE_FARBE = {
