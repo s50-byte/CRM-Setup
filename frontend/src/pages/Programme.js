@@ -87,14 +87,23 @@ function Section({ title, children, headerRight }) {
 const PRODUKTEBLATT_ID = '__produkteblatt__';
 
 function mitProdukteblatt(p, docs) {
-    if (!p.produkteblatt_datei_id) return docs;
-    const eintrag = {
-        pdok_id: PRODUKTEBLATT_ID,
-        dateiname: p.produkteblatt_titel || p.produkteblatt_dateiname || 'Produkteblatt',
-        typ: 'Produkteblatt',
-        datei_id: p.produkteblatt_datei_id,
-    };
-    return [eintrag, ...(docs || [])];
+    if (!docs) return docs;
+    const alle = [...docs];
+    if (p.produkteblatt_datei_id) {
+        alle.push({
+            pdok_id: PRODUKTEBLATT_ID,
+            dateiname: p.produkteblatt_titel || p.produkteblatt_dateiname || 'Produkteblatt',
+            typ: 'Produkteblatt',
+            datei_id: p.produkteblatt_datei_id,
+        });
+    }
+    // Nach Phase in Programmreihenfolge, Programmebene zuoberst, dann alphabetisch.
+    const phasenOrdnung = (p.phasen || []).map(ph => ph.label);
+    const rang = d => (d.phase_label ? phasenOrdnung.indexOf(d.phase_label) : -1);
+    return alle.sort((a, b) =>
+        rang(a) - rang(b) ||
+        (a.dateiname || '').localeCompare(b.dateiname || '', 'de')
+    );
 }
 
 function DokListe({ docs, onDelete, onOeffnen }) {
@@ -104,11 +113,13 @@ function DokListe({ docs, onDelete, onOeffnen }) {
         <div>
             {docs.map(d => (
                 <div key={d.pdok_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
-                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 5, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.08)', fontFamily: 'monospace', flexShrink: 0 }}>{d.typ || '—'}</span>
-                    {d.phase_label && (
-                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: '#EEF3FE', color: '#1D4ED8', flexShrink: 0 }}
-                              title="Dokument dieser Phase">{d.phase_label}</span>
-                    )}
+                    <span style={{
+                        fontSize: 10, padding: '1px 6px', borderRadius: 8, flexShrink: 0, minWidth: 62, textAlign: 'center',
+                        background: d.phase_label ? '#EEF3FE' : '#F5F4F0',
+                        color: d.phase_label ? '#1D4ED8' : '#A09D97',
+                    }} title={d.phase_label ? 'Dokument dieser Phase' : 'Auf Programmebene'}>
+                        {d.phase_label || 'Programm'}
+                    </span>
                     {d.datei_id ? (
                         <button
                             onClick={() => onOeffnen(d.datei_id, d.dateiname)}
@@ -119,6 +130,7 @@ function DokListe({ docs, onDelete, onOeffnen }) {
                             {d.dateiname}
                         </span>
                     )}
+                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 5, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.08)', fontFamily: 'monospace', flexShrink: 0 }}>{d.typ || '—'}</span>
                     {onDelete && !d.phase_label && (
                         <button style={BTN_DEL_SM} onClick={() => onDelete(d.pdok_id)}>×</button>
                     )}
@@ -416,20 +428,6 @@ export default function Programme() {
         }
     }
 
-    async function toggleProgRolle(programm_id, currentRollen, rolle, checked) {
-        const newRollen = checked ? [...currentRollen, rolle] : currentRollen.filter(r => r !== rolle);
-        setGruppen(prev => prev.map(g => ({
-            ...g,
-            programme: g.programme.map(p => p.programm_id === programm_id ? { ...p, rollen: newRollen } : p)
-        })));
-        try {
-            await client.put(`/programme/${programm_id}/rollen`, { rollen: newRollen });
-        } catch (err) {
-            setFehler(err.response?.data?.error || 'Fehler beim Speichern der Rollen');
-            await ladeProgramme();
-        }
-    }
-
     async function togglePhaseRolle(programm_id, phase_id, currentRollen, rolle, checked) {
         const newRollen = checked ? [...currentRollen, rolle] : currentRollen.filter(r => r !== rolle);
         setGruppen(prev => prev.map(g => ({
@@ -701,27 +699,10 @@ export default function Programme() {
                                                                 )}
 
                                                                 <Section title="Zuständige Rollen">
-                                                                    {editierbar ? (
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                                            {ROLLEN.map(rolle => (
-                                                                                <label key={rolle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        checked={(p.rollen || []).includes(rolle)}
-                                                                                        onChange={e => toggleProgRolle(p.programm_id, p.rollen || [], rolle, e.target.checked)}
-                                                                                        style={{ cursor: 'pointer', accentColor: p.farbe_hex }}
-                                                                                    />
-                                                                                    <span style={{ fontSize: 13 }}>{rolle}</span>
-                                                                                </label>
-                                                                            ))}
-                                                                        </div>
-                                                                    ) : (() => {
-                                                                        // Die Uebersicht fasst zusammen: die am Programm gesetzten
-                                                                        // Rollen und alle, die in einzelnen Phasen vorkommen.
-                                                                        const alleRollen = [...new Set([
-                                                                            ...(p.rollen || []),
-                                                                            ...(p.phasen || []).flatMap(ph => ph.rollen || []),
-                                                                        ])];
+                                                                    {(() => {
+                                                                        // Zusammenfassung aus den Phasen. Gesetzt werden die Rollen in der
+                                                                        // jeweiligen Phase, darum gibt es hier bewusst keine Auswahl.
+                                                                        const alleRollen = [...new Set((p.phasen || []).flatMap(ph => ph.rollen || []))];
                                                                         return alleRollen.length === 0 ? (
                                                                             <div style={{ fontSize: 11.5, color: '#A09D97', fontStyle: 'italic' }}>Keine Rollen definiert</div>
                                                                         ) : (

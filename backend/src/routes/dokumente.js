@@ -150,7 +150,7 @@ router.get('/programm/:programm_id', auth, async (req, res) => {
              LEFT JOIN phase ph ON ph.phase_id = d.phase_id
              WHERE d.programm_id = $1
                ${mitPhasen ? '' : 'AND d.phase_id IS NULL'}
-             ORDER BY ph.reihenfolge NULLS FIRST, d.erstellt_am DESC`,
+             ORDER BY ph.reihenfolge NULLS FIRST, d.dateiname`,
             [req.params.programm_id]
         );
         res.json(result.rows);
