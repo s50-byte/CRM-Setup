@@ -182,9 +182,15 @@ router.put('/:id', auth, async (req, res) => {
     try {
         await dbClient.query('BEGIN');
         const r = await dbClient.query(
+            // Ein abgesagter Termin, der bearbeitet wird, lebt wieder auf: wer ihn
+            // anfasst, will ihn offensichtlich stattfinden lassen. Ohne das
+            // bliebe er trotz neuem Datum abgesagt und unsichtbar.
             `UPDATE termin
                 SET typ = $1, datum = $2, zeit = $3, notiz = $4,
-                    status = COALESCE($5, status), updated_at = NOW()
+                    status = COALESCE($5,
+                        CASE WHEN status = 'Abgesagt' THEN 'Ausstehend'::termin_status
+                             ELSE status END),
+                    updated_at = NOW()
               WHERE termin_id = $6
               RETURNING *`,
             [typ, datum, zeit || null, notiz || null, status || null, req.params.id]
