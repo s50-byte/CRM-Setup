@@ -13,6 +13,28 @@ const BUCKETS = [
 
 const LABEL_FARBEN = { 'LE': '#16A34A', 'TN': '#2563EB', 'MA': '#7C3AED' };
 
+// Die drei Massnahmenrichtungen. Ein Dossier geht durch genau eine davon.
+const RICHTUNGEN = ['berufsmassnahmen', 'integrationsmassnahmen', 'beratung_coaching'];
+
+// Welche Verschiebung braucht eine Rueckfrage?
+//
+// Der uebliche Weg – aus der Vorabklaerung in eine Richtung, von dort in den
+// Programmstart – laeuft ohne Nachfrage durch. Rueckgefragt wird nur, wo ein
+// bereits eingeschlagener Weg verlassen wird: das passiert selten und selten
+// versehentlich gewollt.
+function rueckfrage(von, nach) {
+    if (von === nach) return null;
+    if (von === 'vorabklaerung' && RICHTUNGEN.includes(nach)) return null;
+    if (RICHTUNGEN.includes(von) && nach === 'programmstart') return null;
+    if (nach === 'vorabklaerung') {
+        return { titel: 'Anfrage zurücksetzen?', text: 'Das Dossier geht zurück in die Vorabklärung.' };
+    }
+    if (RICHTUNGEN.includes(nach)) {
+        return { titel: 'Massnahme ändern?', text: 'Das Dossier wechselt in eine andere Massnahme.' };
+    }
+    return null;
+}
+
 function heute() { return new Date().toISOString().slice(0, 10); }
 function fmtDatum(d) {
     return d ? new Date(d).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
@@ -73,6 +95,7 @@ export default function Intake() {
     const [anfrageModal, setAnfrageModal] = useState(false);
     const [aufgeklappt, setAufgeklappt] = useState({});
     const [dragOverBucket, setDragOverBucket] = useState('');
+    const [bestaetigung, setBestaetigung] = useState(null);
     const navigate = useNavigate();
 
     function ladeDossiers() {
@@ -100,6 +123,12 @@ export default function Intake() {
 
     async function verschieben(dossier, neuerBucket) {
         if (dossier.pipeline_status === neuerBucket) return;
+        const frage = rueckfrage(dossier.pipeline_status, neuerBucket);
+        if (frage) { setBestaetigung({ dossier, neuerBucket, ...frage }); return; }
+        await verschiebenAusfuehren(dossier, neuerBucket);
+    }
+
+    async function verschiebenAusfuehren(dossier, neuerBucket) {
         const alterLabel = BUCKETS.find(b => b.key === dossier.pipeline_status)?.label || dossier.pipeline_status;
         const neuerLabel = BUCKETS.find(b => b.key === neuerBucket)?.label || neuerBucket;
         try {
@@ -229,6 +258,39 @@ export default function Intake() {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {bestaetigung && (
+                <div onClick={() => setBestaetigung(null)} style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                        background: '#fff', borderRadius: 12, padding: '1.5rem',
+                        width: 380, maxWidth: '92vw', boxShadow: '0 8px 32px rgba(0,0,0,.18)',
+                    }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{bestaetigung.titel}</div>
+                        <div style={{ fontSize: 13, color: '#6B6860', lineHeight: 1.5 }}>
+                            {bestaetigung.dossier.vorname} {bestaetigung.dossier.nachname} — {bestaetigung.text}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 18 }}>
+                            <button onClick={() => setBestaetigung(null)} style={{
+                                padding: '7px 20px', fontSize: 13, cursor: 'pointer',
+                                border: '1px solid rgba(0,0,0,.12)', borderRadius: 6,
+                                background: '#fff', fontFamily: 'inherit', color: '#6B6860',
+                            }}>Nein</button>
+                            <button onClick={() => {
+                                const { dossier, neuerBucket } = bestaetigung;
+                                setBestaetigung(null);
+                                verschiebenAusfuehren(dossier, neuerBucket);
+                            }} style={{
+                                padding: '7px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                                border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff',
+                                fontFamily: 'inherit',
+                            }}>Ja</button>
+                        </div>
+                    </div>
                 </div>
             )}
 
