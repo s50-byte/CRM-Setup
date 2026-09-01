@@ -189,15 +189,23 @@ router.put('/:id', auth, async (req, res) => {
         return res.status(403).json({ error: 'Keine Berechtigung' });
     }
     const { name, farbe_hex, monatspreis, avg_dauer_monate, aufwand_h_monat,
-            produkteblatt_url, produkteblatt_datei_id } = req.body;
+            produkteblatt_url, produkteblatt_datei_id, produkteblatt_titel } = req.body;
     if (!name || !monatspreis) return res.status(400).json({ error: 'Name und Monatspreis erforderlich' });
     try {
         const pbDa = await hatSpalte('programm', 'produkteblatt_url');
         const pbDateiDa = await hatSpalte('programm', 'produkteblatt_datei_id');
         if (produkteblatt_datei_id !== undefined && pbDateiDa) {
+            const titelDa = await hatSpalte('programm', 'produkteblatt_titel');
             await db.query(
-                `UPDATE programm SET produkteblatt_datei_id = $1 WHERE programm_id = $2`,
-                [produkteblatt_datei_id || null, req.params.id]
+                titelDa
+                    ? `UPDATE programm SET produkteblatt_datei_id = $1, produkteblatt_titel = $2
+                       WHERE programm_id = $3`
+                    : `UPDATE programm SET produkteblatt_datei_id = $1 WHERE programm_id = $3`,
+                titelDa
+                    ? [produkteblatt_datei_id || null,
+                       produkteblatt_datei_id ? (produkteblatt_titel?.trim() || null) : null,
+                       req.params.id]
+                    : [produkteblatt_datei_id || null, null, req.params.id]
             );
         }
         const basis = [name, farbe_hex || '#2563EB', monatspreis, avg_dauer_monate || null,

@@ -359,7 +359,10 @@ export default function Programme() {
 
             // Das Produkteblatt haengt am Tarif, nicht an der Dokumentliste.
             if (dokModal.produkteblatt) {
-                await produkteblattSpeichern(dokModal.programm, { produkteblatt_datei_id: datei_id });
+                await produkteblattSpeichern(dokModal.programm, {
+                    produkteblatt_datei_id: datei_id,
+                    produkteblatt_titel: dokForm.dateiname.trim(),
+                });
                 setDokModal(null);
                 setDokForm({ dateiname: '', typ: 'Sonstiges', datei: null });
                 return;
@@ -647,7 +650,7 @@ export default function Programme() {
                                                                         <button
                                                                             onClick={() => dateiOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
                                                                             style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, padding: 0 }}
-                                                                        >📄 {p.produkteblatt_dateiname || 'Produkteblatt SVA'}</button>
+                                                                        >📄 {p.produkteblatt_titel || p.produkteblatt_dateiname || 'Produkteblatt SVA'}</button>
                                                                     )}
                                                                 </div>
 
@@ -659,7 +662,7 @@ export default function Programme() {
                                                                                 <button
                                                                                     onClick={() => dateiOeffnen(p.produkteblatt_datei_id, p.produkteblatt_dateiname)}
                                                                                     style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
-                                                                                >📄 {p.produkteblatt_dateiname}</button>
+                                                                                >📄 {p.produkteblatt_titel || p.produkteblatt_dateiname}</button>
                                                                                 <button
                                                                                     onClick={() => produkteblattEntfernen(p)}
                                                                                     disabled={busy}
