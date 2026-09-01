@@ -12,6 +12,7 @@ import NeuerTerminModal from '../components/NeuerTerminModal';
 import DokumentErstellenModal from '../components/DokumentErstellenModal';
 import DokumentEditorModal from '../components/DokumentEditorModal';
 import Zeitstrahl from '../components/Zeitstrahl';
+import ZielModal from '../components/ZielModal';
 
 
 const LABEL_FARBEN = {
@@ -27,7 +28,7 @@ const INTAKE_STUFEN = [
     { keys: ['vorabklaerung'], label: 'Vorabklärung' },
     {
         keys: ['berufsmassnahmen', 'integrationsmassnahmen', 'beratung_coaching'],
-        label: 'Bereich',
+        label: 'Zuweisen',
         varianten: [
             { key: 'berufsmassnahmen',       label: 'Berufsmassnahmen' },
             { key: 'integrationsmassnahmen', label: 'Integrationsmassnahmen' },
@@ -148,8 +149,7 @@ export default function DossierDetail() {
 
     // Ziele
     const [ziele, setZiele] = useState([]);
-    const [zielInput, setZielInput] = useState('');
-    const [zielDatumInput, setZielDatumInput] = useState('');
+    const [zielModal, setZielModal] = useState(null);   // {} = neu, Ziel = bearbeiten
     const [zielFehler, setZielFehler] = useState('');
 
     const [termine, setTermine] = useState([]);
@@ -258,32 +258,17 @@ export default function DossierDetail() {
         }, ...prev]);
     }
 
-    async function addZiel() {
-        if (!zielInput.trim()) return;
-        setZielFehler('');
-        try {
-            const r = await client.post(`/dossiers/${id}/ziele`, {
-                text: zielInput.trim(),
-                ziel_datum: zielDatumInput || null,
-            });
-            setZiele(prev => [...prev, r.data]);
-            setZielInput('');
-            setZielDatumInput('');
-        } catch (err) {
-            console.error(err);
-            setZielFehler(err.response?.data?.error || 'Fehler beim Erstellen des Ziels.');
+    async function zielSpeichern(daten) {
+        if (zielModal?.ziel_id) {
+            const r = await client.put(`/dossiers/${id}/ziele/${zielModal.ziel_id}`, daten);
+            setZiele(zs => zs.map(z => z.ziel_id === r.data.ziel_id ? r.data : z));
+        } else {
+            const r = await client.post(`/dossiers/${id}/ziele`, daten);
+            setZiele(zs => [...zs, r.data]);
         }
     }
 
 
-    async function zielDatum(ziel_id, datum) {
-        setZiele(zs => zs.map(z => z.ziel_id === ziel_id ? { ...z, ziel_datum: datum } : z));
-        try {
-            await client.put(`/dossiers/${id}/ziele/${ziel_id}`, { ziel_datum: datum || null });
-        } catch (err) {
-            console.error(err);
-        }
-    }
     async function toggleZiel(ziel_id) {
         setZielFehler('');
         try {
@@ -713,17 +698,16 @@ export default function DossierDetail() {
                                     }}>{z.text}</span>
                                     {/* Angestrebtes Datum – nicht zu verwechseln mit
                                         erreicht_am, das den Zeitpunkt des Abhakens haelt. */}
-                                    <input
-                                        type="date"
-                                        value={z.ziel_datum ? z.ziel_datum.slice(0, 10) : ''}
-                                        onChange={e => zielDatum(z.ziel_id, e.target.value)}
-                                        title="Bis wann soll das Ziel erreicht sein?"
-                                        style={{
-                                            fontSize: 10.5, fontFamily: 'monospace', flexShrink: 0,
-                                            border: '1px solid rgba(0,0,0,.09)', borderRadius: 5,
-                                            padding: '2px 5px', background: '#fff', color: '#6B6860',
-                                        }}
-                                    />
+                                    {z.ziel_datum && (
+                                        <span title="Zieldatum" style={{ fontSize: 10.5, color: '#6B6860', fontFamily: 'monospace', flexShrink: 0 }}>
+                                            bis {fmt(z.ziel_datum)}
+                                        </span>
+                                    )}
+                                    <button onClick={() => setZielModal(z)} title="Bearbeiten" style={{
+                                        width: 22, height: 22, flexShrink: 0, border: '1px solid rgba(0,0,0,.09)',
+                                        borderRadius: 5, background: '#fff', color: '#6B6860', cursor: 'pointer',
+                                        fontSize: 11, lineHeight: 1, fontFamily: 'inherit', padding: 0
+                                    }}>✎</button>
                                     {z.erreicht_am && (
                                         <span title="erreicht am" style={{ fontSize: 10.5, color: '#15803D', fontFamily: 'monospace', flexShrink: 0 }}>
                                             ✓ {fmt(z.erreicht_am)}
@@ -742,22 +726,11 @@ export default function DossierDetail() {
                                 </div>
                             )}
                             {dossier?.akt_verlauf_id ? (
-                                <div style={{ display: 'flex', gap: 7, marginTop: ziele.length > 0 || zielFehler ? 10 : 0 }}>
-                                    <input
-                                        value={zielInput} onChange={e => setZielInput(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && addZiel()}
-                                        placeholder="Neues Ziel eingeben…"
-                                        style={{ flex: 1, fontSize: 12.5, padding: '6px 10px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, fontFamily: 'inherit', outline: 'none' }}
-                                    />
-                                    <input
-                                        type="date"
-                                        value={zielDatumInput}
-                                        onChange={e => setZielDatumInput(e.target.value)}
-                                        title="Bis wann soll das Ziel erreicht sein?"
-                                        style={{ fontSize: 12, padding: '6px 8px', border: '1px solid rgba(0,0,0,.09)', borderRadius: 6, fontFamily: 'inherit', outline: 'none', color: '#6B6860' }}
-                                    />
-                                    <button onClick={addZiel} style={{ padding: '6px 14px', fontSize: 12.5, cursor: 'pointer', border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', fontFamily: 'inherit', fontWeight: 500 }}>+</button>
-                                </div>
+                                <button onClick={() => setZielModal({})} style={{
+                                    marginTop: ziele.length > 0 || zielFehler ? 10 : 0,
+                                    padding: '6px 14px', fontSize: 12.5, cursor: 'pointer', border: '1px dashed rgba(37,99,235,.3)',
+                                    borderRadius: 6, background: '#F8FAFF', color: '#2563EB', fontFamily: 'inherit', fontWeight: 500,
+                                }}>+ Ziel</button>
                             ) : (
                                 <div style={{ fontSize: 12, color: '#9A3412', background: '#FFF7ED', border: '1px solid rgba(154,52,18,.15)', borderRadius: 6, padding: '7px 10px', marginTop: ziele.length > 0 ? 10 : 0 }}>
                                     Programm noch nicht gestartet — Ziele können erst nach der ersten Verfügung mit Programm erfasst werden.
@@ -1227,6 +1200,13 @@ export default function DossierDetail() {
                     reloadDossier();
                 }}
             />
+            <ZielModal
+                open={!!zielModal}
+                ziel={zielModal?.ziel_id ? zielModal : null}
+                onClose={() => setZielModal(null)}
+                onSpeichern={zielSpeichern}
+            />
+
             <NeuerTerminModal
                 open={terminModal || !!terminBearbeiten}
                 termin={terminBearbeiten}

@@ -232,13 +232,38 @@ export default function VerfuegungModal({ open, onClose, dossierId, dossier, ver
                     <div>
                         <FieldLabel>Verfügungsdokument</FieldLabel>
                         {dateiId && !datei ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ flex: 1, fontSize: 12.5 }}>📄 {dateiTitel || dateiName || 'hinterlegt'}</span>
-                                <button
-                                    onClick={() => { setDateiId(null); setDateiName(''); setDateiTitel(''); }}
-                                    style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(220,38,38,.25)', borderRadius: 5, background: '#FEF2F2', color: '#B91C1C', fontFamily: 'inherit' }}
-                                >Entfernen</button>
-                            </div>
+                            <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ flex: 1, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        📄 {dateiName || 'hinterlegt'}
+                                    </span>
+                                    {/* Ersetzen statt nur entfernen – sonst muesste man erst
+                                        speichern, um eine andere Datei anhaengen zu koennen. */}
+                                    <label style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(0,0,0,.12)', borderRadius: 5, background: '#fff', color: '#2563EB', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                                        Ersetzen…
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
+                                            onChange={e => {
+                                                const f = e.target.files?.[0] || null;
+                                                if (f) { setDatei(f); setDateiId(null); setDateiName(''); }
+                                            }}
+                                            style={{ display: 'none' }}
+                                        />
+                                    </label>
+                                    <button
+                                        onClick={() => { setDateiId(null); setDateiName(''); setDateiTitel(''); }}
+                                        style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', border: '1px solid rgba(220,38,38,.25)', borderRadius: 5, background: '#FEF2F2', color: '#B91C1C', fontFamily: 'inherit' }}
+                                    >Entfernen</button>
+                                </div>
+                                <input
+                                    type="text"
+                                    value={dateiTitel}
+                                    onChange={e => setDateiTitel(e.target.value)}
+                                    placeholder="Anzeigename"
+                                    style={{ ...inputStyle, marginTop: 6 }}
+                                />
+                            </>
                         ) : (
                             <>
                                 <input
