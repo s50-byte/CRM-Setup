@@ -83,14 +83,23 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
     const von = prog?.gueltig_von || prog?.start_datum;
     const bis = prog?.gueltig_bis || prog?.geplantes_enddatum;
     const straenge = daten?.straenge || [];
+    // Ohne vollstaendigen Zeitraum laesst sich nichts massstabsgetreu zeichnen –
+    // ein fehlendes Enddatum ergaebe NaN und damit ein zerrissenes Layout.
     const gesamt = von && bis ? tage(von, bis) : 0;
+    const zeitraumGueltig = Number.isFinite(gesamt) && gesamt >= 1;
 
-    // Heute nur einzeichnen, wenn es in den Zeitraum faellt.
-    const heuteAnteil = (() => {
-        if (!von || !bis || !gesamt) return null;
+    // Liegt heute ausserhalb des Zeitraums, wird die Linie an den Rand geklemmt
+    // statt weggelassen: bei einem Programm, das erst beginnt, steht sie links,
+    // bei einem abgelaufenen rechts. So bleibt ablesbar, wo man steht.
+    const heute = (() => {
+        if (!zeitraumGueltig) return null;
         const h = new Date(); h.setHours(0, 0, 0, 0);
         const a = anteil(h, von, gesamt);
-        return a >= 0 && a <= 1 ? a : null;
+        return {
+            anteil: Math.min(1, Math.max(0, a)),
+            davor: a < 0,
+            danach: a > 1,
+        };
     })();
 
     if (!prog) return null;
@@ -121,7 +130,13 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                 </div>
             )}
 
-            {straenge.length === 0 ? (
+            {!zeitraumGueltig ? (
+                <div style={{ fontSize: 12, color: '#92400E', background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 6, padding: '8px 11px' }}>
+                    Die aktive Verfügung hat keinen vollständigen Gültigkeitszeitraum
+                    {von ? ` (ab ${kurz(von)}, Ende fehlt)` : ''}. Ohne Von und Bis lässt sich
+                    der Zeitstrahl nicht massstabsgetreu darstellen.
+                </div>
+            ) : straenge.length === 0 ? (
                 <div style={{ fontSize: 12, color: '#A09D97' }}>
                     Noch keine Phasen verteilt.{bearbeitbar ? ' Über „Erzeugen" aus der Verfügung anlegen.' : ''}
                 </div>
@@ -129,18 +144,22 @@ export default function Zeitstrahl({ dossierId, bearbeitbar, onPhaseKlick }) {
                 <div style={{ position: 'relative' }}>
                     {/* Heute-Linie über alle Stränge – daran ist ablesbar, welcher
                         Tarif gerade in welcher Phase steht. */}
-                    {heuteAnteil !== null && (
+                    {heute && (
                         <div style={{
                             position: 'absolute', top: 0, bottom: 18,
-                            left: `${heuteAnteil * 100}%`,
-                            width: 2, marginLeft: -1, background: '#DC2626', zIndex: 3,
-                            pointerEvents: 'none',
+                            left: `${heute.anteil * 100}%`,
+                            width: 2, marginLeft: -1, zIndex: 3, pointerEvents: 'none',
+                            background: heute.davor || heute.danach ? '#DC262655' : '#DC2626',
                         }}>
                             <div style={{
-                                position: 'absolute', top: -6, left: -18, width: 38,
+                                position: 'absolute', top: -6,
+                                left: heute.anteil > .5 ? 'auto' : -14,
+                                right: heute.anteil > .5 ? -14 : 'auto',
                                 fontSize: 9, fontWeight: 700, color: '#DC2626',
-                                textAlign: 'center', letterSpacing: '.04em',
-                            }}>HEUTE</div>
+                                letterSpacing: '.04em', whiteSpace: 'nowrap',
+                            }}>
+                                {heute.davor ? 'HEUTE ◂' : heute.danach ? '▸ HEUTE' : 'HEUTE'}
+                            </div>
                         </div>
                     )}
 
