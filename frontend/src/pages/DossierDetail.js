@@ -11,6 +11,7 @@ import JournalModal from '../components/JournalModal';
 import NeuerTerminModal from '../components/NeuerTerminModal';
 import DokumentErstellenModal from '../components/DokumentErstellenModal';
 import DokumentEditorModal from '../components/DokumentEditorModal';
+import Zeitstrahl from '../components/Zeitstrahl';
 
 
 const LABEL_FARBEN = {
@@ -623,6 +624,12 @@ export default function DossierDetail() {
                     </div>
                 </div>
             )}
+
+            <Zeitstrahl
+                dossierId={id}
+                bearbeitbar={hatAktiveVerfuegung}
+                onPhaseKlick={phase_id => navigate(`/dossiers/${id}/phase/${phase_id}`)}
+            />
 
             {/* ── PHASEN-STEPPER ──────────────────────────── */}
             {phasen.length > 0 && hatAktiveVerfuegung && (
