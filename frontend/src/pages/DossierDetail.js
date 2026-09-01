@@ -432,15 +432,17 @@ export default function DossierDetail() {
                             {dossier.vorname} {dossier.nachname}
                         </div>
                         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
-                            {/* Programm und Phase – der Zustand, in dem der Fall steckt. */}
-                            {dossier.programm_name && (
-                                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(37,99,235,.15)', fontWeight: 500 }}>
-                                    {dossier.programm_name}
-                                </span>
-                            )}
-                            {dossier.phase_label && (
-                                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#F5F3FF', color: '#5B21B6', border: '1px solid rgba(124,58,237,.15)', fontFamily: 'monospace' }}>
-                                    {dossier.phase_label}
+                            {/* Zwei Etiketten in derselben Anordnung, egal ob der Fall
+                                laeuft oder noch im Intake steht: erst wo er steht,
+                                dann in welchem Abschnitt. */}
+                            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#EEF3FE', color: '#1D4ED8', border: '1px solid rgba(37,99,235,.15)', fontWeight: 500 }}>
+                                {dossier.programm_name || 'Intake'}
+                            </span>
+                            {(dossier.programm_name ? dossier.phase_label : INTAKE_LABEL[dossier.pipeline_status] || dossier.pipeline_status) && (
+                                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#F5F3FF', color: '#5B21B6', border: '1px solid rgba(124,58,237,.15)' }}>
+                                    {dossier.programm_name
+                                        ? dossier.phase_label
+                                        : (INTAKE_LABEL[dossier.pipeline_status] || dossier.pipeline_status)}
                                 </span>
                             )}
                             {dossier.klient_label && LABEL_FARBEN[dossier.klient_label] && (
@@ -450,13 +452,6 @@ export default function DossierDetail() {
                                     color: LABEL_FARBEN[dossier.klient_label].color,
                                     border: `1px solid ${LABEL_FARBEN[dossier.klient_label].color}33`,
                                 }}>{dossier.klient_label}</span>
-                            )}
-                            {/* Der Intake-Status nur, solange kein Programm laeuft – danach
-                                sagen Programm und Phase mehr aus. Und lesbar statt roh. */}
-                            {!dossier.programm_name && dossier.pipeline_status && (
-                                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#F5F4F0', color: '#6B6860', border: '1px solid rgba(0,0,0,.09)' }}>
-                                    {INTAKE_LABEL[dossier.pipeline_status] || dossier.pipeline_status}
-                                </span>
                             )}
                         </div>
                         <div style={{ marginTop: 9 }}>
