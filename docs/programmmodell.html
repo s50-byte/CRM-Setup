@@ -1,0 +1,1307 @@
+<title>Programmmodell im Abgleich</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --ground:      #F4F6F9;
+    --surface:     #FFFFFF;
+    --surface-alt: #EDF1F5;
+    --ink:         #16202B;
+    --ink-soft:    #3C4A58;
+    --muted:       #64748B;
+    --rule:        #D8E0E8;
+    --rule-soft:   #E6EBF1;
+    --accent:      #1F5C8C;
+    --accent-soft: #E4EDF5;
+
+    --ok:        #2E6F52;
+    --ok-bg:     #E3F0E9;
+    --teil:      #9A6712;
+    --teil-bg:   #F7EEDC;
+    --fehlt:     #A63F37;
+    --fehlt-bg:  #F7E5E3;
+
+    --shadow: 0 1px 2px rgba(22, 32, 43, .05), 0 8px 24px -16px rgba(22, 32, 43, .28);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0F151B;
+      --surface:     #161E26;
+      --surface-alt: #1C262F;
+      --ink:         #E2E9F0;
+      --ink-soft:    #BCC8D4;
+      --muted:       #8B9AA9;
+      --rule:        #27333E;
+      --rule-soft:   #202B35;
+      --accent:      #74AAD8;
+      --accent-soft: #1B2937;
+
+      --ok:        #7FC3A0;
+      --ok-bg:     #16291F;
+      --teil:      #DCAE5C;
+      --teil-bg:   #2A2113;
+      --fehlt:     #E0897F;
+      --fehlt-bg:  #2C1917;
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0F151B;
+    --surface:     #161E26;
+    --surface-alt: #1C262F;
+    --ink:         #E2E9F0;
+    --ink-soft:    #BCC8D4;
+    --muted:       #8B9AA9;
+    --rule:        #27333E;
+    --rule-soft:   #202B35;
+    --accent:      #74AAD8;
+    --accent-soft: #1B2937;
+
+    --ok:        #7FC3A0;
+    --ok-bg:     #16291F;
+    --teil:      #DCAE5C;
+    --teil-bg:   #2A2113;
+    --fehlt:     #E0897F;
+    --fehlt-bg:  #2C1917;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: clamp(1.75rem, 4vw, 4rem) clamp(1.1rem, 4vw, 2.5rem) 5rem;
+  }
+
+  h1, h2, h3, .label, .chip, .num, th, .baustein-name {
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  code, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+
+  code {
+    font-size: .82em;
+    background: var(--surface-alt);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    padding: .08em .34em;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 1.5rem; }
+
+  .label {
+    font-size: .69rem;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-size: clamp(2rem, 5.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -.02em;
+    margin: .7rem 0 0;
+    text-wrap: balance;
+  }
+
+  .steh {
+    margin: .9rem 0 0;
+    font-size: 1.09rem;
+    color: var(--ink-soft);
+    max-width: 46rem;
+  }
+
+  .herkunft {
+    margin-top: 1.4rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.5rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .76rem;
+    color: var(--muted);
+  }
+
+  section { margin-top: 3.5rem; }
+
+  h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    margin: 0 0 .35rem;
+    padding-bottom: .55rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .vorspann {
+    color: var(--muted);
+    font-size: .96rem;
+    margin: .75rem 0 1.75rem;
+    max-width: 44rem;
+  }
+
+  .tabellenrahmen { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .93rem;
+    min-width: 32rem;
+  }
+
+  th {
+    text-align: left;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 .8rem .55rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  td {
+    padding: .62rem .8rem .62rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: baseline;
+  }
+
+  td:last-child, th:last-child { padding-right: 0; }
+  .rechts, th.rechts { text-align: right; }
+
+  .zahl { font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monospace; font-size: .86rem; }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    font-size: .8rem;
+    font-weight: 600;
+    width: 2.2rem;
+  }
+
+  .chip {
+    display: inline-block;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: .2rem .55rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .chip.ok    { background: var(--ok-bg);    color: var(--ok); }
+  .chip.teil  { background: var(--teil-bg);  color: var(--teil); }
+  .chip.fehlt { background: var(--fehlt-bg); color: var(--fehlt); }
+
+  /* ---------- Zielmodell ---------- */
+
+  .modell { display: flex; flex-direction: column; gap: .75rem; }
+
+  .ebene {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.15rem 1.35rem 1.25rem;
+    box-shadow: var(--shadow);
+  }
+
+  .ebene-kopf {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: .55rem;
+  }
+
+  .ebene h3 { font-size: 1.12rem; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+  .ebene .quelle { font-family: "IBM Plex Mono", monospace; font-size: .76rem; color: var(--muted); }
+  .ebene p { margin: 0; font-size: .95rem; color: var(--ink-soft); }
+
+  .pfeil {
+    text-align: center;
+    color: var(--accent);
+    font-size: 1.15rem;
+    line-height: 1;
+    margin: -.15rem 0;
+  }
+
+  .bausteine {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: .6rem;
+    margin-top: .95rem;
+  }
+
+  .baustein {
+    background: var(--accent-soft);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    padding: .6rem .75rem .7rem;
+  }
+
+  .baustein-name {
+    display: block;
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: .12rem;
+  }
+
+  .baustein span.detail { font-size: .82rem; color: var(--ink-soft); line-height: 1.45; display: block; }
+
+  /* ---------- Punkte ---------- */
+
+  .punkte { display: flex; flex-direction: column; gap: 1.25rem; }
+
+  .punkt {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .punkt-kopf {
+    display: flex;
+    align-items: baseline;
+    gap: .85rem;
+    padding: 1rem 1.35rem;
+    border-bottom: 1px solid var(--rule-soft);
+    background: var(--surface-alt);
+  }
+
+  .punkt-nr {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .82rem;
+    font-weight: 500;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  h3 {
+    font-size: 1.06rem;
+    font-weight: 600;
+    margin: 0;
+    flex: 1;
+    letter-spacing: -.005em;
+    text-wrap: balance;
+  }
+
+  .spalten { display: grid; grid-template-columns: 1fr 1fr; }
+
+  @media (max-width: 46rem) { .spalten { grid-template-columns: 1fr; } }
+
+  .feld { padding: 1.15rem 1.35rem 1.3rem; }
+  .feld + .feld { border-left: 1px solid var(--rule-soft); }
+
+  @media (max-width: 46rem) {
+    .feld + .feld { border-left: none; border-top: 1px solid var(--rule-soft); }
+  }
+
+  .feld .label { display: block; margin-bottom: .5rem; }
+  .feld p { margin: 0 0 .7rem; font-size: .95rem; }
+  .feld p:last-child { margin-bottom: 0; }
+
+  .soll {
+    font-style: italic;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--accent);
+    padding-left: .85rem;
+  }
+
+  .luecke {
+    padding: 1rem 1.35rem 1.15rem;
+    border-top: 1px solid var(--rule-soft);
+    background: var(--surface);
+  }
+
+  .luecke .label { color: var(--accent); }
+  .luecke p { margin: .5rem 0 0; font-size: .95rem; }
+
+  /* ---------- Befunde ---------- */
+
+  .befunde { display: flex; flex-direction: column; gap: 1rem; }
+
+  .befund {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+
+  .befund-marke {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 1.05rem;
+    color: var(--accent);
+    line-height: 1.3;
+  }
+
+  .befund h3 { font-size: .99rem; margin-bottom: .3rem; }
+  .befund p { margin: 0; font-size: .93rem; color: var(--ink-soft); }
+  .befund .inhalt { grid-column: 2; }
+
+  /* ---------- Fragen ---------- */
+
+  ol.fragen {
+    list-style: none;
+    counter-reset: frage;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .85rem;
+  }
+
+  ol.fragen li {
+    counter-increment: frage;
+    position: relative;
+    padding: .85rem 1.25rem .95rem 3.1rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    font-size: .96rem;
+  }
+
+  ol.fragen li::before {
+    content: counter(frage, decimal-leading-zero);
+    position: absolute;
+    left: 1.25rem;
+    top: .95rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .78rem;
+    font-weight: 500;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  ol.fragen strong { font-weight: 600; }
+
+  .nachsatz {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--ink);
+    font-size: .93rem;
+    color: var(--muted);
+    max-width: 44rem;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <span class="label">KFT · Auslegeordnung</span>
+    <h1>Programmmodell im Abgleich</h1>
+    <p class="steh">
+      Das Zielbild für Tarife, Phasen und Verfügungen, gegen den heutigen Stand
+      geprüft. Der Grundriss steht: der Tarif ist die Basis, das Programm die
+      fallbezogene Instanz darauf, der Zeitstrahl die Ansicht, in der beides
+      zusammenkommt. Was fehlt, ist überwiegend Inhalt — und an drei Stellen eine
+      Entdopplung.
+    </p>
+    <div class="herkunft">
+      <span>31.08.2026</span>
+      <span>Quellen: Schema, Routen, Datenbestand iv_crm</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Das Zielmodell</h2>
+    <p class="vorspann">
+      Entschieden: Der Tarif ist die Basis, worauf das Programm baut. Der Tarif hat
+      keine Dauer, das Programm schon. Das Phasenmodell hängt am Tarif.
+    </p>
+
+    <div class="modell">
+
+      <div class="ebene">
+        <div class="ebene-kopf">
+          <h3>Tarif</h3>
+          <span class="quelle">heute <code>leistung</code> · 36 Zeilen</span>
+        </div>
+        <p>
+          Standardisierter Katalog, gesetzt. Keine Dauer — auch die Phasen darin
+          tragen keine. Der Tarif trägt das Phasenmodell: je Tarif die Abfolge der
+          Phasen, je Phase die Kriterien — Events und Dokumente, jeweils Muss oder
+          Kann, mit der zuständigen <em>Fallrolle</em>. Ausserdem die
+          Umrechnungsschlüssel, mit denen aus verfügten Monaten oder Stunden das
+          Budget „Stunden pro Klient pro Monat“ wird.
+        </p>
+      </div>
+
+      <div class="pfeil" aria-hidden="true">↓</div>
+
+      <div class="ebene">
+        <div class="ebene-kopf">
+          <h3>Programm</h3>
+          <span class="quelle">hängt am Dossier · heute am ehesten <code>programm_verlauf</code></span>
+        </div>
+        <p>
+          Die Instanz am Dossier, zusammengesetzt aus vier Bausteinen. Ein Klient
+          durchläuft über die Zeit mehrere Programme nacheinander — je eine
+          Verfügung, immer nur eine aktiv.
+        </p>
+        <div class="bausteine">
+          <div class="baustein">
+            <span class="baustein-name">Tarife</span>
+            <span class="detail">einer oder mehrere, je mit eigener Menge</span>
+          </div>
+          <div class="baustein">
+            <span class="baustein-name">Dauer</span>
+            <span class="detail">Start und Ende, aus der Verfügung</span>
+          </div>
+          <div class="baustein">
+            <span class="baustein-name">Verfügung</span>
+            <span class="detail">hochgeladenes Dokument, Voraussetzung für den Start</span>
+          </div>
+          <div class="baustein">
+            <span class="baustein-name">Verrechnung</span>
+            <span class="detail">je nach Verfügtem</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pfeil" aria-hidden="true">↓</div>
+
+      <div class="ebene">
+        <div class="ebene-kopf">
+          <h3>Phaseninstanzen · Zeitstrahl</h3>
+          <span class="quelle">hängt am Programm · heute <code>dossier_phase</code>, ungenutzt</span>
+        </div>
+        <p>
+          Man wählt Start- und Enddatum sowie die Tarife und bekommt einen
+          Zeitstrahl: je Tarif ein eigener Phasenstrang aus dem Phasenmodell des
+          Tarifs, gleichmässig über die Dauer verteilt. Es gibt keinen Haupttarif,
+          der den Ton angibt — die Stränge laufen nebeneinander. Die Aufteilung
+          lässt sich danach interaktiv verschieben.
+        </p>
+        <p style="margin-top:.7rem">
+          Erst hier entstehen konkrete Daten: jede Phaseninstanz bekommt Start und
+          Ende. Daraus speisen sich Fristen und Hinweise wie „läuft bald ab“ — heute
+          beruhen die auf der geschätzten Katalogdauer des Programms.
+        </p>
+        <p style="margin-top:.7rem">
+          Beim Verschieben rücken die Nachbarphasen mit: keine Lücken, keine
+          Überlappungen, das Enddatum des Programms ist eine harte Grenze, und keine
+          Phase wird kürzer als ein Tag.
+        </p>
+        <p style="margin-top:.7rem">
+          Termine sind zweierlei. Ein <strong>frei erfasster</strong> Termin — ein
+          Vorstellungsgespräch etwa — liegt, wo er liegt, und schränkt nichts ein;
+          in welcher Phase er stattfindet, spielt keine Rolle.
+        </p>
+        <p style="margin-top:.7rem">
+          Ein <strong>phasengebundener</strong> Termin, der ein Muss-Kriterium
+          erfüllt, ist eine Abmachung mit einer Person und bleibt liegen. Nicht der
+          Termin weicht der Phase, sondern die Phase dem Termin: beim Verschieben
+          stoppt die Grenze an ihm. Der Start kommt höchstens bis einen Tag vor den
+          Termin, das Ende höchstens bis einen Tag danach.
+        </p>
+        <p style="margin-top:.7rem">
+          Beim Weiterschalten einer Phase werden die Muss-Kriterien geprüft. Sind
+          sie offen, geht es nur mit einer Begründung weiter — Auswahl aus einer
+          Liste und/oder Freitext —, die im Journal landet.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Was der Umbau bedeutet</h2>
+    <p class="vorspann">
+      Die grösste Änderung: der heutige Programm-Katalog verliert seine Rolle. Der
+      Tarif übernimmt sie.
+    </p>
+
+    <div class="tabellenrahmen">
+      <table>
+        <thead>
+          <tr><th>Gegenstand</th><th>Heute</th><th>Künftig</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Tarifkatalog</td>
+            <td><code>leistung</code>, 36</td>
+            <td>bleibt, wird zur Basis</td>
+          </tr>
+          <tr>
+            <td>Programmkatalog</td>
+            <td><code>programm</code>, 36, 1:1 zum Tarif</td>
+            <td>entfällt</td>
+          </tr>
+          <tr>
+            <td>Phasenmodell</td>
+            <td><code>phase</code> hängt am Programmkatalog</td>
+            <td>hängt am Tarif</td>
+          </tr>
+          <tr>
+            <td>Programminstanz</td>
+            <td><code>programm_verlauf</code>, 7</td>
+            <td>wird „das Programm“, bekommt Verfügung und Verrechnung</td>
+          </tr>
+          <tr>
+            <td>Phasen am Fall</td>
+            <td><code>dossier_phase</code>, ungenutzt</td>
+            <td>wird aus der Dauer erzeugt</td>
+          </tr>
+          <tr>
+            <td>Verfügung</td>
+            <td>nur ein <code>datum</code>, kein Dokument</td>
+            <td>Von/Bis plus hochgeladenes Dokument</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="vorspann" style="margin-top:2rem">
+      Elf Tabellen verweisen auf den Programm-Katalog. Das klingt nach viel, ist es
+      aber nicht: nur vier davon tragen überhaupt Daten, und weil Programm und Tarif
+      heute strikt 1:1 stehen, lässt sich jeder Verweis mechanisch auf den Tarif
+      umschreiben.
+    </p>
+
+    <div class="tabellenrahmen">
+      <table>
+        <thead>
+          <tr><th>Tabelle</th><th class="rechts">Zeilen</th><th>Umstellung</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>phase</code></td><td class="rechts zahl">36</td><td>Verweis auf den Tarif umhängen</td></tr>
+          <tr><td><code>benutzer_berechtigung</code></td><td class="rechts zahl">32</td><td>Berechtigungen künftig je Tarif — noch zu entscheiden</td></tr>
+          <tr><td><code>dossier</code> <span class="mono" style="font-size:.8rem;color:var(--muted)">akt_programm_id</span></td><td class="rechts zahl">7</td><td>hängt an der Entdopplung mit <code>programm_verlauf</code></td></tr>
+          <tr><td><code>programm_verlauf</code></td><td class="rechts zahl">7</td><td>wird selbst zur Programminstanz</td></tr>
+          <tr><td>7 weitere Tabellen</td><td class="rechts zahl">0</td><td>leer — Verweis einfach umhängen</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Stand je Anforderung</h2>
+    <p class="vorspann">
+      Die neun Aussagen aus dem Zielbild, in der Reihenfolge, in der sie formuliert
+      wurden. „Nicht gepflegt“ heisst: die Struktur trägt es, die Inhalte sind noch
+      nicht erfasst — das ist Definitionsarbeit, keine Programmieraufgabe.
+    </p>
+
+    <div class="punkte">
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">01</span>
+          <h3>36 Tarife, gesetzt und standardisiert</h3>
+          <span class="chip ok">erfüllt</span>
+        </div>
+        <div class="spalten">
+          <div class="feld">
+            <span class="label">Soll</span>
+            <p class="soll">Die 36 Tarife sind gesetzt und standardisiert.</p>
+          </div>
+          <div class="feld">
+            <span class="label">Ist</span>
+            <p>
+              <code>leistung</code> hält 36 Tarife mit Tarifnummer, Tarifziffer,
+              Entschädigungsart und Ansatz. Gepflegt und brauchbar.
+            </p>
+            <p>
+              Daneben steht der Katalog <code>programm</code> mit denselben 36
+              Einträgen, je über <code>leistung_id</code> an einen Tarif gebunden.
+            </p>
+          </div>
+        </div>
+        <div class="luecke">
+          <span class="label">Folge</span>
+          <p>
+            Der Tarif ist da und bleibt. Der Programm-Katalog daneben ist die
+            Doppelspurigkeit, die mit dem Umbau verschwindet.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">02</span>
+          <h3>Phasen innerhalb jedes Tarifs</h3>
+          <span class="chip teil">nicht gepflegt</span>
+        </div>
+        <div class="spalten">
+          <div class="feld">
+            <span class="label">Soll</span>
+            <p class="soll">Innerhalb jedes Tarifs gibt es verschiedene Phasen.</p>
+          </div>
+          <div class="feld">
+            <span class="label">Ist</span>
+            <p>
+              36 Phasen — exakt eine je Programm, mit drei verschiedenen
+              Bezeichnungen im ganzen Bestand, im Kern „Phase 1“. Platzhalter aus
+              der Ersteinrichtung.
+            </p>
+            <p>
+              Die Phase hängt heute am Programm-Katalog, nicht am Tarif.
+            </p>
+          </div>
+        </div>
+        <div class="luecke">
+          <span class="label">Zu tun</span>
+          <p>
+            Verweis auf den Tarif umhängen — technisch klein. Die eigentliche Arbeit
+            ist fachlich: für 36 Tarife die Phasenabfolge festlegen. Sofern sich
+            mehrere Tarife denselben Ablauf teilen, lohnt sich vorher die Frage nach
+            wiederverwendbaren Vorlagen.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">03</span>
+          <h3>Events und Dokumente je Phase</h3>
+          <span class="chip teil">nicht gepflegt</span>
+        </div>
+        <div class="spalten">
+          <div class="feld">
+            <span class="label">Soll</span>
+            <p class="soll">
+              In den Phasen haben gewisse Events zu passieren, und Dokumente sind
+              notwendig.
+            </p>
+          </div>
+          <div class="feld">
+            <span class="label">Ist</span>
+            <p>
+              <code>kriterium</code> hängt an der Phase, kennt die Typen
+              <code>doc</code>, <code>person</code> und <code>date</code>, ein
+              Pflicht-Kennzeichen und eine verantwortliche Person.
+            </p>
+            <p>Im ganzen System drei Kriterien, zwei davon Pflicht.</p>
+          </div>
+        </div>
+        <div class="luecke">
+          <span class="label">Zu tun</span>
+          <p>
+            Ein Dokumentkriterium bleibt eine Behauptung, solange nichts hochgeladen
+            werden kann. „Event“ hat keinen eigenen Typ — <code>date</code> kommt am
+            nächsten, meint aber einen Termin.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">04</span>
+          <h3>Muss-Kriterien als Warnung beim Phasenwechsel</h3>
+          <span class="chip fehlt">fehlt</span>
+        </div>
+        <div class="spalten">
+          <div class="feld">
+            <span class="label">Soll</span>
+            <p class="soll">
+              Ohne erfüllte Muss-Kriterien kann die nächste Phase nur unter Warnung
+              gestartet werden.
+            </p>
+          </div>
+          <div class="feld">
+            <span class="label">Ist</span>
+            <p>
+              <code>kriterium_status</code> ist leer — der Erfüllungsstand je Klient
+              wird nirgends geführt.
+            </p>
+            <p>
+              Der Phasenwechsel prüft nichts und warnt nicht. Er übersetzt zudem
+              Phasenbezeichnungen über eine fest verdrahtete Liste
+              („Erstkontakt“, „Abklärung“, „Schnupper“ …) in den Pipeline-Status —
+              keine davon existiert heute noch, der Zweig läuft immer ins Leere.
+            </p>
+          </div>
+        </div>
+        <div class="luecke">
+          <span class="label">Zu tun</span>
+          <p>
+            Neu zu bauen, und dabei den toten Code aus der Vorgängergeneration
+            entfernen.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">05</span>
+          <h3>Verfügung als Dokument, Voraussetzung für den Start</h3>
+          <span class="chip fehlt">fehlt</span>
+        </div>
+        <div class="spalten">
+          <div class="feld">
+            <span class="label">Soll</span>
+            <p class="soll">
+              Eine Verfügung ist ein hochgeladenes Dokument und Voraussetzung für
+              einen Programmstart.
+            </p>
+          </div>
+          <div class="feld">
+            <span class="label">Ist</span>
+            <p>
+              Es gibt im ganzen CRM keine Dateiablage. <code>verfuegung</code> führt
+              Nummer, Datum, Status, Bemerkung, Verrechnungsart und Betrag — kein
+              Dokument, kein Anhang.
+            </p>
+            <p>Ein Programmstart ohne Verfügung ist möglich und kommt vor.</p>
+          </div>
+        </div>
+        <div class="luecke">
+          <span class="label">Zu tun</span>
+          <p>
+            Hängt an der Upload-Etappe, die ohnehin ansteht — sie betrifft auch
+            Zielvereinbarungen und das Produkteblatt. Diese Etappe ist damit der
+            Engpass für das ganze Modell.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">06</span>
+          <h3>Dauer und Tarif manuell aus der Verfügung</h3>
+          <span class="chip teil">teilweise</span>
+        </div>
+        <div class="spalten">
+          <div class="feld">
+            <span class="label">Soll</span>
+            <p class="soll">
+              Aus der Verfügung sind Dauer und Tarif abzuleiten. Das soll manuell
+              passieren und muss nicht automatisiert sein.
+            </p>
+          </div>
+          <div class="feld">
+            <span class="label">Ist</span>
+            <p>
+              <code>verfuegung</code> hat ein einzelnes <code>datum</code> — kein
+              Von/Bis. Die verfügte Dauer steht gar nicht darauf.
+            </p>
+            <p>
+              Der Tarif hängt an den Positionen. Seit dem 31.08. leitet das Backend
+              das Programm daraus <em>automatisch</em> ab, sobald eine aktive
+              Verfügung eine Position bekommt.
+            </p>
+          </div>
+        </div>
+        <div class="luecke">
+          <span class="label">Zu tun</span>
+          <p>
+            Der Verfügung fehlt der Gültigkeitszeitraum — ohne ihn gibt es nichts,
+            woraus Phasen entstehen könnten. Und die heutige Automatik läuft dem
+            Zielbild zuwider: sie gehört durch einen bestätigten manuellen Schritt
+            ersetzt.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">07</span>
+          <h3>Phasen aus Start- und Enddatum anlegen</h3>
+          <span class="chip fehlt">fehlt</span>
+        </div>
+        <div class="spalten">
+          <div class="feld">
+            <span class="label">Soll</span>
+            <p class="soll">
+              Basierend auf Start- und Enddatum des Programms werden die Phasen
+              angelegt.
+            </p>
+          </div>
+          <div class="feld">
+            <span class="label">Ist</span>
+            <p>
+              <code>dossier_phase</code> existiert mit den passenden Feldern
+              (Dossier, Phase, Start, Ende, Notiz) und wird beim Erfassen eines
+              Phasenzeitraums geschrieben — steht aber bei null Zeilen.
+            </p>
+            <p>
+              Daneben führt <code>programm_verlauf</code> ebenfalls eine
+              <code>phase_id</code> samt Start- und geplantem Enddatum.
+            </p>
+          </div>
+        </div>
+        <div class="luecke">
+          <span class="label">Zu tun</span>
+          <p>
+            Generierung bauen — und vorher entscheiden, welcher der beiden Orte für
+            den Phasenzeitraum bleibt.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">08</span>
+          <h3>Verspätete Verfügung erzeugt einen Task</h3>
+          <span class="chip fehlt">fehlt</span>
+        </div>
+        <div class="spalten">
+          <div class="feld">
+            <span class="label">Soll</span>
+            <p class="soll">
+              Eine Verfügung kann verspätet und erst nach Programmstart eintreffen.
+              Ein entsprechender Task wird automatisch erstellt und ist im Dashboard
+              sichtbar.
+            </p>
+          </div>
+          <div class="feld">
+            <span class="label">Ist</span>
+            <p>
+              <code>task</code> und <code>phase_task_vorlage</code> sind beide leer.
+              Es gibt keine automatische Task-Erzeugung, an keiner Stelle.
+            </p>
+            <p>
+              Das Dashboard zeigt Aufgaben an — es entstehen nur keine.
+            </p>
+          </div>
+        </div>
+        <div class="luecke">
+          <span class="label">Zu tun</span>
+          <p>
+            Zuerst braucht es den Zustand: „gestartet, aber ohne Verfügung“ muss
+            abfragbar sein. Das ergibt sich aus dem Zielmodell von selbst, sobald die
+            Verfügung am Programm hängt. Erst dann Auslöser und Regel.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">09</span>
+          <h3>Verrechnung je nach Verfügtem</h3>
+          <span class="chip ok">weitgehend da</span>
+        </div>
+        <div class="spalten">
+          <div class="feld">
+            <span class="label">Soll</span>
+            <p class="soll">
+              Die Verrechnung des Programms kann unterschiedlich passieren, je
+              nachdem was verfügt wird.
+            </p>
+          </div>
+          <div class="feld">
+            <span class="label">Ist</span>
+            <p>
+              Der am weitesten gediehene Punkt. <code>verrechnungsart</code> steht auf
+              der Verfügung <em>und</em> auf jeder Position, dazu Betrag und
+              Soll-Stunden je Position.
+            </p>
+            <p>
+              Im Bestand vorkommend: Stundenpauschale und Monatspauschale; das
+              Erfassungsformular bietet zusätzlich Fallpauschale.
+            </p>
+          </div>
+        </div>
+        <div class="luecke">
+          <span class="label">Zu tun</span>
+          <p>
+            Da eine Verfügung mehrere Tarife mit verschiedenen Einheiten tragen
+            kann, gehört die Verrechnungsart an die Position. Das Feld auf der
+            Verfügung wird damit überflüssig.
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Was der Zeitstrahl voraussetzt</h2>
+    <p class="vorspann">
+      Vier Befunde aus dem Bestand zur zentralen Ansicht — zwei davon nehmen Arbeit
+      ab, zwei fügen welche hinzu.
+    </p>
+
+    <div class="befunde">
+
+      <div class="befund">
+        <span class="befund-marke" aria-hidden="true">◧</span>
+        <div class="inhalt">
+          <h3>Menge und Einheit fehlen auf der Position</h3>
+          <p>
+            Verfügt werden teils Monate, teils Stunden — die Position kennt aber nur
+            <code>soll_stunden</code>, und alle 36 Tarife tragen die Einheit
+            <em>Stunden</em>. Es braucht Menge plus Einheit je Position. Die
+            Umrechnungsschlüssel sind mehrere und liegen am Tarif; daraus ergibt
+            sich das Budget „Stunden pro Klient pro Monat“.
+          </p>
+        </div>
+      </div>
+
+      <div class="befund">
+        <span class="befund-marke" aria-hidden="true">◧</span>
+        <div class="inhalt">
+          <h3>Die Phaseninstanz zieht vom Dossier ans Programm</h3>
+          <p>
+            Entschieden: die Kette lautet Dossier → Programm → Phaseninstanz.
+            <code>dossier_phase</code> hängt heute direkt am Dossier und trägt ein
+            UNIQUE auf <code>(dossier_id, phase_id)</code> — beim sequenziellen
+            Modell bricht das, sobald ein Klient denselben Tarif ein zweites Mal
+            durchläuft. Tabelle und Schlüssel hängen künftig am Programm. Die
+            Tabelle ist leer, das ist also ein reiner Schemaschritt ohne Datenumzug.
+          </p>
+        </div>
+      </div>
+
+      <div class="befund">
+        <span class="befund-marke" aria-hidden="true">◧</span>
+        <div class="inhalt">
+          <h3>Ein Termin weiss nicht, zu welcher Phase er gehört</h3>
+          <p>
+            <code>termin</code> führt Klient, Typ, Datum, Zeit, Status und Notiz —
+            keinen Bezug zu einer Phase oder einem Kriterium. Alle Termine stehen
+            heute frei. Für die Bindung an ein Muss-Kriterium braucht es diesen
+            Bezug, und daran hängt die Prüfung, dass der Termin im Fenster der Phase
+            liegt.
+          </p>
+        </div>
+      </div>
+
+      <div class="befund">
+        <span class="befund-marke" aria-hidden="true">⚠</span>
+        <div class="inhalt">
+          <h3><code>kriterium_status</code> hängt am Klienten, nicht am Programm</h3>
+          <p>
+            Der Erfüllungsstand ist auf <code>(kriterium_id, klient_id)</code>
+            geführt — dieselbe Schwäche wie zuvor bei den Phaseninstanzen.
+            Durchläuft ein Klient denselben Tarif ein zweites Mal, lässt sich nicht
+            mehr sagen, in welchem Durchlauf ein Kriterium erfüllt wurde, und der
+            zweite Durchlauf kollidiert mit dem ersten. Auch dieser Bezug gehört an
+            die Phaseninstanz. Die Tabelle ist leer, also wieder ein reiner
+            Schemaschritt.
+          </p>
+        </div>
+      </div>
+
+      <div class="befund">
+        <span class="befund-marke" aria-hidden="true">◧</span>
+        <div class="inhalt">
+          <h3>Fristen beruhen heute auf einer Schätzung</h3>
+          <p>
+            „Bald ablaufend“ auf dem Dashboard rechnet Startdatum plus
+            <code>programm.avg_dauer_tage</code> — die geschätzte Katalogdauer — und
+            meldet unter 28 Tagen. Mit der Verfügung (Zeitraum) und dem Zeitstrahl
+            (Phasenzeitraum) wird daraus eine belastbare Frist. Termine und Aufgaben
+            haben ohnehin ihr eigenes Datum und hängen nicht daran.
+          </p>
+        </div>
+      </div>
+
+      <div class="befund">
+        <span class="befund-marke" aria-hidden="true">✓</span>
+        <div class="inhalt">
+          <h3>Die Auslastungsplanung rechnet bereits in dieser Währung</h3>
+          <p>
+            <code>/gantt</code> ermittelt heute schon die Programmdauer in Monaten
+            aus <code>programm_verlauf</code>, holt Betrag und Verrechnungsart aus
+            der Verfügung und stellt die Ist-Stunden aus dem Journal daneben,
+            getrennt nach verrechenbar und nicht verrechenbar. Die geparkte
+            Gantt-Ansicht über mehrere Verfügungen ist damit kein leeres Blatt,
+            sondern ein Ausbau.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Geparkt</h2>
+    <p class="vorspann">
+      Bewusst zurückgestellt, aber beim Bauen mitzudenken, damit es später nicht
+      quer liegt.
+    </p>
+    <div class="befunde">
+      <div class="befund">
+        <span class="befund-marke" aria-hidden="true">▷</span>
+        <div class="inhalt">
+          <h3>Zeitstrahl über mehrere Verfügungen, als Gantt-Diagramm</h3>
+          <p>
+            Dieselbe Ansicht, aber über die ganze Zeit, die ein Klient da ist — alle
+            Verfügungen nacheinander in einem Diagramm. Für den ersten Wurf genügt
+            eine Verfügung. Die Voraussetzung dafür ist mit der Entscheidung
+            Dossier → Programm → Phaseninstanz bereits erfüllt: die Programme eines
+            Klienten lassen sich damit ohne Umbau nebeneinanderlegen.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Entschieden</h2>
+    <p class="vorspann">
+      Der Grundriss ist vollständig. Was hier steht, ist Vorgabe und nicht mehr
+      Diskussionsgegenstand.
+    </p>
+
+    <div class="tabellenrahmen">
+      <table>
+        <thead><tr><th>Frage</th><th>Entscheid</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Verhältnis Tarif ↔ Programm</td>
+            <td>Der Tarif ist die Basis. Das Programm baut darauf und hat als
+                einziges eine Dauer.</td>
+          </tr>
+          <tr>
+            <td>Bausteine des Programms</td>
+            <td>Tarife, Dauer, Verfügung, Verrechnung.</td>
+          </tr>
+          <tr>
+            <td>Tarife je Programm</td>
+            <td>Mehrere möglich, kein Haupttarif — je Tarif ein eigener
+                Phasenstrang.</td>
+          </tr>
+          <tr>
+            <td>Mehrere Verfügungen</td>
+            <td>Nacheinander über die Zeit, immer nur eine aktive.</td>
+          </tr>
+          <tr>
+            <td>Zugehörigkeit</td>
+            <td>Dossier → Programm → Phaseninstanz.</td>
+          </tr>
+          <tr>
+            <td>Phasenmodell</td>
+            <td>Am Tarif, initial je Tarif definiert. Dass Phasen später in mehreren
+                Tarifen vorkommen, ist zu erwarten — Wiederverwendung bleibt offen,
+                wird aber nicht verbaut.</td>
+          </tr>
+          <tr>
+            <td>Umrechnung Monate ↔ Stunden</td>
+            <td>Mehrere Schlüssel, am Tarif hinterlegt.</td>
+          </tr>
+          <tr>
+            <td>Solldauer je Phase</td>
+            <td>Gibt es nicht. Der Katalog kennt keine Dauer; die Phasen werden am
+                Fall gleichmässig über die Programmdauer verteilt und von Hand
+                verschoben.</td>
+          </tr>
+          <tr>
+            <td>Verantwortlich je Kriterium</td>
+            <td>Eine Fallrolle, keine Person. Welche Person das ist, ergibt sich am
+                Fall aus den Zuweisungen.</td>
+          </tr>
+          <tr>
+            <td>Verschieben auf dem Zeitstrahl</td>
+            <td>Nachbarn rücken mit. Keine Lücken, keine Überlappungen, Enddatum als
+                harte Grenze, Mindestlänge ein Tag.</td>
+          </tr>
+          <tr>
+            <td>Freie Termine</td>
+            <td>Liegen beliebig und schränken die Planung nicht ein.</td>
+          </tr>
+          <tr>
+            <td>Phasengebundene Termine</td>
+            <td>Der Termin bleibt, die Phase weicht ihm aus. Beim Verschieben stoppt
+                die Grenze am Termin: Start höchstens bis einen Tag davor, Ende
+                höchstens bis einen Tag danach.</td>
+          </tr>
+          <tr>
+            <td>Warnung beim Phasenwechsel</td>
+            <td>Begründung nötig — Auswahlliste und/oder Freitext —, landet im
+                Journal.</td>
+          </tr>
+          <tr>
+            <td>Verrechnung</td>
+            <td>Zurückgestellt (01.09.2026) — wird neu gedacht. Betrifft Menge und
+                Einheit je Position, die Umrechnungsschlüssel Monate↔Stunden und die
+                Verrechnungsart.</td>
+          </tr>
+          <tr>
+            <td>Bestehende Fälle</td>
+            <td>Testdaten, werden gelöscht. Kein Altbestand zu übernehmen.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Etappen</h2>
+    <p class="vorspann">
+      Geschnitten nach Abhängigkeit, nicht nach Aufwand. A steht für sich und wird
+      nie wieder so billig; B ist der Engpass für alles Weitere.
+    </p>
+
+    <div class="punkte">
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">A</span>
+          <h3>Entdopplung</h3>
+          <span class="chip ok">vorziehbar</span>
+        </div>
+        <div class="feld">
+          <p>
+            <code>phase</code> vom Programm-Katalog an den Tarif umhängen, den
+            Katalog <code>programm</code> auflösen, die elf Verweise auf den Tarif
+            umschreiben. Testdossiers ohne Phase löschen.
+          </p>
+          <p>
+            Nur vier der elf verweisenden Tabellen tragen Daten, der Rest ist leer.
+            Kein sichtbares Feature — aber danach steht das Modell sauber, und der
+            Schritt hängt an nichts anderem.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">B</span>
+          <h3>Dateiupload</h3>
+          <span class="chip teil">Engpass</span>
+        </div>
+        <div class="feld">
+          <p>
+            Ablage, Upload, Auslieferung, Zugriffsschutz. Trägt die Verfügung als
+            Dokument, die Dokumentkriterien, dazu Zielvereinbarungen und das
+            Produkteblatt.
+          </p>
+          <p>
+            Gebaut am 31.08./01.09.2026: Ablage auf einer eigenen Datenplatte,
+            Upload und Download hinter der Anmeldung, austauschbarer Hintergrund für
+            den späteren SharePoint. Genutzt von Produkteblatt, Programm- und
+            Phasendokumenten.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">C</span>
+          <h3>Verfügung vollständig</h3>
+          <span class="chip teil">nach B</span>
+        </div>
+        <div class="feld">
+          <p>
+            Gültigkeitszeitraum Von/Bis, das Dokument anhängen, die Regel „nur eine
+            aktive“ erzwingen. Und der Rückbau: die Automatik, die das Programm aus
+            der Position ableitet, weicht dem bestätigten manuellen Schritt.
+          </p>
+          <p>
+            <strong>Die Verrechnung ist herausgelöst</strong> (01.09.2026) und wird
+            neu gedacht: Menge und Einheit je Position, die Umrechnungsschlüssel am
+            Tarif und die Verrechnungsart gehören in eine eigene Etappe. Für den
+            Zeitstrahl genügt, was hier bleibt — er braucht Von/Bis und die Tarife,
+            nicht die Abrechnung.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">D</span>
+          <h3>Phasenmodell pflegen</h3>
+          <span class="chip ok">Oberfläche steht</span>
+        </div>
+        <div class="feld">
+          <p>
+            Je Tarif die Phasenabfolge erfassen, sortierbar. Je Phase die Kriterien:
+            Text, Typ (Dokument, Person, Termin), Muss oder Kann, und die zuständige
+            Fallrolle.
+          </p>
+          <p>
+            Oberfläche steht seit dem 31.08.2026. Was bleibt, ist Definitionsarbeit
+            für 36 Tarife — läuft unabhängig von B und C.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">E</span>
+          <h3>Zeitstrahl</h3>
+          <span class="chip teil">nach C und D</span>
+        </div>
+        <div class="feld">
+          <p>
+            Phaseninstanzen ans Programm hängen, neuer Eindeutigkeitsschlüssel. Aus
+            Start, Ende und Tarifen die Stränge erzeugen und gleichmässig
+            vorbelegen. Interaktives Verschieben mit den festgelegten Regeln —
+            und mit den Anschlägen, die phasengebundene Termine setzen. Weil die
+            Nachbarphasen mitrücken, pflanzt sich so ein Anschlag durch den ganzen
+            Strang fort; das ist der anspruchsvollste Teil der Etappe.
+          </p>
+          <p>
+            Das Kernstück. Braucht C für Dauer und Tarife, D für die Phasen selbst.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">F</span>
+          <h3>Phasenwechsel mit Prüfung</h3>
+          <span class="chip teil">nach E</span>
+        </div>
+        <div class="feld">
+          <p>
+            <code>kriterium_status</code> an die Phaseninstanz hängen und füllen,
+            beim Weiterschalten die Muss-Kriterien prüfen, bei offenen die Begründung
+            verlangen und ins Journal schreiben. Termine als Erfüllung eines
+            Kriteriums vom Typ Termin verknüpfen. Dabei den toten Code im
+            Phasenwechsel entfernen.
+          </p>
+        </div>
+      </article>
+
+      <article class="punkt">
+        <div class="punkt-kopf">
+          <span class="punkt-nr">G</span>
+          <h3>Verspätete Verfügung</h3>
+          <span class="chip teil">nach C</span>
+        </div>
+        <div class="feld">
+          <p>
+            Den Zustand „gestartet, aber ohne Verfügung“ abfragbar machen, daraus
+            automatisch einen Task erzeugen und im Dashboard zeigen.
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <p class="nachsatz">
+    Zwei Details bleiben fürs Bauen, keine Grundsatzfragen: welche
+    Umrechnungsschlüssel es konkret gibt, und ob die Begründungen beim
+    Phasenwechsel aus einer festen Liste kommen oder pflegbar sein sollen. Beides
+    lässt sich beim Umsetzen der jeweiligen Etappe klären. Eine Nebenbedingung
+    fällt aus den Verschieberegeln: bei Mindestlänge ein Tag muss die Programmdauer
+    mindestens so viele Tage haben, wie der längste Phasenstrang Phasen zählt —
+    sonst ist die Verteilung nicht erfüllbar.</p>
+
+</div>
