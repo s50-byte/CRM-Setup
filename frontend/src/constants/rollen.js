@@ -21,6 +21,15 @@ export const ROLLEN_ZUWEISUNG = [
     'Klientenführung', 'Job Coach', 'Fachperson', 'Stellvertretung',
 ];
 
+// Feste Reihenfolge fuer knappe Aufzaehlungen: erst die Fallfuehrung, dann
+// Fachperson, dann Job Coach. Alles Uebrige haengt hinten an.
+export const ROLLEN_REIHENFOLGE = ['Klientenführung', 'Fachperson', 'Job Coach'];
+
+export function rollenRang(rolle) {
+    const i = ROLLEN_REIHENFOLGE.indexOf(rolle);
+    return i === -1 ? ROLLEN_REIHENFOLGE.length : i;
+}
+
 // Kuerzel fuer knappe Darstellungen, etwa in der Dossierliste.
 export const ROLLEN_KUERZEL = {
     'Klientenführung':   'KF',

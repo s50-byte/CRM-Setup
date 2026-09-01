@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import NeueAnfrageModal from '../components/NeueAnfrageModal';
-import { ROLLEN_KUERZEL } from '../constants/rollen';
+import { ROLLEN_KUERZEL, rollenRang } from '../constants/rollen';
 
 const FARBEN = {
     'Erstmalige berufliche Abklärung': '#EA580C',
@@ -125,22 +125,26 @@ function DossierTabelle({ rows, sortField, sortDir, onSort, navigate, filterAkti
                                 {d.klient_label || '—'}
                             </td>
                             <td style={{ padding: '8px 12px', fontSize: 11.5 }}>
-                                {(d.zugewiesen || []).length === 0 ? '—' : (d.zugewiesen || []).map((u, k) => {
-                                    // Kuerzel dahinter, damit die Rolle im Fall auf einen Blick klar ist.
-                                    const kuerzel = u.stellvertretung ? 'SV' : ROLLEN_KUERZEL[u.rolle_im_fall];
-                                    return (
-                                        <span key={u.user_id} style={{ whiteSpace: 'nowrap' }}>
-                                            {k > 0 && ', '}
-                                            {u.full_name}
-                                            {kuerzel && (
-                                                <span title={u.rolle_im_fall} style={{
-                                                    fontSize: 9.5, fontWeight: 600, marginLeft: 3,
-                                                    color: '#6B6860', fontFamily: 'monospace',
-                                                }}>{kuerzel}</span>
-                                            )}
-                                        </span>
-                                    );
-                                })}
+                                {(d.zugewiesen || []).length === 0 ? '—' : [...(d.zugewiesen || [])]
+                                    // Immer in der Reihenfolge KF, FP, JC – so steht die
+                                    // Fallfuehrung ueber alle Zeilen hinweg an derselben Stelle.
+                                    .sort((a, b) => rollenRang(a.rolle_im_fall) - rollenRang(b.rolle_im_fall)
+                                        || (a.full_name || '').localeCompare(b.full_name || '', 'de'))
+                                    .map((u, k) => {
+                                        const kuerzel = u.stellvertretung ? 'SV' : ROLLEN_KUERZEL[u.rolle_im_fall];
+                                        return (
+                                            <span key={u.user_id} style={{ whiteSpace: 'nowrap' }}>
+                                                {k > 0 && ', '}
+                                                {kuerzel && (
+                                                    <span title={u.rolle_im_fall} style={{
+                                                        fontSize: 9.5, fontWeight: 600, marginRight: 3,
+                                                        color: '#6B6860', fontFamily: 'monospace',
+                                                    }}>{kuerzel}</span>
+                                                )}
+                                                {u.full_name}
+                                            </span>
+                                        );
+                                    })}
                             </td>
                             <td style={{ padding: '8px 12px', fontSize: 11.5, color: '#6B6860' }}>
                                 {d.standort_kuerzel || '—'}
