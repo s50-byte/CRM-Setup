@@ -61,14 +61,16 @@ function sortData(arr, field, dir) {
     });
 }
 
-function DossierTabelle({ rows, sortField, sortDir, onSort, navigate, filterAktiv }) {
+function DossierTabelle({ rows, sortField, sortDir, onSort, navigate, filterAktiv, ohneProgramm }) {
     const si = f => !f ? '' : sortField === f ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
+    // Anfragen im Intake haben noch kein Programm – die Spalte bleibt dort weg.
+    const spalten = ohneProgramm ? COLS.filter(c => c.field !== 'programm_name') : COLS;
 
     return (
-        <table style={{ width: '100%', minWidth: 860, borderCollapse: 'collapse', fontSize: 12.5 }}>
+        <table style={{ width: '100%', minWidth: ohneProgramm ? 760 : 860, borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
                 <tr style={{ background: '#F5F4F0', borderBottom: '1px solid rgba(0,0,0,.09)' }}>
-                    {COLS.map((c, i) => (
+                    {spalten.map((c, i) => (
                         <th key={i} onClick={() => c.field && onSort(c.field)} style={{
                             textAlign: 'left', padding: '8px 12px', fontSize: 10.5, fontWeight: 600,
                             color: (c.field && sortField === c.field) ? '#2563EB' : '#6B6860',
@@ -80,7 +82,7 @@ function DossierTabelle({ rows, sortField, sortDir, onSort, navigate, filterAkti
             </thead>
             <tbody>
                 {rows.length === 0 ? (
-                    <tr><td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>
+                    <tr><td colSpan={spalten.length} style={{ padding: '2rem', textAlign: 'center', color: '#6B6860' }}>
                         {filterAktiv ? 'Keine Treffer für die gewählten Filter' : 'Keine Dossiers'}
                     </td></tr>
                 ) : rows.map((d, i) => {
@@ -100,15 +102,17 @@ function DossierTabelle({ rows, sortField, sortDir, onSort, navigate, filterAkti
                                 }} title={istInaktiv ? 'Inaktiv' : 'Aktiv'} />
                                 {d.nachname} {d.vorname}
                             </td>
-                            <td style={{ padding: '8px 12px' }}>
-                                {d.programm_name ? (
-                                    <span style={{
-                                        fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                                        background: farbe + '22', color: farbe,
-                                        border: `1px solid ${farbe}33`, fontWeight: 500
-                                    }}>{d.programm_name}</span>
-                                ) : '—'}
-                            </td>
+                            {!ohneProgramm && (
+                                <td style={{ padding: '8px 12px' }}>
+                                    {d.programm_name ? (
+                                        <span style={{
+                                            fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                                            background: farbe + '22', color: farbe,
+                                            border: `1px solid ${farbe}33`, fontWeight: 500
+                                        }}>{d.programm_name}</span>
+                                    ) : '—'}
+                                </td>
+                            )}
                             <td style={{ padding: '8px 12px' }}>
                                 <span style={{
                                     fontSize: 11, padding: '2px 7px', borderRadius: 20,
@@ -161,6 +165,9 @@ export default function Dossiers() {
     const [sortFieldInaktiv, setSortFieldInaktiv] = useState('');
     const [sortDirInaktiv, setSortDirInaktiv] = useState('asc');
     const [inaktiveOffen, setInaktiveOffen] = useState(false);
+    const [intakeOffen, setIntakeOffen] = useState(false);
+    const [sortFieldIntake, setSortFieldIntake] = useState('');
+    const [sortDirIntake, setSortDirIntake] = useState('asc');
     const [anfrageModal, setAnfrageModal] = useState(false);
     const navigate = useNavigate();
 
@@ -178,6 +185,11 @@ export default function Dossiers() {
     const handleSortInaktiv = field => {
         if (sortFieldInaktiv === field) setSortDirInaktiv(d => d === 'asc' ? 'desc' : 'asc');
         else { setSortFieldInaktiv(field); setSortDirInaktiv('asc'); }
+    };
+
+    const handleSortIntake = field => {
+        if (sortFieldIntake === field) setSortDirIntake(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSortFieldIntake(field); setSortDirIntake('asc'); }
     };
 
     // Distinct-Listen aus geladenen Dossiers
@@ -212,7 +224,11 @@ export default function Dossiers() {
         return true;
     });
 
-    const aktive = sortData(gefiltert.filter(d => d.status !== 'inaktiv'), sortField, sortDir);
+    // Anfragen im Intake sind noch keine gefuehrten Faelle – eigene Gruppe,
+    // wie die inaktiven Dossiers.
+    const imIntake = d => d.status !== 'inaktiv' && d.intake_abgeschlossen !== true;
+    const aktive = sortData(gefiltert.filter(d => d.status !== 'inaktiv' && !imIntake(d)), sortField, sortDir);
+    const intake = sortData(gefiltert.filter(imIntake), sortFieldIntake, sortDirIntake);
     const inaktive = sortData(gefiltert.filter(d => d.status === 'inaktiv'), sortFieldInaktiv, sortDirInaktiv);
 
     if (laden) {
@@ -282,6 +298,19 @@ export default function Dossiers() {
 
             <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)' }}>
                 <DossierTabelle rows={aktive} sortField={sortField} sortDir={sortDir} onSort={handleSort} navigate={navigate} filterAktiv={filterAktiv} />
+            </div>
+
+            <div style={{ marginTop: '1.25rem' }}>
+                <button onClick={() => setIntakeOffen(o => !o)} style={{
+                    width: '100%', textAlign: 'left', fontSize: 12, fontWeight: 600,
+                    color: '#6B6860', cursor: 'pointer', border: 'none', background: 'transparent',
+                    fontFamily: 'inherit', padding: '4px 0'
+                }}>{intakeOffen ? '▾' : '▸'} Intake ({intake.length})</button>
+                {intakeOffen && (
+                    <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.09)', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,.07)', marginTop: 8 }}>
+                        <DossierTabelle rows={intake} sortField={sortFieldIntake} sortDir={sortDirIntake} onSort={handleSortIntake} navigate={navigate} filterAktiv={filterAktiv} ohneProgramm />
+                    </div>
+                )}
             </div>
 
             <div style={{ marginTop: '1.25rem' }}>
